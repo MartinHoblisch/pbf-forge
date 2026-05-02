@@ -1,0 +1,52 @@
+[
+  {
+    "id": "preset-railway-network",
+    "name": "Railway Network",
+    "tags": ["railway=rail", "railway=light_rail", "railway=subway", "railway=tram"],
+    "geometry_types": ["ways", "relations"],
+    "output_formats": ["gpkg"],
+    "suffix": "railway_network",
+    "columns_mode": "manual",
+    "manual_keys": ["name", "railway", "electrified", "gauge", "maxspeed", "operator", "ref"]
+  },
+  {
+    "id": "preset-waterways",
+    "name": "Waterways",
+    "tags": ["waterway=river", "waterway=canal", "waterway=stream", "waterway=drain"],
+    "geometry_types": ["ways", "relations"],
+    "output_formats": ["gpkg"],
+    "suffix": "waterways",
+    "columns_mode": "manual",
+    "manual_keys": ["name", "waterway", "width", "maxdepth", "operator", "ref"]
+  },
+  {
+    "id": "preset-road-network",
+    "name": "Road Network",
+    "tags": ["highway=motorway", "highway=trunk", "highway=primary", "highway=secondary", "highway=tertiary"],
+    "geometry_types": ["ways"],
+    "output_formats": ["gpkg"],
+    "suffix": "road_network",
+    "columns_mode": "manual",
+    "manual_keys": ["name", "highway", "maxspeed", "lanes", "oneway", "ref", "surface"]
+  },
+  {
+    "id": "preset-protected-areas",
+    "name": "Protected Areas",
+    "tags": ["boundary=protected_area", "leisure=nature_reserve"],
+    "geometry_types": ["ways", "relations"],
+    "output_formats": ["gpkg"],
+    "suffix": "protected_areas",
+    "columns_mode": "manual",
+    "manual_keys": ["name", "boundary", "protect_class", "operator", "ref"]
+  },
+  {
+    "id": "preset-buildings",
+    "name": "Buildings",
+    "tags": ["building"],
+    "geometry_types": ["ways", "relations"],
+    "output_formats": ["gpkg"],
+    "suffix": "buildings",
+    "columns_mode": "manual",
+    "manual_keys": ["name", "building", "building:levels", "addr:street", "addr:housenumber", "addr:city"]
+  }
+]

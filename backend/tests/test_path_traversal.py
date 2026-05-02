@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+from unittest.mock import patch
+
+import pytest
+
+_VALID_BODY = {
+    "source_files": ["berlin.osm.pbf"],
+    "tags": ["amenity"],
+    "geometry_types": ["nodes"],
+    "suffix": "test",
+    "output_formats": ["gpkg"],
+}
+
+
+# ── /api/filter/run output_dir traversal ─────────────────────────────────────
+
+
+def test_traversal_dotdot_rejected(client):
+    body = {**_VALID_BODY, "output_dir": "../../../etc"}
+    resp = client.post("/api/filter/run", json=body)
+    assert resp.status_code == 400
+
+
+def test_traversal_dotslash_rejected(client):
+    body = {**_VALID_BODY, "output_dir": "./../../outside"}
+    resp = client.post("/api/filter/run", json=body)
+    assert resp.status_code == 400
+
+
+def test_valid_subdir_accepted(client, tmp_data_dir):
+    body = {**_VALID_BODY, "output_dir": "valid/subdir"}
+    resp = client.post("/api/filter/run", json=body)
+    assert resp.status_code != 400
+    assert "job_id" in resp.json()
+
+
+# ── /api/fs/browse path traversal ────────────────────────────────────────────
+
+
+@pytest.fixture
+def mock_host_drives(tmp_path):
+    host_drives = tmp_path / "host_drives"
+    host_drives.mkdir()
+    with patch("routes.filesystem._HOST_DRIVES", host_drives):
+        yield host_drives
+
+
+def test_fs_browse_outside_allowed_returns_error(client, mock_host_drives):
+    resp = client.get("/api/fs/browse", params={"path": "../../../etc"})
+    assert resp.status_code == 200
+    assert "error" in resp.json()
+
+
+def test_fs_browse_symlink_outside_returns_error(client, mock_host_drives, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = mock_host_drives / "evil_link"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation not supported")
+
+    resp = client.get("/api/fs/browse", params={"path": "evil_link/../../../etc"})
+    assert resp.status_code == 200
+    assert "error" in resp.json()

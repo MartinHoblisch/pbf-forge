@@ -1,0 +1,18 @@
+services:
+  pbf-forge:
+    container_name: pbf-forge
+    build: .
+    # Bind to loopback only — never expose to LAN/public internet.
+    # SECURITY.md non-goal: tool is auth-less; do not change to 0.0.0.0.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - "${DATA_DIR:-./data}:/data"
+      - ./user-config.json:/app/user-config.json
+      - /mnt:/host_drives:ro
+    environment:
+      - DATA_DIR=/data
+      - HOST_DATA_DIR=${DATA_DIR:-./data}
+    mem_limit: 4g
+    memswap_limit: 4g
+    restart: unless-stopped

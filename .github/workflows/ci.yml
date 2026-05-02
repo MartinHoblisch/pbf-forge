@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check backend/
+      - run: ruff format --check backend/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system deps for osmium Python bindings
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libboost-python-dev
+      - name: Install Python deps
+        run: pip install -r backend/requirements.txt
+      - name: Install test extras
+        run: pip install pytest pytest-cov pytest-asyncio httpx
+      - name: Run tests
+        working-directory: backend
+        run: pytest tests/ --cov=. --cov-report=term-missing
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (smoke test)
+        run: docker build . --tag pbf-forge:smoke

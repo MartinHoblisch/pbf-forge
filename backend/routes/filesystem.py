@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import APIRouter
+
+router = APIRouter(prefix="/api")
+
+_HOST_DRIVES = Path("/host_drives")
+
+
+def _to_windows_path(rel: str) -> str:
+    """Convert container-relative path to Windows path.
+
+    "h"         → "H:\\"
+    "h/foo/bar" → "H:\\foo\\bar"
+    """
+    if not rel:
+        return ""
+    parts = Path(rel).parts
+    drive_seg = parts[0]
+    if len(drive_seg) != 1 or not drive_seg.isalpha():
+        return ""
+    drive = drive_seg.upper()
+    rest = "\\".join(parts[1:])
+    return f"{drive}:\\{rest}" if rest else f"{drive}:\\"
+
+
+def _is_visible(name: str) -> bool:
+    return not name.startswith((".", "$"))
+
+
+@router.get("/fs/browse")
+def browse_fs(path: str = "") -> dict:
+    """List subdirectories for the folder browser.
+
+    path=""    → list available drive letters from /host_drives
+    path="h"   → list root of H:
+    path="h/f" → list H:\\f
+    """
+    if not _HOST_DRIVES.exists():
+        return {
+            "path": path,
+            "windows_path": "",
+            "dirs": [],
+            "parent": None,
+            "error": "Directory browser not available (only in Docker Desktop for Windows)",
+        }
+
+    target = (_HOST_DRIVES / path) if path else _HOST_DRIVES
+    # Resolve to catch symlinks, then guard against traversal
+    try:
+        resolved = target.resolve()
+        resolved.relative_to(_HOST_DRIVES.resolve())
+    except (ValueError, OSError):
+        return {"path": "", "windows_path": "", "dirs": [], "parent": None, "error": "Invalid path"}
+
+    if not resolved.is_dir():
+        return {
+            "path": path,
+            "windows_path": _to_windows_path(path),
+            "dirs": [],
+            "parent": None,
+            "error": "Not a directory",
+        }
+
+    try:
+        dirs = sorted(
+            e.name for e in resolved.iterdir() if e.is_dir() and (not path or _is_visible(e.name))
+        )
+    except PermissionError:
+        dirs = []
+
+    parent: str | None
+    if not path:
+        parent = None
+    else:
+        p = str(Path(path).parent)
+        parent = "" if p == "." else p
+
+    return {
+        "path": path,
+        "windows_path": _to_windows_path(path),
+        "dirs": dirs,
+        "parent": parent,
+    }
