@@ -1,4 +1,4 @@
-fastapi>=0.111
+fastapi>=0.136.1
 uvicorn[standard]>=0.29
 requests>=2.32
 osmium>=3.7
