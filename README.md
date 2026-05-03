@@ -39,6 +39,8 @@ cd pbf-forge
 docker compose up
 ```
 
+> **Linux only:** if you get `permission denied while trying to connect to the Docker daemon socket`, your user is not in the `docker` group yet. Run `sudo usermod -aG docker $USER`, then log out and back in (or run `newgrp docker` in the current shell). Then retry `docker compose up`.
+
 Open <http://127.0.0.1:8000>. Choose a region, optionally apply a tag filter, export.
 
 The container binds to `127.0.0.1` only and ships without authentication. **Do not expose it to a LAN or public internet.** See [SECURITY.md](SECURITY.md).
