@@ -1,4 +1,5 @@
 """Module-level singletons set during app startup."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
