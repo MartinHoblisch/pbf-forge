@@ -1,0 +1,115 @@
+# === Operating System ===
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+
+
+# === IDE & Editor ===
+.vscode/
+*.code-workspace
+.idea/
+*.iml
+*.iws
+*.ipr
+*.sublime-project
+*.sublime-workspace
+.vim/
+.vs/
+*~
+*.swp
+*.swo
+\#*\#
+.\#*
+.project
+.classpath
+
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+*.egg
+.installed.cfg
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+
+# === Node.js ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+
+# === Environment & Secrets ===
+.env
+.env.local
+.env.*.local
+config/secrets.yml
+secrets.json
+
+
+# === Build artifacts ===
+dist/
+build/
+
+
+# === Temporary & Logs ===
+*.tmp
+*.temp
+*.bak
+*.backup
+*.log
+logs/
+
+
+# === Database ===
+*.db
+*.sqlite
+*.sqlite3
+
+
+# === Project: OSM data & outputs ===
+*.pbf
+*.geojson
+*.gpkg
+
+# === Runtime files (DATA_DIR) ===
+.osm_tool_presets.json
+.osm_tool_urls.json
+.filter_history.json
+user-config.json
+
+# === GeoParquet ===
+*.parquet
+
+# === Local-only / personal ===
+Notizen.txt
+tasks/
+.scan-patterns.local
+.claude/

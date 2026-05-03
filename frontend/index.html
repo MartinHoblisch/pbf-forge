@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PBF Forge</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:    #1d4ed8;
+  --blue-lt: #dbeafe;
+  --green:   #16a34a;
+  --green-lt:#dcfce7;
+  --orange:  #d97706;
+  --orange-lt:#fef3c7;
+  --red:     #dc2626;
+  --red-lt:  #fee2e2;
+  --gray:    #6b7280;
+  --gray-lt: #f3f4f6;
+  --border:  #e5e7eb;
+  --shadow:  0 1px 3px rgba(0,0,0,.1);
+  --radius:  6px;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body { background: #f1f5f9; color: #111827; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Header ── */
+header {
+  background: #1e3a5f;
+  color: #fff;
+  padding: 0 1.5rem;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
+#ws-indicator {
+  margin-left: auto;
+  font-size: .75rem;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  opacity: .85;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.dot.ok  { background: #4ade80; }
+.dot.err { background: #f87171; }
+
+/* ── Lang button ── */
+#lang-btn {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  padding: .25rem .65rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+#lang-btn:hover { background: rgba(255,255,255,.25); }
+
+/* ── Tabs ── */
+nav.tabs {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  padding: 0 1.5rem;
+}
+.tab-btn {
+  padding: .75rem 1.25rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: .9rem;
+  color: var(--gray);
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  font-weight: 500;
+  transition: color .15s, border-color .15s;
+}
+.tab-btn:hover  { color: var(--blue); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* ── Layout ── */
+main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; flex: 1; width: 100%; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Card ── */
+.card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.card-header {
+  padding: .85rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: .95rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.card-body { padding: 1.25rem; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ── Buttons ── */
+.btn {
+  padding: .45rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: .875rem;
+  font-weight: 500;
+  transition: opacity .15s, background .15s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: .45; cursor: default; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #1e40af; }
+.btn-secondary { background: #fff; color: #374151; border-color: var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--gray-lt); }
+.btn-danger  { background: var(--red); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-sm { padding: .3rem .65rem; font-size: .8rem; }
+.btn-link { background: transparent; border: none; color: var(--blue); padding: .2rem .4rem; }
+.btn-link:hover { text-decoration: underline; }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+th, td { padding: .65rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--gray-lt); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--gray); white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f9fafb; }
+
+/* ── Sortable columns ── */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--blue); }
+th.sort-asc::after  { content: " ▲"; font-size: .7rem; }
+th.sort-desc::after { content: " ▼"; font-size: .7rem; }
+th.sort-asc, th.sort-desc { color: var(--blue); }
+
+/* ── Status badges ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-green  { background: var(--green-lt);  color: var(--green); }
+.badge-orange { background: var(--orange-lt); color: var(--orange); }
+.badge-red    { background: var(--red-lt);    color: var(--red); }
+.badge-blue   { background: var(--blue-lt);   color: var(--blue); }
+.badge-gray   { background: var(--gray-lt);   color: var(--gray); }
+
+/* ── Progress bar ── */
+.progress-wrap { min-width: 140px; }
+.progress-bar-bg {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 3px;
+  transition: width .3s;
+}
+.progress-meta { font-size: .72rem; color: var(--gray); }
+
+/* ── Form ── */
+.form-group { margin-bottom: 1rem; }
+label.field-label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: .4rem; color: #374151; }
+input[type=text], input[type=url], textarea, select {
+  width: 100%;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .875rem;
+  outline: none;
+  transition: border-color .15s;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--blue); }
+textarea { resize: vertical; min-height: 90px; font-family: inherit; }
+
+.checkbox-group, .radio-group { display: flex; flex-direction: column; gap: .4rem; }
+.checkbox-group label, .radio-group label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .875rem;
+  cursor: pointer;
+}
+.inline-group { flex-direction: row; flex-wrap: wrap; gap: .75rem; }
+
+/* ── URL preview ── */
+.url-preview {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--gray-lt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: .875rem;
+}
+.url-preview table { margin: .5rem 0; }
+.url-preview td:first-child { font-weight: 600; width: 140px; padding: .25rem 0; }
+.url-preview td { border: none; padding: .25rem .5rem .25rem 0; }
+
+/* ── Job log ── */
+.job-log {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: 'Courier New', monospace;
+  font-size: .78rem;
+  padding: .75rem 1rem;
+  border-radius: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: .75rem;
+}
+
+/* ── Job progress ── */
+.job-progress { margin-bottom: .5rem; }
+.job-progress-bar-bg {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.job-progress-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.job-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: .72rem;
+  color: var(--gray);
+  margin-bottom: 3px;
+}
+.job-phase-text {
+  font-size: .78rem;
+  color: var(--gray);
+  font-style: italic;
+  margin-bottom: .25rem;
+}
+details.job-log-wrap > summary {
+  cursor: pointer;
+  font-size: .75rem;
+  color: var(--gray);
+  user-select: none;
+  margin-top: .5rem;
+}
+details.job-log-wrap > summary:hover { color: var(--blue); }
+
+/* ── Preset cards ── */
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.preset-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.preset-card h3 { font-size: .95rem; font-weight: 600; }
+.preset-card .meta { font-size: .8rem; color: var(--gray); }
+.preset-actions { display: flex; gap: .5rem; margin-top: auto; padding-top: .5rem; }
+
+/* ── Section spacing ── */
+.section-gap { margin-top: 1.5rem; }
+.info { font-size: .8rem; color: var(--gray); margin-top: .25rem; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .6s linear infinite; }
+
+/* ── Overlays / Lock-Screen ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.overlay-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 2.5rem;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.overlay-box h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: #111827; }
+.overlay-box p  { font-size: .9rem; color: #374151; margin-bottom: 1.25rem; line-height: 1.5; }
+.lock-path-badge {
+  background: var(--gray-lt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .5rem .85rem;
+  font-family: monospace;
+  font-size: .85rem;
+  margin-bottom: 1.5rem;
+  word-break: break-all;
+  color: #374151;
+}
+.lock-spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .75rem;
+  padding: .5rem 0;
+}
+.spinner-lg {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+/* ── Dir badge in header ── */
+.dir-badge {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  background: rgba(255,255,255,.12);
+  border-radius: var(--radius);
+  padding: .25rem .65rem;
+  font-size: .78rem;
+  max-width: 320px;
+}
+.dir-badge-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: .9;
+}
+.dir-badge-edit {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,.7);
+  cursor: pointer;
+  padding: 0 .15rem;
+  font-size: .9rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.dir-badge-edit:hover { color: #fff; }
+
+/* ── Folder browser ── */
+.fs-browser-box {
+  max-width: 560px;
+}
+.fs-breadcrumb {
+  font-size: .82rem;
+  color: var(--gray);
+  margin-bottom: .75rem;
+  min-height: 1.2em;
+  word-break: break-all;
+}
+.fs-breadcrumb .crumb-link {
+  color: var(--blue);
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  font: inherit;
+  padding: 0;
+  font-size: .82rem;
+}
+.fs-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: .75rem;
+}
+.fs-entry {
+  padding: .5rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  font-size: .875rem;
+  transition: background .1s;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.fs-entry:last-child { border-bottom: none; }
+.fs-entry:hover { background: var(--blue-lt); }
+.fs-entry-up { color: var(--gray); font-size: .82rem; }
+.fs-selected-path {
+  padding: .45rem .75rem;
+  background: var(--gray-lt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: monospace;
+  font-size: .82rem;
+  margin-bottom: 1rem;
+  min-height: 2em;
+  word-break: break-all;
+  color: #374151;
+}
+.path-input-wrap {
+  display: flex;
+  gap: .5rem;
+}
+.path-input-wrap input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Overwrite modal file list ── */
+.ow-file-list {
+  background: var(--gray-lt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .5rem .85rem;
+  font-family: monospace;
+  font-size: .82rem;
+  margin-bottom: 1.5rem;
+  max-height: 180px;
+  overflow-y: auto;
+  word-break: break-all;
+  color: #374151;
+}
+.ow-file-list div { padding: .2rem 0; border-bottom: 1px solid var(--border); }
+.ow-file-list div:last-child { border-bottom: none; }
+
+/* ── Footer ── */
+footer {
+  background: #fff;
+  border-top: 1px solid var(--border);
+  padding: .85rem 1.5rem;
+  font-size: .78rem;
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+footer a { color: var(--gray); text-decoration: none; }
+footer a:hover { color: var(--blue); text-decoration: underline; }
+footer .credits-sep { color: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PBF Forge</h1>
+  <div id="dir-badge" class="dir-badge" style="display:none">
+    <span>📁</span>
+    <span class="dir-badge-path" id="dir-badge-text"></span>
+    <button class="dir-badge-edit" onclick="openChangeDirModal()" id="btn-dir-badge-edit" title="Verzeichnis ändern">✎</button>
+  </div>
+  <button id="lang-btn" onclick="toggleLang()">EN</button>
+  <div id="ws-indicator">
+    <span class="dot" id="ws-dot"></span>
+    <span id="ws-text">Verbinde …</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" onclick="showTab('downloads')" data-i18n="tab_downloads">Download-Manager</button>
+  <button class="tab-btn" onclick="showTab('filter')" data-i18n="tab_filter">Filter-Manager</button>
+  <button class="tab-btn" onclick="showTab('presets')" data-i18n="tab_presets">Presets</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════════════ DOWNLOADS ═══ -->
+<div id="tab-downloads" class="tab-panel active">
+
+  <div class="toolbar">
+    <button class="btn btn-secondary" onclick="checkAll()" data-i18n="btn_check_all">Alle prüfen</button>
+    <button class="btn btn-primary" onclick="downloadOutdated()" data-i18n="btn_download_outdated">Alle Updates herunterladen</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header" data-i18n="card_files">Vorhandene Dateien</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" id="th-name" onclick="sortFiles('name')" data-i18n="th_filename">Dateiname</th>
+            <th class="sortable" id="th-local" onclick="sortFiles('local')" data-i18n="th_local">Lokal</th>
+            <th class="sortable" id="th-server" onclick="sortFiles('server')" data-i18n="th_server">Server</th>
+            <th class="sortable" id="th-status" onclick="sortFiles('status')" data-i18n="th_status">Status</th>
+            <th data-i18n="th_progress">Fortschritt</th>
+            <th data-i18n="th_actions">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="files-tbody">
+          <tr><td colspan="6" style="color:var(--gray);text-align:center;padding:2rem">Wird geladen …</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-header" data-i18n="card_add_url">URL hinzufügen</div>
+    <div class="card-body">
+      <p id="url-hint-p" style="font-size:.875rem;color:#374151;margin-bottom:.75rem">
+        Geofabrik-Download-URL eingeben (z.&nbsp;B. <code>https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf</code>):
+      </p>
+      <div style="display:flex;gap:.5rem">
+        <input type="url" id="url-input" placeholder="https://download.geofabrik.de/…" style="flex:1">
+        <button class="btn btn-secondary" onclick="fetchUrlInfo()" data-i18n="url_check">Prüfen</button>
+      </div>
+
+      <div id="url-preview" style="display:none">
+        <div class="url-preview">
+          <table>
+            <tr><td data-i18n="url_filename">Dateiname</td><td id="up-filename"></td></tr>
+            <tr><td data-i18n="url_size">Größe (Server)</td><td id="up-size"></td></tr>
+            <tr><td data-i18n="url_date">Stand (Server)</td><td id="up-mtime"></td></tr>
+            <tr><td data-i18n="url_exists_label">Bereits lokal</td><td id="up-exists"></td></tr>
+          </table>
+          <button class="btn btn-primary btn-sm" onclick="addUrl()" data-i18n="url_download">Herunterladen</button>
+        </div>
+      </div>
+      <div id="url-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+    </div>
+  </div>
+
+</div><!-- /tab-downloads -->
+
+
+<!-- ═════════════════════════════════════════════════════════════ FILTER ══ -->
+<div id="tab-filter" class="tab-panel">
+
+  <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;align-items:start">
+
+    <!-- Form -->
+    <div class="card">
+      <div class="card-header" data-i18n="card_filter_settings">Filtereinstellungen</div>
+      <div class="card-body">
+
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_source_files">Quelldatei(en)</label>
+          <div id="source-files-list" class="checkbox-group" style="max-height:240px;overflow-y:auto;padding:2px">
+            <span style="color:var(--gray);font-size:.85rem">Wird geladen …</span>
+          </div>
+          <div id="source-eta-hint" style="display:none;margin-top:.4rem;padding:.4rem .75rem;background:var(--orange-lt);color:var(--orange);border:1px solid var(--orange);border-radius:var(--radius);font-size:.8rem"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">OSM-Tags <span class="info" data-i18n="osm_tags_hint">(eine pro Zeile)</span></label>
+          <textarea id="filter-tags" placeholder="railway=rail&#10;highway=motorway&#10;building"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_geo_types">Geometrietypen</label>
+          <div class="checkbox-group inline-group">
+            <label><input type="checkbox" id="geo-nodes"> Nodes</label>
+            <label><input type="checkbox" id="geo-ways" checked> Ways</label>
+            <label><input type="checkbox" id="geo-relations" checked> Relations</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Suffix <span class="info" data-i18n="suffix_hint">(Dateinamen-Anhang)</span></label>
+          <input type="text" id="filter-suffix" placeholder="z. B. railway">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_output_format">Ausgabeformat</label>
+          <div class="checkbox-group inline-group">
+            <label><input type="checkbox" name="fmt" value="geojson" onchange="document.getElementById('geojson-mode-hint').style.display=this.checked?'block':'none';_updateFilterHints()"> GeoJSON</label>
+            <label><input type="checkbox" name="fmt" value="gpkg" checked> GeoPackage</label>
+            <div style="display:inline-flex;align-items:center;gap:.25rem">
+              <label style="margin:0"><input type="checkbox" name="fmt" value="pbf" onchange="document.getElementById('pbf-hint').style.display=this.checked?'inline-block':'none';document.getElementById('pbf-mode-hint').style.display=this.checked?'block':'none'"> PBF</label><span id="pbf-hint" onclick="event.stopPropagation()" style="display:none;cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_pbf">ℹ info</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="geojson-size-warn" style="display:none;margin-bottom:.5rem;padding:.4rem .75rem;background:var(--orange-lt);color:var(--orange);border:1px solid var(--orange);border-radius:var(--radius);font-size:.8rem"></div>
+
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_osm_attrs">OSM-Attribute</label>
+          <div class="radio-group">
+            <div style="display:flex;align-items:center;gap:.4rem">
+              <label style="margin:0"><input type="radio" name="cols" value="other_tags" checked> <span data-i18n="radio_standard">Standard</span></label>
+              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_standard">ℹ info</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem">
+              <label style="margin:0"><input type="radio" name="cols" value="all"> <span data-i18n="radio_all">Alles expandieren</span></label>
+              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_expand_all">ℹ info</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.4rem">
+              <label style="margin:0"><input type="radio" name="cols" value="manual"> <span data-i18n="radio_manual">Manuell auswählen</span></label>
+              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_manual">ℹ info</span>
+            </div>
+          </div>
+          <p id="geojson-mode-hint" class="info" style="display:none;margin-top:.35rem" data-i18n="geojson_mode_hint">Für GeoJSON sind <strong>Standard</strong> und <strong>Alles expandieren</strong> identisch.</p>
+          <p id="pbf-mode-hint" class="info" style="display:none;margin-top:.35rem" data-i18n="pbf_mode_hint">Für PBF sind <strong>Standard</strong> und <strong>Alles expandieren</strong> identisch.</p>
+        </div>
+
+        <div class="form-group" id="manual-keys-wrap" style="display:none">
+          <label class="field-label" data-i18n="label_col_names">Column Names</label> <span class="info" data-i18n="col_names_hint">(comma-separated)</span>
+          <input type="text" id="manual-keys" placeholder="name,highway,railway,maxspeed">
+        </div>
+
+        <button class="btn btn-primary" style="width:100%" onclick="runFilter()" data-i18n="btn_run_filter">Filter ausführen</button>
+        <div id="filter-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+      </div>
+    </div>
+
+    <!-- Jobs -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <h2 style="font-size:1rem;font-weight:600" data-i18n="jobs_title">Laufende &amp; abgeschlossene Jobs</h2>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary btn-sm" onclick="clearFilterJobs()" data-i18n="btn_clear_jobs">Leeren</button>
+          <button class="btn btn-danger btn-sm" onclick="cancelRunningJobs()" data-i18n="btn_cancel_jobs">Abbrechen</button>
+        </div>
+      </div>
+      <div id="filter-jobs-list">
+        <div style="color:var(--gray);font-size:.875rem" data-i18n="no_jobs">Noch keine Jobs.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /tab-filter -->
+
+
+<!-- ══════════════════════════════════════════════════════════ PRESETS ══ -->
+<div id="tab-presets" class="tab-panel">
+
+  <div class="card section-gap" style="margin-top:0">
+    <div class="card-header" data-i18n="card_presets">Gespeicherte Presets</div>
+    <div class="card-body">
+      <div id="presets-grid" class="preset-grid">
+        <span style="color:var(--gray);font-size:.875rem">Wird geladen …</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card section-gap">
+    <div class="card-header" id="preset-form-heading" data-i18n="card_new_preset">Neues Preset erstellen</div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_name">Name</label>
+          <input type="text" id="new-preset-name" placeholder="z. B. Schienennetz">
+        </div>
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_suffix">Suffix</label>
+          <input type="text" id="new-preset-suffix" placeholder="z. B. railway">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">OSM-Tags <span class="info" data-i18n="osm_tags_hint">(eine pro Zeile)</span></label>
+        <textarea id="new-preset-tags" rows="3" placeholder="railway=rail&#10;railway=light_rail"></textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_geo_types">Geometrietypen</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" id="np-nodes"> Nodes</label>
+            <label><input type="checkbox" id="np-ways" checked> Ways</label>
+            <label><input type="checkbox" id="np-relations" checked> Relations</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_output_format">Ausgabeformat</label>
+          <div class="checkbox-group">
+            <label><input type="checkbox" name="np-fmt" value="geojson"> GeoJSON</label>
+            <label><input type="checkbox" name="np-fmt" value="gpkg" checked> GeoPackage</label>
+            <label><input type="checkbox" name="np-fmt" value="pbf"> PBF</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="field-label" data-i18n="label_osm_attrs">OSM-Attribute</label>
+          <div class="radio-group">
+            <label><input type="radio" name="np-cols" value="other_tags" checked> <span data-i18n="radio_standard">Standard</span></label>
+            <label><input type="radio" name="np-cols" value="all"> <span data-i18n="radio_all">Alles expandieren</span></label>
+            <label><input type="radio" name="np-cols" value="manual"> <span data-i18n="radio_manual">Manuell auswählen</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" id="np-manual-wrap" style="display:none">
+        <label class="field-label"><span data-i18n="label_cols">Spalten</span> <span class="info" data-i18n="col_names_hint">(Komma-getrennt)</span></label>
+        <input type="text" id="np-manual-keys" placeholder="name,railway,maxspeed">
+      </div>
+
+      <button class="btn btn-primary" onclick="savePreset()" data-i18n="btn_save_preset">Preset speichern</button>
+      <button id="btn-preset-cancel" class="btn btn-secondary" style="display:none" onclick="_cancelEdit()" data-i18n="btn_cancel">Abbrechen</button>
+      <div id="preset-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+    </div>
+  </div>
+
+</div><!-- /tab-presets -->
+
+</main>
+
+<footer>
+  <span><strong>PBF Forge</strong></span>
+  <span class="credits-sep">|</span>
+  <span>by Martin Hoblisch</span>
+  <span class="credits-sep">|</span>
+  <span>&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (<a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">ODbL 1.0</a>)</span>
+  <span class="credits-sep">|</span>
+  <span>Data: <a href="https://www.geofabrik.de" target="_blank" rel="noopener">Geofabrik</a></span>
+</footer>
+
+<!-- ── Onboarding overlay ── -->
+<div id="overlay-onboarding" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h2 data-i18n="onboard_title">Arbeitsverzeichnis einrichten</h2>
+    <p data-i18n="onboard_p">Bitte das Verzeichnis angeben, in dem OSM-PBF-Dateien gespeichert werden sollen. Das Verzeichnis muss auf dem Host-System existieren.</p>
+    <div class="form-group">
+      <label class="field-label" data-i18n="onboard_label">Verzeichnis (Windows-Pfad)</label>
+      <div class="path-input-wrap">
+        <input type="text" id="onboarding-path" placeholder="z. B. C:\Users\Martin\osm-data">
+        <button class="btn btn-secondary" id="btn-browse-onboarding" type="button" title="Ordner durchsuchen" data-i18n="onboard_browse">📂 Durchsuchen</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveDataDir()" style="width:100%" data-i18n="onboard_save">Speichern &amp; Neustart vorbereiten</button>
+    <div id="onboarding-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+  </div>
+</div>
+
+<!-- ── Lock-Screen overlay ── -->
+<div id="overlay-lock" class="overlay" style="display:none">
+  <div class="overlay-box" style="text-align:center">
+    <h2 data-i18n="lock_title">Neustart erforderlich</h2>
+    <p id="lock-p">Das Datenverzeichnis wurde gesetzt. Bitte <strong>start.bat</strong> erneut ausführen, damit die Änderung wirksam wird.</p>
+    <div class="lock-path-badge" id="lock-path"></div>
+    <div class="lock-spinner-wrap">
+      <div class="spinner-lg"></div>
+      <span style="font-size:.85rem;color:var(--gray)" data-i18n="lock_waiting">Warte auf Neustart …</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Change-dir modal ── -->
+<div id="modal-change-dir" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h2 data-i18n="cd_title">Verzeichnis ändern</h2>
+    <p id="cd-p">Nach dem Speichern muss <strong>start.bat</strong> neu ausgeführt werden, damit die Änderung wirksam wird.</p>
+    <div class="form-group">
+      <label class="field-label" data-i18n="cd_label">Neues Verzeichnis (Windows-Pfad)</label>
+      <div class="path-input-wrap">
+        <input type="text" id="change-dir-input" placeholder="z. B. C:\Users\Martin\osm-data">
+        <button class="btn btn-secondary" id="btn-browse-changedir" type="button" title="Ordner durchsuchen" data-i18n="onboard_browse">📂 Durchsuchen</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="closeChangeDirModal()" data-i18n="cd_cancel">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveChangedDir()" data-i18n="cd_save">Speichern</button>
+    </div>
+    <div id="change-dir-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+  </div>
+</div>
+
+<!-- ── Folder browser modal ── -->
+<div id="modal-fs-browser" class="overlay" style="display:none">
+  <div class="overlay-box fs-browser-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <h2 style="margin:0" data-i18n="fb_title">Ordner wählen</h2>
+      <button class="btn btn-secondary btn-sm" id="btn-fs-close">✕</button>
+    </div>
+    <div class="fs-breadcrumb" id="fs-breadcrumb"></div>
+    <div class="fs-list" id="fs-list"></div>
+    <div class="fs-selected-path" id="fs-selected-path">—</div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button class="btn btn-secondary" id="btn-fs-cancel" data-i18n="fb_cancel">Abbrechen</button>
+      <button class="btn btn-primary" id="btn-fs-confirm" data-i18n="fb_confirm">Diesen Ordner wählen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Overwrite confirmation modal ── -->
+<div id="modal-overwrite" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h2 data-i18n="ow_title">Dateien würden überschrieben</h2>
+    <p data-i18n="ow_desc">Folgende Dateien existieren bereits und würden überschrieben:</p>
+    <div class="ow-file-list" id="ow-file-list"></div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button class="btn btn-secondary" id="btn-ow-cancel" data-i18n="ow_cancel">Abbrechen</button>
+      <button class="btn btn-danger" id="btn-ow-confirm" data-i18n="ow_confirm">Überschreiben</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── i18n ────────────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  de: {
+    tab_downloads: 'Download-Manager',
+    tab_filter: 'Filter-Manager',
+    tab_presets: 'Presets',
+    btn_check_all: 'Alle prüfen',
+    btn_download_outdated: 'Alle Updates herunterladen',
+    th_filename: 'Dateiname',
+    th_local: 'Lokal',
+    th_server: 'Server',
+    th_status: 'Status',
+    th_progress: 'Fortschritt',
+    th_actions: 'Aktionen',
+    card_files: 'Vorhandene Dateien',
+    card_add_url: 'URL hinzufügen',
+    url_hint: 'Geofabrik-Download-URL eingeben (z.&nbsp;B. <code>https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf</code>):',
+    url_check: 'Prüfen',
+    url_filename: 'Dateiname',
+    url_size: 'Größe (Server)',
+    url_date: 'Stand (Server)',
+    url_exists_label: 'Bereits lokal',
+    url_download: 'Herunterladen',
+    card_filter_settings: 'Filtereinstellungen',
+    label_source_files: 'Quelldatei(en)',
+    osm_tags_hint: '(eine pro Zeile)',
+    label_geo_types: 'Geometrietypen',
+    label_suffix: 'Suffix',
+    suffix_hint: '(Dateinamen-Anhang)',
+    label_output_format: 'Ausgabeformat',
+    label_osm_attrs: 'OSM-Attribute',
+    radio_standard: 'Standard',
+    radio_all: 'Alles expandieren',
+    radio_manual: 'Manuell auswählen',
+    geojson_mode_hint: 'Für GeoJSON sind <strong>Standard</strong> und <strong>Alles expandieren</strong> identisch.',
+    pbf_mode_hint: 'Für PBF wird der Attribut-Modus ignoriert. QGIS/GDAL zeigt immer sein eigenes Schema.',
+    tooltip_standard: 'Ausgabe mit den Standardeinstellungen von GDAL (GeoJSON/GeoPackage) bzw. Osmium (PBF) für das jeweilige Format. Tags außerhalb der definierten Schlüssel landen in einer kompakten other_tags-Spalte.',
+    tooltip_expand_all: 'Jeder OSM-Tag wird als eigene Spalte ausgegeben. Ideal für detaillierte Analysen, kann bei vielen Tags hunderte Spalten erzeugen. Vorsicht bei großen Quelldaten: Ausgabedatei und Bearbeitungszeit steigen erheblich an. Funktioniert nicht für PBF.',
+    tooltip_manual: 'Nur die eingetragenen Spaltennamen werden extrahiert. Gut für gezielte Abfragen mit schlanken Ausgaben.',
+    tooltip_pbf: 'PBF ist ein binäres OSM-Graphformat ohne festes Spaltenkonzept. QGIS/GDAL zeigt immer sein eigenes Schema (osm_id, name, highway ...) unabhängig vom gewählten Attribut-Modus.',
+    label_col_names: 'Spaltennamen',
+    col_names_hint: '(Komma-getrennt)',
+    btn_run_filter: 'Filter ausführen',
+    jobs_title: 'Laufende &amp; abgeschlossene Jobs',
+    btn_refresh: 'Aktualisieren',
+    btn_clear_jobs: 'Leeren',
+    btn_cancel_jobs: 'Abbrechen',
+    no_jobs: 'Noch keine Jobs.',
+    job_pending: 'Ausstehend',
+    job_running: 'Läuft …',
+    job_done: 'Fertig',
+    job_error: 'Fehler',
+    job_err_prefix: 'Fehler:',
+    job_output_prefix: 'Ausgabe:',
+    card_presets: 'Gespeicherte Presets',
+    no_presets: 'Keine Presets vorhanden.',
+    card_new_preset: 'Neues Preset erstellen',
+    label_name: 'Name',
+    label_tags: 'OSM-Tags',
+    label_cols: 'Spalten',
+    cols_standard: 'Standard',
+    cols_all: 'Alle',
+    cols_manual: 'Manuell',
+    btn_save_preset: 'Preset speichern',
+    preset_use: 'Verwenden',
+    preset_edit: 'Bearbeiten',
+    preset_edit_heading: 'Preset bearbeiten',
+    preset_new_heading: 'Neues Preset erstellen',
+    preset_delete: 'Löschen',
+    status_up_to_date: 'Aktuell',
+    status_update_available: 'Update verfügbar',
+    age_days: 'Tage', age_weeks: 'Wochen', age_months: 'Monate', age_years: 'Jahre', age_lt1day: '< 1 Tag', age_old: 'veraltet',
+    status_not_downloaded: 'Nicht vorhanden',
+    status_downloading: 'Lädt …',
+    status_checking: 'Wird geprüft',
+    status_error: 'Fehler',
+    status_unknown: 'Unbekannt',
+    ws_connecting: 'Verbinde …',
+    ws_connected: 'Verbunden',
+    ws_disconnected: 'Getrennt – verbinde neu …',
+    ws_error: 'Verbindungsfehler',
+    eta_lt1min: 'Noch <1 Min',
+    eta_hr: (h, m) => `Noch ~${h} Std ${m} Min`,
+    eta_min: m => `Noch ~${m} Min`,
+    eta_remaining: s => `noch ca. ${s}`,
+    err_no_source: 'Bitte mindestens eine Quelldatei auswählen.',
+    err_no_tags: 'Bitte mindestens einen OSM-Tag eingeben.',
+    err_no_suffix: 'Bitte einen Suffix eingeben.',
+    err_no_geo: 'Bitte mindestens einen Geometrietyp auswählen.',
+    err_no_format: 'Bitte mindestens ein Ausgabeformat auswählen.',
+    btn_cancel_job: 'Job abbrechen',
+    warn_geojson_large: 'Hinweis: GeoJSON kann bei großen Quelldateien sehr groß werden (>500 MB). GeoPackage oder GeoParquet sind effizienter.',
+    eta_large_file_hint: 'Hinweis: Sehr große Quelldatei. Filterung kann je nach Hardware mehrere Stunden dauern.',
+    err_url_not_pbf: 'URL muss auf .osm.pbf enden.',
+    job_step: (i, n) => `Schritt ${i} von ${n}:`,
+    err_server: 'Serverfehler',
+    err_conn: msg => 'Verbindungsfehler: ' + msg,
+    err_preset_name: 'Bitte einen Namen eingeben.',
+    url_exists_yes: 'Ja (wird überschrieben/fortgesetzt)',
+    url_exists_no: 'Nein',
+    confirm_delete_preset: 'Preset wirklich löschen?',
+    btn_download: 'Herunterladen',
+    btn_cancel: 'Abbrechen',
+    btn_check: 'Prüfen',
+    alert_no_updates: 'Keine veralteten oder fehlenden Dateien mit bekannter URL.',
+    no_files: 'Keine PBF-Dateien im Datenverzeichnis gefunden.',
+    no_source_files: 'Keine PBF-Dateien vorhanden.',
+    fb_title: 'Ordner wählen',
+    fb_drives: 'Laufwerke',
+    fb_parent: 'Übergeordneter Ordner',
+    fb_no_subdirs: 'Keine Unterordner',
+    fb_cancel: 'Abbrechen',
+    fb_confirm: 'Diesen Ordner wählen',
+    fb_err_conn: 'Verbindungsfehler',
+    onboard_title: 'Arbeitsverzeichnis einrichten',
+    onboard_p: 'Bitte das Verzeichnis angeben, in dem OSM-PBF-Dateien gespeichert werden sollen. Das Verzeichnis muss auf dem Host-System existieren.',
+    onboard_label: 'Verzeichnis (Windows-Pfad)',
+    onboard_browse: '📂 Durchsuchen',
+    onboard_save: 'Speichern &amp; Neustart vorbereiten',
+    onboard_err_path: 'Bitte einen Pfad eingeben.',
+    onboard_err_server: 'Serverfehler beim Speichern.',
+    onboard_err_conn: msg => 'Verbindungsfehler: ' + msg,
+    lock_title: 'Neustart erforderlich',
+    lock_p: 'Das Datenverzeichnis wurde gesetzt. Bitte <strong>start.bat</strong> erneut ausführen, damit die Änderung wirksam wird.',
+    lock_waiting: 'Warte auf Neustart …',
+    cd_title: 'Verzeichnis ändern',
+    cd_p: 'Nach dem Speichern muss <strong>start.bat</strong> neu ausgeführt werden, damit die Änderung wirksam wird.',
+    cd_label: 'Neues Verzeichnis (Windows-Pfad)',
+    cd_cancel: 'Abbrechen',
+    cd_save: 'Speichern',
+    cd_err_path: 'Bitte einen Pfad eingeben.',
+    ow_title: 'Dateien würden überschrieben',
+    ow_desc: 'Folgende Dateien existieren bereits und würden überschrieben:',
+    ow_cancel: 'Abbrechen',
+    ow_confirm: 'Überschreiben',
+  },
+  en: {
+    tab_downloads: 'Download Manager',
+    tab_filter: 'Filter Manager',
+    tab_presets: 'Presets',
+    btn_check_all: 'Check all',
+    btn_download_outdated: 'Download all updates',
+    th_filename: 'Filename',
+    th_local: 'Local',
+    th_server: 'Server',
+    th_status: 'Status',
+    th_progress: 'Progress',
+    th_actions: 'Actions',
+    card_files: 'Available files',
+    card_add_url: 'Add URL',
+    url_hint: 'Enter Geofabrik download URL (e.g. <code>https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf</code>):',
+    url_check: 'Check',
+    url_filename: 'Filename',
+    url_size: 'Size (server)',
+    url_date: 'Date (server)',
+    url_exists_label: 'Already local',
+    url_download: 'Download',
+    card_filter_settings: 'Filter settings',
+    label_source_files: 'Source file(s)',
+    osm_tags_hint: '(one per line)',
+    label_geo_types: 'Geometry types',
+    label_suffix: 'Suffix',
+    suffix_hint: '(filename appendix)',
+    label_output_format: 'Output format',
+    label_osm_attrs: 'OSM Attributes',
+    radio_standard: 'Standard',
+    radio_all: 'Expand all',
+    radio_manual: 'Select manually',
+    geojson_mode_hint: 'For GeoJSON, <strong>Standard</strong> and <strong>Expand all</strong> are identical.',
+    pbf_mode_hint: 'For PBF, the attribute mode is ignored. QGIS/GDAL always shows its own schema.',
+    tooltip_standard: 'Output using the default settings of GDAL (GeoJSON/GeoPackage) or Osmium (PBF) for the respective format. Tags outside defined keys end up in a compact other_tags column.',
+    tooltip_expand_all: 'Every OSM tag is output as its own column. Ideal for detailed analysis, but can produce hundreds of columns with many tags. Be careful with large source data: output size and processing time can increase significantly. Does not work for PBF.',
+    tooltip_manual: 'Only the specified column names are extracted. Good for targeted queries with slim outputs.',
+    tooltip_pbf: 'PBF is a binary OSM graph format without a fixed column concept. QGIS/GDAL always shows its own schema (osm_id, name, highway ...) regardless of the selected attribute mode.',
+    label_col_names: 'Column names',
+    col_names_hint: '(comma-separated)',
+    btn_run_filter: 'Run filter',
+    jobs_title: 'Running &amp; completed jobs',
+    btn_refresh: 'Refresh',
+    btn_clear_jobs: 'Clear',
+    btn_cancel_jobs: 'Cancel',
+    no_jobs: 'No jobs yet.',
+    job_pending: 'Pending',
+    job_running: 'Running…',
+    job_done: 'Done',
+    job_error: 'Error',
+    job_err_prefix: 'Error:',
+    job_output_prefix: 'Output:',
+    card_presets: 'Saved presets',
+    no_presets: 'No presets available.',
+    card_new_preset: 'Create new preset',
+    label_name: 'Name',
+    label_tags: 'OSM Tags',
+    label_cols: 'Columns',
+    cols_standard: 'Standard',
+    cols_all: 'All',
+    cols_manual: 'Manual',
+    btn_save_preset: 'Save preset',
+    preset_use: 'Use',
+    preset_edit: 'Edit',
+    preset_edit_heading: 'Edit preset',
+    preset_new_heading: 'New preset',
+    preset_delete: 'Delete',
+    status_up_to_date: 'Up to date',
+    status_update_available: 'Update available',
+    age_days: 'days', age_weeks: 'weeks', age_months: 'months', age_years: 'years', age_lt1day: '< 1 day', age_old: 'outdated',
+    status_not_downloaded: 'Not downloaded',
+    status_downloading: 'Downloading…',
+    status_checking: 'Checking',
+    status_error: 'Error',
+    status_unknown: 'Unknown',
+    ws_connecting: 'Connecting…',
+    ws_connected: 'Connected',
+    ws_disconnected: 'Disconnected – reconnecting…',
+    ws_error: 'Connection error',
+    eta_lt1min: '<1 min left',
+    eta_hr: (h, m) => `~${h} hr ${m} min left`,
+    eta_min: m => `~${m} min left`,
+    eta_remaining: s => `~${s} remaining`,
+    err_no_source: 'Please select at least one source file.',
+    err_no_tags: 'Please enter at least one OSM tag.',
+    err_no_suffix: 'Please enter a suffix.',
+    err_no_geo: 'Please select at least one geometry type.',
+    err_no_format: 'Please select at least one output format.',
+    btn_cancel_job: 'Cancel job',
+    warn_geojson_large: 'Note: GeoJSON output from large source files can exceed 500 MB. GeoPackage or GeoParquet are more efficient.',
+    eta_large_file_hint: 'Note: Very large source file. Filtering may take several hours depending on hardware.',
+    err_url_not_pbf: 'URL must end with .osm.pbf.',
+    job_step: (i, n) => `Step ${i} of ${n}:`,
+    err_server: 'Server error',
+    err_conn: msg => 'Connection error: ' + msg,
+    err_preset_name: 'Please enter a name.',
+    url_exists_yes: 'Yes (will be overwritten/resumed)',
+    url_exists_no: 'No',
+    confirm_delete_preset: 'Really delete preset?',
+    btn_download: 'Download',
+    btn_cancel: 'Cancel',
+    btn_check: 'Check',
+    alert_no_updates: 'No outdated or missing files with known URL.',
+    no_files: 'No PBF files found in data directory.',
+    no_source_files: 'No PBF files available.',
+    fb_title: 'Choose folder',
+    fb_drives: 'Drives',
+    fb_parent: 'Parent folder',
+    fb_no_subdirs: 'No subfolders',
+    fb_cancel: 'Cancel',
+    fb_confirm: 'Select this folder',
+    fb_err_conn: 'Connection error',
+    onboard_title: 'Set up working directory',
+    onboard_p: 'Please specify the directory where OSM PBF files should be stored. The directory must exist on the host system.',
+    onboard_label: 'Directory (Windows path)',
+    onboard_browse: '📂 Browse',
+    onboard_save: 'Save &amp; prepare restart',
+    onboard_err_path: 'Please enter a path.',
+    onboard_err_server: 'Server error while saving.',
+    onboard_err_conn: msg => 'Connection error: ' + msg,
+    lock_title: 'Restart required',
+    lock_p: 'The data directory has been set. Please run <strong>start.bat</strong> again for the change to take effect.',
+    lock_waiting: 'Waiting for restart…',
+    cd_title: 'Change directory',
+    cd_p: 'After saving, <strong>start.bat</strong> must be run again for the change to take effect.',
+    cd_label: 'New directory (Windows path)',
+    cd_cancel: 'Cancel',
+    cd_save: 'Save',
+    cd_err_path: 'Please enter a path.',
+    ow_title: 'Files would be overwritten',
+    ow_desc: 'The following files already exist and would be overwritten:',
+    ow_cancel: 'Cancel',
+    ow_confirm: 'Overwrite',
+    label_suffix: 'Suffix',
+  }
+};
+
+let lang = localStorage.getItem('lang') || 'en';
+let wsStatus = 'ws_connecting';
+
+function t(key, ...args) {
+  const val = (TRANSLATIONS[lang] ?? TRANSLATIONS.en)[key] ?? TRANSLATIONS.en[key] ?? key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.getElementById('lang-btn').textContent = lang === 'de' ? 'EN' : 'DE';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.innerHTML = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.getElementById('url-hint-p').innerHTML = t('url_hint');
+  document.getElementById('lock-p').innerHTML = t('lock_p');
+  document.getElementById('cd-p').innerHTML = t('cd_p');
+  document.getElementById('ws-text').textContent = t(wsStatus);
+}
+
+function toggleLang() {
+  lang = lang === 'de' ? 'en' : 'de';
+  localStorage.setItem('lang', lang);
+  applyLang();
+  renderFiles();
+  renderFilterJobs();
+  renderPresets();
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let files = [];
+let filterJobs = [];
+let presetList = [];
+let _editingPresetId = null;
+let urlInfoData = null;
+let ws = null;
+let currentSort = { col: null, dir: 'asc' };
+let settingsState = { configured: false, host_data_dir: '', pending_restart: false };
+
+// ─── Settings / onboarding ────────────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    settingsState = await res.json();
+  } catch (e) {
+    settingsState = { configured: false, host_data_dir: '', pending_restart: false };
+  }
+  applySettingsState();
+}
+
+function applySettingsState() {
+  const { configured, pending_restart, host_data_dir } = settingsState;
+  if (!configured) {
+    _showOverlay('onboarding');
+  } else if (pending_restart) {
+    document.getElementById('lock-path').textContent = host_data_dir;
+    _showOverlay('lock');
+  } else {
+    _showOverlay(null);
+    const badge = document.getElementById('dir-badge');
+    badge.style.display = 'flex';
+    document.getElementById('dir-badge-text').textContent = host_data_dir;
+  }
+}
+
+function _showOverlay(name) {
+  document.getElementById('overlay-onboarding').style.display = name === 'onboarding' ? 'flex' : 'none';
+  document.getElementById('overlay-lock').style.display        = name === 'lock'        ? 'flex' : 'none';
+  document.getElementById('modal-change-dir').style.display   = name === 'change-dir'  ? 'flex' : 'none';
+  if (name !== null) document.getElementById('dir-badge').style.display = 'none';
+}
+
+async function _postSettings(path, errEl) {
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host_data_dir: path })
+    });
+    if (!res.ok) { errEl.textContent = t('onboard_err_server'); errEl.style.display = 'block'; return false; }
+    return true;
+  } catch (e) {
+    errEl.textContent = t('onboard_err_conn', e.message);
+    errEl.style.display = 'block';
+    return false;
+  }
+}
+
+async function saveDataDir() {
+  const path = document.getElementById('onboarding-path').value.trim();
+  const errEl = document.getElementById('onboarding-error');
+  errEl.style.display = 'none';
+  if (!path) { errEl.textContent = t('onboard_err_path'); errEl.style.display = 'block'; return; }
+  if (!await _postSettings(path, errEl)) return;
+  settingsState = { configured: true, host_data_dir: path, pending_restart: true };
+  document.getElementById('lock-path').textContent = path;
+  _showOverlay('lock');
+}
+
+function openChangeDirModal() {
+  document.getElementById('change-dir-input').value = settingsState.host_data_dir || '';
+  document.getElementById('change-dir-error').style.display = 'none';
+  _showOverlay('change-dir');
+}
+
+function closeChangeDirModal() {
+  applySettingsState();
+}
+
+async function saveChangedDir() {
+  const path = document.getElementById('change-dir-input').value.trim();
+  const errEl = document.getElementById('change-dir-error');
+  errEl.style.display = 'none';
+  if (!path) { errEl.textContent = t('cd_err_path'); errEl.style.display = 'block'; return; }
+  if (!await _postSettings(path, errEl)) return;
+  settingsState = { configured: true, host_data_dir: path, pending_restart: true };
+  document.getElementById('lock-path').textContent = path;
+  _showOverlay('lock');
+}
+
+// ─── Formatting ───────────────────────────────────────────────────────────────
+function fmtSize(bytes) {
+  if (bytes == null) return '—';
+  if (bytes >= 1e9) return (bytes / 1e9).toFixed(2) + ' GB';
+  if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + ' MB';
+  return (bytes / 1e3).toFixed(0) + ' KB';
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'});
+  } catch { return iso.slice(0,10); }
+}
+function fmtSpeed(bps) {
+  if (!bps) return '';
+  if (bps >= 1e6) return (bps / 1e6).toFixed(1) + ' MB/s';
+  return (bps / 1e3).toFixed(0) + ' KB/s';
+}
+function fmtAge(serverMtime, localMtime) {
+  if (!serverMtime || !localMtime) return '';
+  const days = Math.floor((new Date(serverMtime) - new Date(localMtime)) / 86400000);
+  if (days < 1)   return t('age_lt1day');
+  if (days < 7)   return days + '\u00a0' + t('age_days');
+  if (days < 30)  return Math.floor(days / 7) + '\u00a0' + t('age_weeks');
+  if (days < 365) return Math.floor(days / 30) + '\u00a0' + t('age_months');
+  return Math.floor(days / 365) + '\u00a0' + t('age_years');
+}
+function fmtEta(sec) {
+  if (!sec || sec <= 0) return '';
+  if (sec < 60) return t('eta_lt1min');
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return t('eta_hr', h, m);
+  return t('eta_min', m);
+}
+function formatDuration(sec) {
+  if (sec == null || sec < 0) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ─── Phase elapsed timers ──────────────────────────────────────────────────────
+const _phaseTimers = {};   // jobId → intervalId
+function _startPhaseTimer(jobId) {
+  if (_phaseTimers[jobId]) return;
+  _phaseTimers[jobId] = setInterval(() => _tickPhaseTimer(jobId), 1000);
+}
+function _stopPhaseTimer(jobId) {
+  if (_phaseTimers[jobId]) { clearInterval(_phaseTimers[jobId]); delete _phaseTimers[jobId]; }
+}
+function _tickPhaseTimer(jobId) {
+  const el = document.getElementById(`phase-elapsed-${jobId}`);
+  if (!el) { _stopPhaseTimer(jobId); return; }
+  const started = parseFloat(el.dataset.started);
+  if (!started) { _stopPhaseTimer(jobId); return; }
+  const elapsed = (Date.now() / 1000) - started;
+  el.textContent = formatDuration(elapsed);
+}
+
+// ─── Status helpers ───────────────────────────────────────────────────────────
+function getStatusLabels() {
+  return {
+    up_to_date:       ['badge-green',  '✓ ' + t('status_up_to_date')],
+    update_available: ['badge-orange', '↑ ' + t('status_update_available')],
+    not_downloaded:   ['badge-gray',   '↓ ' + t('status_not_downloaded')],
+    downloading:      ['badge-blue',   '↓ ' + t('status_downloading')],
+    checking:         ['badge-blue',   '⟳ ' + t('status_checking')],
+    error:            ['badge-red',    '✗ ' + t('status_error')],
+    unknown:          ['badge-gray',   '? ' + t('status_unknown')],
+  };
+}
+function statusBadge(status) {
+  const [cls, label] = getStatusLabels()[status] || ['badge-gray', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+// ─── Sort ─────────────────────────────────────────────────────────────────────
+const STATUS_ORDER = ['up_to_date','update_available','not_downloaded','downloading','checking','error','unknown'];
+
+function sortFiles(col) {
+  if (currentSort.col === col) {
+    currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSort.col = col;
+    currentSort.dir = 'asc';
+  }
+  renderFiles();
+}
+
+function getSortedFiles() {
+  if (!currentSort.col) return files;
+  return [...files].sort((a, b) => {
+    let av, bv;
+    switch (currentSort.col) {
+      case 'name':   av = (a.filename || '').toLowerCase(); bv = (b.filename || '').toLowerCase(); break;
+      case 'local':  av = a.local_size  || 0; bv = b.local_size  || 0; break;
+      case 'server': av = a.server_size || 0; bv = b.server_size || 0; break;
+      case 'status': av = STATUS_ORDER.indexOf(a.status); bv = STATUS_ORDER.indexOf(b.status);
+                     if (av < 0) av = 99; if (bv < 0) bv = 99; break;
+      default: return 0;
+    }
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return currentSort.dir === 'asc' ? cmp : -cmp;
+  });
+}
+
+function updateSortHeaders() {
+  ['name','local','server','status'].forEach(col => {
+    const th = document.getElementById(`th-${col}`);
+    if (!th) return;
+    th.classList.remove('sort-asc','sort-desc');
+    if (currentSort.col === col) th.classList.add(`sort-${currentSort.dir}`);
+  });
+}
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+function connectWs() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    wsStatus = 'ws_connected';
+    document.getElementById('ws-dot').className = 'dot ok';
+    document.getElementById('ws-text').textContent = t('ws_connected');
+    loadSettings();
+  };
+  ws.onclose = () => {
+    wsStatus = 'ws_disconnected';
+    document.getElementById('ws-dot').className = 'dot err';
+    document.getElementById('ws-text').textContent = t('ws_disconnected');
+    setTimeout(connectWs, 3000);
+  };
+  ws.onerror = () => {
+    wsStatus = 'ws_error';
+    document.getElementById('ws-dot').className = 'dot err';
+    document.getElementById('ws-text').textContent = t('ws_error');
+  };
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    if (msg.type === 'files') {
+      files = msg.files;
+      renderFiles();
+      if (files.length > 0 && files.every(f => f.status === 'unknown')) {
+        checkAll();
+      }
+    } else if (msg.type === 'file_update') {
+      const idx = files.findIndex(f => f.filename === msg.file.filename);
+      if (idx >= 0) files[idx] = msg.file; else files.push(msg.file);
+      renderFiles();
+    } else if (msg.type === 'filter_jobs') {
+      filterJobs = msg.jobs;
+      renderFilterJobs();
+    } else if (msg.type === 'filter_update') {
+      const idx = filterJobs.findIndex(j => j.id === msg.job.id);
+      if (idx >= 0) filterJobs[idx] = msg.job; else filterJobs.unshift(msg.job);
+      renderFilterJobs();
+    }
+  };
+}
+
+// ─── Download tab ─────────────────────────────────────────────────────────────
+function renderFiles() {
+  updateSortHeaders();
+  const tbody = document.getElementById('files-tbody');
+  const sorted = getSortedFiles();
+  if (!sorted.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--gray);text-align:center;padding:2rem">${t('no_files')}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sorted.map(f => {
+    const pct = (f.server_size && f.downloaded_bytes)
+      ? Math.round(f.downloaded_bytes / f.server_size * 100)
+      : (f.status === 'up_to_date' && f.local_size && f.server_size ? 100 : 0);
+
+    const eta = fmtEta(f.eta_seconds);
+    const progressCell = f.status === 'downloading'
+      ? `<div class="progress-wrap">
+           <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+           <div class="progress-meta">${pct}%${fmtSpeed(f.speed_bps) ? ' · ' + fmtSpeed(f.speed_bps) : ''}${eta ? ' · ' + eta : ''}</div>
+         </div>`
+      : '—';
+
+    const canDownload = f.url && ['update_available','not_downloaded','unknown','error'].includes(f.status);
+    const canCancel   = f.status === 'downloading';
+
+    const actions = `
+      ${canDownload ? `<button class="btn btn-secondary btn-sm" onclick="downloadOne('${f.filename}')">${t('btn_download')}</button>` : ''}
+      ${canCancel   ? `<button class="btn btn-danger btn-sm" onclick="cancelDownload('${f.filename}')">${t('btn_cancel')}</button>` : ''}
+      ${f.url ? `<button class="btn btn-secondary btn-sm" onclick="checkOne('${f.filename}')">${t('btn_check')}</button>` : ''}
+    `.trim();
+
+    const errTip = f.error ? ` title="${escHtml(f.error)}"` : '';
+
+    return `<tr${errTip}>
+      <td style="font-family:monospace;font-size:.82rem">${escHtml(f.filename)}</td>
+      <td>${fmtSize(f.local_size)}<br><span style="font-size:.75rem;color:var(--gray)">${fmtDate(f.local_mtime)}</span></td>
+      <td>${fmtSize(f.server_size)}<br><span style="font-size:.75rem;color:var(--gray)">${fmtDate(f.server_mtime)}</span></td>
+      <td>${statusBadge(f.status)}${f.status === 'update_available' && fmtAge(f.server_mtime, f.local_mtime) ? `<br><span style="font-size:.72rem;color:var(--orange);opacity:.85">${fmtAge(f.server_mtime, f.local_mtime)}\u00a0${t('age_old')}</span>` : ''}</td>
+      <td>${progressCell}</td>
+      <td style="white-space:nowrap">${actions || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadFiles() {
+  try {
+    const res = await fetch('/api/files');
+    files = await res.json();
+    renderFiles();
+  } catch {}
+}
+
+async function checkAll() {
+  await fetch('/api/check', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(() => {});
+}
+
+async function checkOne(filename) {
+  await fetch('/api/check', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ filenames: [filename] })
+  }).catch(() => {});
+}
+
+async function downloadOne(filename) {
+  await fetch('/api/download', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ filenames: [filename] })
+  }).catch(() => {});
+}
+
+async function cancelDownload(filename) {
+  await fetch('/api/cancel', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ filename })
+  }).catch(() => {});
+}
+
+async function downloadOutdated() {
+  const targets = files
+    .filter(f => ['update_available','not_downloaded'].includes(f.status) && f.url)
+    .map(f => f.filename);
+  if (!targets.length) { alert(t('alert_no_updates')); return; }
+  await fetch('/api/download', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ filenames: targets })
+  }).catch(() => {});
+}
+
+// URL-Info flow
+async function fetchUrlInfo() {
+  const url = document.getElementById('url-input').value.trim();
+  const preview = document.getElementById('url-preview');
+  const errEl   = document.getElementById('url-error');
+  preview.style.display = 'none';
+  errEl.style.display   = 'none';
+  urlInfoData = null;
+  if (!url) return;
+
+  if (!url.toLowerCase().endsWith('.osm.pbf')) {
+    errEl.textContent = t('err_url_not_pbf');
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res  = await fetch('/api/url-info', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.detail || t('err_server'); errEl.style.display = 'block'; return; }
+    urlInfoData = data;
+    document.getElementById('up-filename').textContent = data.filename;
+    document.getElementById('up-size').textContent     = fmtSize(data.server_size);
+    document.getElementById('up-mtime').textContent    = fmtDate(data.server_mtime);
+    document.getElementById('up-exists').textContent   = data.already_exists ? t('url_exists_yes') : t('url_exists_no');
+    preview.style.display = 'block';
+  } catch (e) {
+    errEl.textContent = t('err_conn', e.message);
+    errEl.style.display = 'block';
+  }
+}
+
+async function addUrl() {
+  if (!urlInfoData) return;
+  await fetch('/api/add-url', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ url: urlInfoData.url, filename: urlInfoData.filename })
+  }).catch(() => {});
+  document.getElementById('url-preview').style.display = 'none';
+  document.getElementById('url-input').value = '';
+}
+
+// ─── Filter tab ───────────────────────────────────────────────────────────────
+async function loadFilterSources() {
+  let fnames;
+  try {
+    const res = await fetch('/api/filter/files');
+    fnames = await res.json();
+  } catch { return; }
+  const container = document.getElementById('source-files-list');
+  if (!fnames.length) {
+    container.innerHTML = `<span style="color:var(--gray);font-size:.85rem">${t('no_source_files')}</span>`;
+    _updateFilterHints();
+    return;
+  }
+  container.innerHTML = fnames.map(fn =>
+    `<label><input type="checkbox" name="src-file" value="${escHtml(fn)}"> ${escHtml(fn)}</label>`
+  ).join('');
+  container.querySelectorAll('input[name="src-file"]').forEach(cb =>
+    cb.addEventListener('change', _updateFilterHints)
+  );
+  _updateFilterHints();
+}
+
+async function loadFilterJobs() {
+  try {
+    const res = await fetch('/api/filter/jobs');
+    filterJobs = await res.json();
+    renderFilterJobs();
+  } catch {}
+}
+
+function clearFilterJobs() {
+  filterJobs = filterJobs.filter(j => j.status === 'running' || j.status === 'pending');
+  renderFilterJobs();
+}
+
+async function cancelRunningJobs() {
+  const running = filterJobs.filter(j => j.status === 'running' || j.status === 'pending');
+  await Promise.all(running.map(j =>
+    fetch(`/api/filter/cancel/${j.id}`, { method: 'POST' }).catch(() => {})
+  ));
+  renderFilterJobs();
+}
+
+async function cancelJob(jobId) {
+  await fetch(`/api/filter/cancel/${jobId}`, { method: 'POST' }).catch(() => {});
+}
+
+function _getSelectedSourceSizeMB() {
+  const selected = [...document.querySelectorAll('input[name="src-file"]:checked')].map(cb => cb.value);
+  return selected.reduce((sum, name) => {
+    const f = files.find(fi => fi.filename === name);
+    return sum + (f?.local_size || 0);
+  }, 0) / 1e6;
+}
+
+function _updateFilterHints() {
+  const sizeMB = _getSelectedSourceSizeMB();
+  const etaEl = document.getElementById('source-eta-hint');
+  if (etaEl) {
+    const show = sizeMB > 1000;
+    etaEl.style.display = show ? 'block' : 'none';
+    if (show) etaEl.textContent = t('eta_large_file_hint');
+  }
+  const geojsonChecked = document.querySelector('input[name="fmt"][value="geojson"]')?.checked;
+  const warnEl = document.getElementById('geojson-size-warn');
+  if (warnEl) {
+    const show = geojsonChecked && sizeMB > 200;
+    warnEl.style.display = show ? 'block' : 'none';
+    if (show) warnEl.textContent = t('warn_geojson_large');
+  }
+}
+
+function _jobProgressPct(j) {
+  if (!j.phases || !j.phases.length) return 0;
+  const total = j.phases.reduce((s, p) => s + p.weight, 0);
+  if (total <= 0) return 0;
+  const done = j.phases.slice(0, j.current_phase_index || 0).reduce((s, p) => s + p.weight, 0);
+  return Math.min(100, Math.round(done / total * 100));
+}
+
+function renderFilterJobs() {
+  const el = document.getElementById('filter-jobs-list');
+  if (!filterJobs.length) {
+    el.innerHTML = `<div style="color:var(--gray);font-size:.875rem">${t('no_jobs')}</div>`;
+    Object.keys(_phaseTimers).forEach(_stopPhaseTimer);
+    return;
+  }
+  const jobStatusMap = {
+    pending: t('job_pending'),
+    running: t('job_running'),
+    done: t('job_done'),
+    error: t('job_error'),
+  };
+
+  const runningIds = new Set();
+
+  el.innerHTML = filterJobs.map(j => {
+    const [cls] = getStatusLabels()[j.status === 'running' ? 'downloading' : j.status] || ['badge-gray'];
+    const statusLabel = jobStatusMap[j.status] || j.status;
+    const fmts = (j.output_formats || (j.output_format ? [j.output_format] : [])).map(f => f.toUpperCase()).join(', ');
+
+    const isRunning = j.status === 'running';
+    const nowSec = Date.now() / 1000;
+    const elapsedJob = j.job_started_at ? nowSec - j.job_started_at : 0;
+    const showProgress = isRunning && elapsedJob > 2 && j.phases && j.phases.length > 0;
+
+    let progressHtml = '';
+    if (showProgress) {
+      runningIds.add(j.id);
+      const pct = _jobProgressPct(j);
+      const etaStr = (j.eta_seconds != null && j.eta_seconds > 0)
+        ? t('eta_remaining', formatDuration(j.eta_seconds))
+        : '';
+      const phaseIdx = j.current_phase_index || 0;
+      const totalPhases = j.phases.length;
+      const curPhase = j.phases[phaseIdx];
+      const phaseLabel = curPhase ? curPhase.label : '';
+      const elapsedPhase = j.phase_started_at ? nowSec - j.phase_started_at : 0;
+
+      progressHtml = `
+        <div class="job-progress">
+          <div class="job-progress-bar-bg">
+            <div class="job-progress-bar-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="job-progress-meta">
+            <span>${pct}%</span>
+            <span>${escHtml(etaStr)}</span>
+          </div>
+          <div class="job-phase-text">
+            ${t('job_step', phaseIdx + 1, totalPhases)} ${escHtml(phaseLabel)}
+            — <span id="phase-elapsed-${escHtml(j.id)}"
+                    data-started="${j.phase_started_at || ''}">${formatDuration(elapsedPhase)}</span>
+          </div>
+        </div>`;
+    }
+
+    const logOpen = !showProgress;
+    const logHtml = j.log
+      ? `<details class="job-log-wrap"${logOpen ? ' open' : ''}>
+           <summary>Log</summary>
+           <div class="job-log">${escHtml(j.log)}</div>
+         </details>`
+      : '';
+
+    return `<div class="card" style="margin-bottom:.75rem">
+      <div class="card-header" style="justify-content:space-between">
+        <span>${escHtml(j.source_files.join(', '))} → <em>${escHtml(j.suffix)}</em> (${escHtml(fmts)})</span>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          ${(j.status === 'running' || j.status === 'pending') ? `<button class="btn btn-danger btn-sm" onclick="cancelJob('${escHtml(j.id)}')">${t('btn_cancel_job')}</button>` : ''}
+          <span class="badge ${cls}">${statusLabel}</span>
+        </div>
+      </div>
+      <div class="card-body" style="padding:.75rem 1.25rem">
+        ${progressHtml}
+        ${j.error ? `<div style="color:var(--red);font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_err_prefix')} ${escHtml(j.error)}</div>` : ''}
+        ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${j.output_files.map(f => escHtml(f)).join('<br>')}</div>` : ''}
+        ${logHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  // start timers for running jobs, stop for others
+  Object.keys(_phaseTimers).forEach(id => { if (!runningIds.has(id)) _stopPhaseTimer(id); });
+  runningIds.forEach(id => _startPhaseTimer(id));
+}
+
+// ─── Overwrite modal ──────────────────────────────────────────────────────────
+let _owResolve = null;
+
+function _showOverwriteModal(paths) {
+  const listEl = document.getElementById('ow-file-list');
+  listEl.innerHTML = paths.map(p => `<div>${escHtml(p.split(/[\\/]/).pop())}</div>`).join('');
+  document.getElementById('modal-overwrite').style.display = 'flex';
+  return new Promise(resolve => { _owResolve = resolve; });
+}
+
+function _closeOverwriteModal(result) {
+  document.getElementById('modal-overwrite').style.display = 'none';
+  if (_owResolve) { _owResolve(result); _owResolve = null; }
+}
+
+async function runFilter() {
+  const errEl = document.getElementById('filter-error');
+  errEl.style.display = 'none';
+
+  const srcBoxes = [...document.querySelectorAll('input[name="src-file"]:checked')];
+  if (!srcBoxes.length) { errEl.textContent = t('err_no_source'); errEl.style.display='block'; return; }
+
+  const rawTags = document.getElementById('filter-tags').value.trim().split('\n').map(t2 => t2.trim()).filter(Boolean);
+  if (!rawTags.length) { errEl.textContent = t('err_no_tags'); errEl.style.display='block'; return; }
+
+  const suffix = document.getElementById('filter-suffix').value.trim();
+  if (!suffix) { errEl.textContent = t('err_no_suffix'); errEl.style.display='block'; return; }
+
+  const geoTypes = [];
+  if (document.getElementById('geo-nodes').checked)     geoTypes.push('nodes');
+  if (document.getElementById('geo-ways').checked)      geoTypes.push('ways');
+  if (document.getElementById('geo-relations').checked) geoTypes.push('relations');
+  if (!geoTypes.length) { errEl.textContent = t('err_no_geo'); errEl.style.display='block'; return; }
+
+  const fmts = [...document.querySelectorAll('input[name="fmt"]:checked')].map(cb => cb.value);
+  if (!fmts.length) { errEl.textContent = t('err_no_format'); errEl.style.display='block'; return; }
+
+  const cols = document.querySelector('input[name="cols"]:checked')?.value || 'other_tags';
+  const manualKeys = cols === 'manual'
+    ? document.getElementById('manual-keys').value.split(',').map(k => k.trim()).filter(Boolean)
+    : [];
+  const body = {
+    source_files: srcBoxes.map(cb => cb.value),
+    tags: rawTags,
+    geometry_types: geoTypes,
+    suffix,
+    output_formats: fmts,
+    columns_mode: cols,
+    manual_keys: manualKeys,
+  };
+
+  try {
+    // Check for overwrites first
+    const checkRes = await fetch('/api/filter/check', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    if (!checkRes.ok) {
+      const data = await checkRes.json();
+      errEl.textContent = data.detail || t('err_server');
+      errEl.style.display = 'block';
+      return;
+    }
+    const { would_overwrite } = await checkRes.json();
+
+    if (would_overwrite.length > 0) {
+      const confirmed = await _showOverwriteModal(would_overwrite);
+      if (!confirmed) return;
+    }
+
+    const res  = await fetch('/api/filter/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.detail || t('err_server'); errEl.style.display='block'; return; }
+    showTab('filter');
+  } catch (e) {
+    errEl.textContent = t('err_conn', e.message);
+    errEl.style.display = 'block';
+  }
+}
+
+// ─── Presets tab ──────────────────────────────────────────────────────────────
+async function loadPresets() {
+  try {
+    const res = await fetch('/api/presets');
+    presetList = await res.json();
+    renderPresets();
+  } catch {}
+}
+
+function renderPresets() {
+  const grid = document.getElementById('presets-grid');
+  if (!presetList.length) {
+    grid.innerHTML = `<span style="color:var(--gray);font-size:.875rem">${t('no_presets')}</span>`;
+    return;
+  }
+  const fmtMap = { pbf:'PBF', geojson:'GeoJSON', gpkg:'GeoPackage' };
+  const colsMap = { other_tags: t('radio_standard'), all: t('radio_all'), manual: t('radio_manual') };
+  grid.innerHTML = presetList.map(p => {
+    const fmts = (p.output_formats || (p.output_format ? [p.output_format] : ['gpkg']));
+    return `
+    <div class="preset-card">
+      <h3>${escHtml(p.name)}</h3>
+      <div class="meta">${escHtml((p.tags||[]).join(', '))}</div>
+      <div class="meta">${(p.geometry_types||[]).join(', ')} · ${fmts.map(f => fmtMap[f]||f).join('+')} · ${colsMap[p.columns_mode]||p.columns_mode}</div>
+      <div class="preset-actions">
+        <button class="btn btn-primary btn-sm" data-preset-id="${escHtml(p.id)}" data-action="load">${t('preset_use')}</button>
+        <button class="btn btn-secondary btn-sm" data-preset-id="${escHtml(p.id)}" data-action="edit">${t('preset_edit')}</button>
+        <button class="btn btn-danger btn-sm" data-preset-id="${escHtml(p.id)}" data-action="delete">${t('preset_delete')}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadPreset(id) {
+  const p = presetList.find(x => x.id === id);
+  if (!p) return;
+
+  document.getElementById('filter-tags').value    = (p.tags || []).join('\n');
+  document.getElementById('filter-suffix').value  = p.suffix || '';
+  document.getElementById('geo-nodes').checked     = (p.geometry_types||[]).includes('nodes');
+  document.getElementById('geo-ways').checked      = (p.geometry_types||[]).includes('ways');
+  document.getElementById('geo-relations').checked = (p.geometry_types||[]).includes('relations');
+
+  // Handle output_formats (array) with backward compat for old output_format (string)
+  const fmts = p.output_formats || (p.output_format ? [p.output_format] : ['gpkg']);
+  document.querySelectorAll('input[name="fmt"]').forEach(cb => {
+    cb.checked = fmts.includes(cb.value);
+  });
+
+  const colsEl = document.querySelector(`input[name="cols"][value="${p.columns_mode}"]`);
+  if (colsEl) colsEl.checked = true;
+
+  document.getElementById('manual-keys').value     = (p.manual_keys||[]).join(',');
+  document.getElementById('manual-keys-wrap').style.display = p.columns_mode === 'manual' ? '' : 'none';
+
+  document.getElementById('geojson-mode-hint').style.display = fmts.includes('geojson') ? 'block' : 'none';
+  document.getElementById('pbf-mode-hint').style.display     = fmts.includes('pbf')     ? 'block' : 'none';
+  document.getElementById('pbf-hint').style.display          = fmts.includes('pbf')     ? 'inline-block' : 'none';
+
+  showTab('filter');
+}
+
+async function deletePreset(id) {
+  if (!confirm(t('confirm_delete_preset'))) return;
+  await fetch(`/api/presets/${id}`, { method:'DELETE' });
+  await loadPresets();
+}
+
+function _setEditMode(editing) {
+  document.getElementById('preset-form-heading').textContent =
+    t(editing ? 'preset_edit_heading' : 'preset_new_heading');
+  document.getElementById('btn-preset-cancel').style.display = editing ? '' : 'none';
+}
+
+function _cancelEdit() {
+  _editingPresetId = null;
+  _setEditMode(false);
+  document.getElementById('new-preset-name').value = '';
+  document.getElementById('new-preset-suffix').value = '';
+  document.getElementById('new-preset-tags').value = '';
+}
+
+function editPreset(id) {
+  const p = presetList.find(x => x.id === id);
+  if (!p) return;
+  _editingPresetId = p.id;
+  document.getElementById('new-preset-name').value = p.name || '';
+  document.getElementById('new-preset-suffix').value = p.suffix || '';
+  document.getElementById('new-preset-tags').value = (p.tags || []).join('\n');
+  ['nodes','ways','relations'].forEach(g =>
+    document.getElementById('np-' + g).checked = (p.geometry_types || []).includes(g)
+  );
+  document.querySelectorAll('input[name="np-fmt"]').forEach(cb =>
+    cb.checked = (p.output_formats || []).includes(cb.value)
+  );
+  const colsMode = p.columns_mode || 'other_tags';
+  document.querySelector(`input[name="np-cols"][value="${colsMode}"]`).checked = true;
+  document.getElementById('np-manual-wrap').style.display = colsMode === 'manual' ? '' : 'none';
+  document.getElementById('np-manual-keys').value = (p.manual_keys || []).join(',');
+  _setEditMode(true);
+  document.getElementById('new-preset-name').focus();
+}
+
+async function savePreset() {
+  const errEl = document.getElementById('preset-error');
+  errEl.style.display = 'none';
+  const name = document.getElementById('new-preset-name').value.trim();
+  if (!name) { errEl.textContent = t('err_preset_name'); errEl.style.display='block'; return; }
+
+  const tags = document.getElementById('new-preset-tags').value.trim().split('\n').map(t2=>t2.trim()).filter(Boolean);
+  const suffix = document.getElementById('new-preset-suffix').value.trim();
+
+  const geoTypes = [];
+  if (document.getElementById('np-nodes').checked)     geoTypes.push('nodes');
+  if (document.getElementById('np-ways').checked)      geoTypes.push('ways');
+  if (document.getElementById('np-relations').checked) geoTypes.push('relations');
+
+  const fmts = [...document.querySelectorAll('input[name="np-fmt"]:checked')].map(cb => cb.value);
+  if (!fmts.length) fmts.push('gpkg');
+
+  const cols = document.querySelector('input[name="np-cols"]:checked')?.value || 'other_tags';
+  const manualKeys = cols === 'manual'
+    ? document.getElementById('np-manual-keys').value.split(',').map(k=>k.trim()).filter(Boolean)
+    : [];
+
+  const method = _editingPresetId ? 'PUT' : 'POST';
+  const url = _editingPresetId ? `/api/presets/${_editingPresetId}` : '/api/presets';
+  await fetch(url, {
+    method, headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, tags, geometry_types:geoTypes, output_formats:fmts, suffix, columns_mode:cols, manual_keys:manualKeys })
+  });
+  _editingPresetId = null;
+  _setEditMode(false);
+  await loadPresets();
+  document.getElementById('new-preset-name').value = '';
+  document.getElementById('new-preset-tags').value = '';
+  document.getElementById('new-preset-suffix').value = '';
+}
+
+// ─── Tab navigation ───────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  const idx = { downloads:0, filter:1, presets:2 }[name];
+  document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
+
+  if (name === 'filter')  { loadFilterSources(); loadFilterJobs(); }
+  if (name === 'presets') loadPresets();
+}
+
+// ─── Show/hide manual keys based on radio ─────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  applyLang();
+
+  document.querySelectorAll('input[name="cols"]').forEach(r =>
+    r.addEventListener('change', () => {
+      const isManual = document.querySelector('input[name="cols"]:checked')?.value === 'manual';
+      document.getElementById('manual-keys-wrap').style.display = isManual ? '' : 'none';
+    })
+  );
+  document.querySelectorAll('input[name="np-cols"]').forEach(r =>
+    r.addEventListener('change', () => {
+      document.getElementById('np-manual-wrap').style.display =
+        document.querySelector('input[name="np-cols"]:checked')?.value === 'manual' ? '' : 'none';
+    })
+  );
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-preset-id]');
+    if (!btn) return;
+    const id = btn.dataset.presetId;
+    if (btn.dataset.action === 'load') loadPreset(id);
+    if (btn.dataset.action === 'edit') editPreset(id);
+    if (btn.dataset.action === 'delete') deletePreset(id);
+  });
+
+  // Overwrite modal buttons
+  document.getElementById('btn-ow-cancel').addEventListener('click', () => _closeOverwriteModal(false));
+  document.getElementById('btn-ow-confirm').addEventListener('click', () => _closeOverwriteModal(true));
+
+  connectWs();
+  loadFiles();
+
+  document.getElementById('btn-browse-onboarding').addEventListener('click', () => openFolderBrowser('onboarding'));
+  document.getElementById('btn-browse-changedir').addEventListener('click', () => openFolderBrowser('change-dir'));
+  document.getElementById('btn-fs-close').addEventListener('click', _closeFolderBrowser);
+  document.getElementById('btn-fs-cancel').addEventListener('click', _closeFolderBrowser);
+  document.getElementById('btn-fs-confirm').addEventListener('click', _confirmFolderBrowser);
+});
+
+// ─── Folder Browser ──────────────────────────────────────────────────────────
+let _fsCtx = null;
+let _fsWinPath = '';
+
+function openFolderBrowser(ctx) {
+  _fsCtx = ctx;
+  _fsWinPath = '';
+  _fsBrowse('');
+  document.getElementById('modal-fs-browser').style.display = 'flex';
+}
+
+function _closeFolderBrowser() {
+  document.getElementById('modal-fs-browser').style.display = 'none';
+}
+
+function _confirmFolderBrowser() {
+  if (!_fsWinPath) return;
+  const id = _fsCtx === 'onboarding' ? 'onboarding-path' : 'change-dir-input';
+  document.getElementById(id).value = _fsWinPath;
+  _closeFolderBrowser();
+}
+
+async function _fsBrowse(path) {
+  const listEl = document.getElementById('fs-list');
+  listEl.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--gray)"><span class="spinner"></span></div>';
+
+  let data;
+  try {
+    const res = await fetch('/api/fs/browse?path=' + encodeURIComponent(path));
+    data = await res.json();
+  } catch {
+    listEl.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:.85rem">${t('fb_err_conn')}</div>`;
+    return;
+  }
+
+  _fsWinPath = data.windows_path || '';
+  document.getElementById('fs-selected-path').textContent = _fsWinPath || '—';
+
+  // Breadcrumb
+  const bc = document.getElementById('fs-breadcrumb');
+  if (!path) {
+    bc.textContent = t('fb_drives');
+  } else {
+    const parts = path.split('/');
+    const frags = [`<button class="crumb-link" data-browse="">${t('fb_drives')}</button>`];
+    let cum = '';
+    parts.forEach((p, i) => {
+      cum = cum ? cum + '/' + p : p;
+      const label = i === 0 ? p.toUpperCase() + ':' : p;
+      const capCum = cum;
+      if (i < parts.length - 1) {
+        frags.push(' › <button class="crumb-link" data-browse="' + escHtml(capCum) + '">' + escHtml(label) + '</button>');
+      } else {
+        frags.push(' › <strong>' + escHtml(label) + '</strong>');
+      }
+    });
+    bc.innerHTML = frags.join('');
+    bc.querySelectorAll('.crumb-link').forEach(el =>
+      el.addEventListener('click', () => _fsBrowse(el.dataset.browse))
+    );
+  }
+
+  if (data.error) {
+    listEl.innerHTML = '<div style="padding:1rem;color:var(--red);font-size:.85rem">' + escHtml(data.error) + '</div>';
+    return;
+  }
+
+  const rows = [];
+  if (data.parent !== null && data.parent !== undefined) {
+    rows.push({ path: data.parent, label: t('fb_parent'), icon: '', up: true });
+  }
+  data.dirs.forEach(d => rows.push({ path: path ? path + '/' + d : d, label: d, icon: path ? '📁' : '💾', up: false }));
+
+  if (!rows.length) {
+    listEl.innerHTML = `<div style="padding:.75rem 1rem;color:var(--gray);font-size:.85rem">${t('fb_no_subdirs')}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = rows.map(r =>
+    `<div class="fs-entry${r.up ? ' fs-entry-up' : ''}" data-path="${escHtml(r.path)}">${r.icon ? r.icon + ' ' : ''}${escHtml(r.label)}</div>`
+  ).join('');
+  listEl.querySelectorAll('.fs-entry').forEach(el =>
+    el.addEventListener('click', () => _fsBrowse(el.dataset.path))
+  );
+}
+
+// ─── Util ─────────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
