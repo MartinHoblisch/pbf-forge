@@ -441,7 +441,7 @@ class DownloadManager:
 
         if actual_hex != expected_hex:
             raise RuntimeError(
-                f"MD5 mismatch for {dest.name}: " f"expected {expected_hex}, got {actual_hex}"
+                f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}"
             )
 
     def _do_download(
