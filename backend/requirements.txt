@@ -1,4 +1,4 @@
 fastapi>=0.111
 uvicorn[standard]>=0.29
-requests>=2.32
+requests>=2.33.1
 osmium>=4.3.1
