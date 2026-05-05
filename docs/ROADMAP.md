@@ -13,7 +13,6 @@ Features under consideration for future releases. Open an [Issue](https://github
 
 - **FlatGeobuf export** — streamable binary vector format; good alternative to GeoJSON for web viewers.
 - **Tag histogram** — count tag values across the current extract before filtering, so you can explore the data without running a full filter + export cycle. (This is a local histogram against the downloaded PBF, not a wrapper around taginfo.)
-- **Exclusion filtering** — two-pass osmium pipeline to exclude objects matching a second tag expression (e.g. select `railway=rail` but exclude `railway:traffic_mode=passenger`). Requires running `osmium tags-filter` twice: once to select, once with `--invert` to remove matching objects from the result.
 - **Merge tool** — combine two filtered PBFs before export (e.g. merge a roads layer with a POI layer).
 - **Incremental PBF updates** — keep a downloaded PBF current by applying daily Geofabrik `.osc.gz` osmChange diffs instead of re-downloading the full file.
 

@@ -115,6 +115,26 @@ Goal: bike routes plus their hierarchical relations for Bavaria.
 
 Output: multi-layer GeoPackage where the `lines` and `other_relations` layers carry the route-segment geometries and the relation membership respectively.
 
+### 4. Rail freight routing network for Europe
+
+Goal: GeoJSON of European rail lines usable for freight routing — passenger-only tracks excluded.
+
+Freight trains are not permitted on tracks tagged `railway:traffic_mode=passenger`. A single include expression would return those tracks too; the **OSM-Tags zum Ausschließen** field removes them in a second pass.
+
+1. Region: **Europe** (`europe-latest.osm.pbf`, ~30 GB — use the progress bar, this takes time).
+2. Include expression:
+   ```
+   railway=rail
+   ```
+3. Exclude expression:
+   ```
+   railway:traffic_mode=passenger
+   ```
+4. Geometry types: **Ways** only.
+5. Export: **GeoJSON** or **GeoPackage**.
+
+Output: a line layer containing only mixed-use and freight-dedicated tracks. Load into a routing engine (e.g. pgRouting, Valhalla) to compute freight-feasible paths. The provenance metadata embedded in the output records both the include and exclude expressions so the filter is reproducible.
+
 ---
 
 ## Roadmap
