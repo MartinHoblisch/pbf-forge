@@ -43,7 +43,14 @@ def test_provenance_geojson_key_inserted(tmp_path):
         encoding="utf-8",
     )
 
-    fm._embed_provenance(geojson, "geojson", "berlin.osm.pbf", ["highway"], ["railway:traffic_mode=passenger"], ["ways"])
+    fm._embed_provenance(
+        geojson,
+        "geojson",
+        "berlin.osm.pbf",
+        ["highway"],
+        ["railway:traffic_mode=passenger"],
+        ["ways"],
+    )
 
     data = json.loads(geojson.read_text(encoding="utf-8"))
     assert "provenance" in data
