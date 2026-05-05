@@ -581,6 +581,11 @@ footer .credits-sep { color: var(--border); }
         </div>
 
         <div class="form-group">
+          <label class="field-label">OSM-Tags zum Ausschließen <span class="info">(optional, eine pro Zeile)</span></label>
+          <textarea id="filter-exclude-tags" placeholder="railway:traffic_mode=passenger&#10;access=private"></textarea>
+        </div>
+
+        <div class="form-group">
           <label class="field-label" data-i18n="label_geo_types">Geometrietypen</label>
           <div class="checkbox-group inline-group">
             <label><input type="checkbox" id="geo-nodes"> Nodes</label>
@@ -1700,6 +1705,8 @@ async function runFilter() {
   const rawTags = document.getElementById('filter-tags').value.trim().split('\n').map(t2 => t2.trim()).filter(Boolean);
   if (!rawTags.length) { errEl.textContent = t('err_no_tags'); errEl.style.display='block'; return; }
 
+  const rawExcludeTags = document.getElementById('filter-exclude-tags').value.trim().split('\n').map(t2 => t2.trim()).filter(Boolean);
+
   const suffix = document.getElementById('filter-suffix').value.trim();
   if (!suffix) { errEl.textContent = t('err_no_suffix'); errEl.style.display='block'; return; }
 
@@ -1719,6 +1726,7 @@ async function runFilter() {
   const body = {
     source_files: srcBoxes.map(cb => cb.value),
     tags: rawTags,
+    exclude_tags: rawExcludeTags,
     geometry_types: geoTypes,
     suffix,
     output_formats: fmts,
