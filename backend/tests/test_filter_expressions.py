@@ -75,3 +75,27 @@ def test_unknown_geometry_type_raises(fm):
     job = _make_job(tags=["amenity"], geometry_types=["polygons"])
     with pytest.raises(ValueError, match="Unknown geometry type"):
         fm._build_expressions(job)
+
+
+def test_exclude_single_tag_single_geometry(fm):
+    job = _make_job(exclude_tags=["railway:traffic_mode=passenger"], geometry_types=["ways"])
+    exprs = fm._build_expressions(job, kind="exclude")
+    assert exprs == ["w/railway:traffic_mode=passenger"]
+
+
+def test_exclude_multiple_tags_cartesian(fm):
+    job = _make_job(exclude_tags=["access=private", "barrier"], geometry_types=["ways", "nodes"])
+    exprs = fm._build_expressions(job, kind="exclude")
+    assert len(exprs) == 4
+    assert exprs == ["w/access=private", "n/access=private", "w/barrier", "n/barrier"]
+
+
+def test_exclude_empty_returns_empty(fm):
+    job = _make_job(exclude_tags=[], geometry_types=["ways"])
+    assert fm._build_expressions(job, kind="exclude") == []
+
+
+def test_exclude_invalid_tag_raises(fm):
+    job = _make_job(exclude_tags=["-invalid"], geometry_types=["ways"])
+    with pytest.raises(ValueError, match="Invalid tag expression"):
+        fm._build_expressions(job, kind="exclude")
