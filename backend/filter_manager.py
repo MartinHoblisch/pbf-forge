@@ -58,6 +58,7 @@ class FilterJob:
     id: str
     source_files: list[str]
     tags: list[str]
+    exclude_tags: list[str]
     geometry_types: list[str]
     suffix: str
     output_formats: list[str]  # ["pbf", "geojson", "gpkg"]
@@ -87,6 +88,7 @@ class FilterJob:
             "id": self.id,
             "source_files": self.source_files,
             "tags": self.tags,
+            "exclude_tags": self.exclude_tags,
             "geometry_types": self.geometry_types,
             "suffix": self.suffix,
             "output_formats": self.output_formats,

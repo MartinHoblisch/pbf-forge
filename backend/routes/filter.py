@@ -20,6 +20,7 @@ class FilterRequest(BaseModel):
     output_dir: Optional[str] = None
     columns_mode: Literal["other_tags", "all", "manual"] = "other_tags"
     manual_keys: list[str] = []
+    exclude_tags: list[str] = []
 
     @field_validator("suffix")
     @classmethod
@@ -93,6 +94,7 @@ def run_filter(req: FilterRequest, background_tasks: BackgroundTasks):
         output_dir=resolved_output_dir,
         columns_mode=req.columns_mode,
         manual_keys=req.manual_keys,
+        exclude_tags=req.exclude_tags,
     )
     background_tasks.add_task(state.filter_manager.run_job, job)
     return {"job_id": job.id}
