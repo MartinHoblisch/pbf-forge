@@ -60,3 +60,18 @@ def test_filter_job_detail_by_id(client):
 def test_filter_job_unknown_id_returns_404(client):
     resp = client.get("/api/filter/jobs/does-not-exist")
     assert resp.status_code == 404
+
+
+def test_filter_run_with_exclude_tags(client):
+    body = {
+        **_VALID_RUN,
+        "exclude_tags": ["railway:traffic_mode=passenger"],
+    }
+    resp = client.post("/api/filter/run", json=body)
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+
+    # Verify exclude_tags is in job detail response
+    resp = client.get(f"/api/filter/jobs/{job_id}")
+    assert resp.status_code == 200
+    assert resp.json()["exclude_tags"] == ["railway:traffic_mode=passenger"]
