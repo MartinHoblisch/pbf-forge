@@ -343,6 +343,7 @@ class FilterManager:
 
     _STEP_FACTORS: dict[str, float] = {
         "filter": 1.0,
+        "exclude": 1.0,
         "reduce": 0.3,
         "export_convert": 0.5,
     }
@@ -458,6 +459,17 @@ class FilterManager:
                     fmt="pbf",
                 )
             )
+
+            if job.exclude_tags:
+                phases.append(
+                    Phase(
+                        label=f"{source} · exclude",
+                        source=source,
+                        step="exclude",
+                        weight=size * self._STEP_FACTORS["exclude"],
+                        fmt="pbf",
+                    )
+                )
 
             if needs_pbf and job.columns_mode == "manual" and job.manual_keys:
                 phases.append(
