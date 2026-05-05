@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import median
-from typing import Optional
+from typing import Literal, Optional
 
 from config import ATTRIBUTION, DATA_DIR
 from filter_history import FilterHistory
@@ -442,10 +442,13 @@ class FilterManager:
 
         return phases
 
-    def _build_expressions(self, job: FilterJob) -> list[str]:
+    def _build_expressions(
+        self, job: FilterJob, *, kind: Literal["include", "exclude"] = "include"
+    ) -> list[str]:
         prefix_map = {"nodes": "n", "ways": "w", "relations": "r"}
         exprs = []
-        for tag in job.tags:
+        tags = job.tags if kind == "include" else job.exclude_tags
+        for tag in tags:
             tag = tag.strip()
             if not tag:
                 continue
