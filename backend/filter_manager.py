@@ -323,6 +323,7 @@ class FilterManager:
                             fmt,
                             source,
                             job.tags,
+                            job.exclude_tags,
                             job.geometry_types,
                         )
                         job.output_files.append(str(out_file))
@@ -694,6 +695,7 @@ class FilterManager:
         fmt: str,
         source_file: str,
         tags: list[str],
+        exclude_tags: list[str],
         geometry_types: list[str],
     ) -> None:
         """Embed provenance metadata (source, filter params, timestamp) into output files.
@@ -706,6 +708,7 @@ class FilterManager:
             "generated_by": "PBF Forge v1.0.0",
             "source": source_file,
             "tags": tags,
+            "exclude_tags": exclude_tags,
             "geometry_types": geometry_types,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }

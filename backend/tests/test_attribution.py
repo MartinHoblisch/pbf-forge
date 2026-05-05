@@ -17,7 +17,7 @@ def test_provenance_gpkg_row_inserted(tmp_path):
     with sqlite3.connect(str(gpkg)) as conn:
         conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
 
-    fm._embed_provenance(gpkg, "gpkg", "berlin.osm.pbf", ["amenity=cafe"], ["nodes"])
+    fm._embed_provenance(gpkg, "gpkg", "berlin.osm.pbf", ["amenity=cafe"], [], ["nodes"])
 
     with sqlite3.connect(str(gpkg)) as conn:
         rows = conn.execute("SELECT md_scope, mime_type, metadata FROM gpkg_metadata").fetchall()
@@ -29,6 +29,7 @@ def test_provenance_gpkg_row_inserted(tmp_path):
     prov = json.loads(metadata)
     assert prov["source"] == "berlin.osm.pbf"
     assert prov["tags"] == ["amenity=cafe"]
+    assert prov["exclude_tags"] == []
     assert prov["geometry_types"] == ["nodes"]
     assert "generated_by" in prov
     assert "generated_at" in prov
@@ -42,13 +43,14 @@ def test_provenance_geojson_key_inserted(tmp_path):
         encoding="utf-8",
     )
 
-    fm._embed_provenance(geojson, "geojson", "berlin.osm.pbf", ["highway"], ["ways"])
+    fm._embed_provenance(geojson, "geojson", "berlin.osm.pbf", ["highway"], ["railway:traffic_mode=passenger"], ["ways"])
 
     data = json.loads(geojson.read_text(encoding="utf-8"))
     assert "provenance" in data
     prov = data["provenance"]
     assert prov["source"] == "berlin.osm.pbf"
     assert prov["tags"] == ["highway"]
+    assert prov["exclude_tags"] == ["railway:traffic_mode=passenger"]
     assert prov["geometry_types"] == ["ways"]
     assert "generated_at" in prov
 
@@ -58,7 +60,7 @@ def test_provenance_pbf_noop(tmp_path):
     pbf = tmp_path / "out.osm.pbf"
     pbf.write_bytes(b"\x00\x01\x02")
 
-    fm._embed_provenance(pbf, "pbf", "berlin.osm.pbf", ["highway"], ["ways"])
+    fm._embed_provenance(pbf, "pbf", "berlin.osm.pbf", ["highway"], [], ["ways"])
 
     assert pbf.read_bytes() == b"\x00\x01\x02"
 
@@ -81,7 +83,7 @@ def test_geojson_multibyte_features_preserved(tmp_path):
     )
 
     fm._embed_attribution_geojson(geojson)
-    fm._embed_provenance(geojson, "geojson", "japan.osm.pbf", ["name"], ["nodes"])
+    fm._embed_provenance(geojson, "geojson", "japan.osm.pbf", ["name"], [], ["nodes"])
 
     data = json.loads(geojson.read_text(encoding="utf-8"))
     names = [f["properties"]["name"] for f in data["features"]]
@@ -101,7 +103,7 @@ def test_provenance_multibyte_tags_preserved(tmp_path):
     )
     tags = ["name:ja=東京都", "name:ar=مكة", "name:el=Αθήνα"]
 
-    fm._embed_provenance(geojson, "geojson", "test.osm.pbf", tags, ["nodes"])
+    fm._embed_provenance(geojson, "geojson", "test.osm.pbf", tags, [], ["nodes"])
 
     data = json.loads(geojson.read_text(encoding="utf-8"))
     assert data["provenance"]["tags"] == tags
