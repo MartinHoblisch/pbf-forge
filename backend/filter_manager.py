@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+import shutil
 import sqlite3
 import tempfile
 import time
@@ -218,6 +219,26 @@ class FilterManager:
                             raise RuntimeError(f"osmium exited with code {rc}")
                         await self._finish_phase(job)
 
+                        if job.exclude_tags:
+                            excl_exprs = self._build_expressions(job, kind="exclude")
+                            excl_tmp = tmp / f"{stem}_excl.osm.pbf"
+                            await self._start_phase(job)
+                            excl_cmd = [
+                                "osmium",
+                                "tags-filter",
+                                str(pbf_out),
+                                *excl_exprs,
+                                "--invert-match",
+                                "-o",
+                                str(excl_tmp),
+                                "--overwrite",
+                            ]
+                            rc = await self._run_cmd(excl_cmd, job)
+                            if rc != 0:
+                                raise RuntimeError(f"osmium exclude pass exited with code {rc}")
+                            shutil.move(str(excl_tmp), str(pbf_out))
+                            await self._finish_phase(job)
+
                         if job.columns_mode == "manual" and job.manual_keys:
                             await self._start_phase(job)
                             rc = await self._reduce_pbf_tags(pbf_out, job)
@@ -242,6 +263,26 @@ class FilterManager:
                         if rc != 0:
                             raise RuntimeError(f"osmium exited with code {rc}")
                         await self._finish_phase(job)
+
+                        if job.exclude_tags:
+                            excl_exprs = self._build_expressions(job, kind="exclude")
+                            excl_tmp = tmp / f"{stem}_excl.osm.pbf"
+                            await self._start_phase(job)
+                            excl_cmd = [
+                                "osmium",
+                                "tags-filter",
+                                str(intermediate),
+                                *excl_exprs,
+                                "--invert-match",
+                                "-o",
+                                str(excl_tmp),
+                                "--overwrite",
+                            ]
+                            rc = await self._run_cmd(excl_cmd, job)
+                            if rc != 0:
+                                raise RuntimeError(f"osmium exclude pass exited with code {rc}")
+                            intermediate = excl_tmp
+                            await self._finish_phase(job)
                     else:
                         continue
 

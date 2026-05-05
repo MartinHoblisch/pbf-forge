@@ -10,6 +10,7 @@ def _make_job(**kwargs) -> FilterJob:
         id="test-job",
         source_files=["berlin.osm.pbf"],
         tags=["amenity"],
+        exclude_tags=[],
         geometry_types=["nodes"],
         suffix="test",
         output_formats=["gpkg"],
