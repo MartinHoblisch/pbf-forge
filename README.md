@@ -39,11 +39,11 @@ cd pbf-forge
 ./start.sh
 ```
 
+`start.sh` handles first-run setup (config file creation, data directory). Running `docker compose up` directly is not recommended on a fresh clone — it skips this setup step.
+
 > **Linux:** if you get `permission denied while trying to connect to the Docker daemon socket`, your user is not in the `docker` group yet. Run `sudo usermod -aG docker $USER`, then log out and back in (or run `newgrp docker` in the current shell). Then retry `./start.sh`.
 
 Open <http://127.0.0.1:8000>. Choose a region, optionally apply a tag filter, export.
-
-`start.sh` handles first-run setup (config file creation, data directory). Running `docker compose up` directly is not recommended on a fresh clone — it skips this setup step.
 
 The container binds to `127.0.0.1` only and ships without authentication. **Do not expose it to a LAN or public internet.** See [SECURITY.md](SECURITY.md).
 
