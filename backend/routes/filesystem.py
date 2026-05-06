@@ -12,17 +12,24 @@ _HOST_DRIVES = Path("/host_drives")
 def _to_windows_path(rel: str) -> str:
     """Convert container-relative path to Windows path.
 
-    "h"         → "H:\\"
-    "h/foo/bar" → "H:\\foo\\bar"
+    Searches for the first single-letter alphabetic segment (the drive letter),
+    which may be nested under a prefix directory on some Docker Desktop setups.
+
+    "h"                        → "H:\\"
+    "h/foo/bar"                → "H:\\foo\\bar"
+    "host/h/foo/bar"           → "H:\\foo\\bar"
     """
     if not rel:
         return ""
     parts = Path(rel).parts
-    drive_seg = parts[0]
-    if len(drive_seg) != 1 or not drive_seg.isalpha():
+    drive_idx = next(
+        (i for i, p in enumerate(parts) if len(p) == 1 and p.isalpha()),
+        None,
+    )
+    if drive_idx is None:
         return ""
-    drive = drive_seg.upper()
-    rest = "\\".join(parts[1:])
+    drive = parts[drive_idx].upper()
+    rest = "\\".join(parts[drive_idx + 1 :])
     return f"{drive}:\\{rest}" if rest else f"{drive}:\\"
 
 
