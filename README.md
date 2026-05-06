@@ -1,6 +1,4 @@
-<div align="center">
-  <img src="docs/assets/logo.png" alt="PBF Forge logo" width="80" height="80">
-</div>
+<img src="docs/assets/logo.png" alt="PBF Forge" width="100%">
 
 # PBF Forge
 
