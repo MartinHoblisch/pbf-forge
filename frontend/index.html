@@ -581,7 +581,7 @@ footer .credits-sep { color: var(--border); }
         </div>
 
         <div class="form-group">
-          <label class="field-label">OSM-Tags zum Ausschließen <span class="info">(optional, eine pro Zeile)</span></label>
+          <label class="field-label"><span data-i18n="label_exclude_tags">OSM-Tags zum Ausschließen</span> <span class="info" data-i18n="exclude_tags_hint">(optional, eine pro Zeile)</span></label>
           <textarea id="filter-exclude-tags" placeholder="railway:traffic_mode=passenger&#10;access=private"></textarea>
         </div>
 
@@ -596,7 +596,7 @@ footer .credits-sep { color: var(--border); }
 
         <div class="form-group">
           <label class="field-label">Suffix <span class="info" data-i18n="suffix_hint">(Dateinamen-Anhang)</span></label>
-          <input type="text" id="filter-suffix" placeholder="z. B. railway">
+          <input type="text" id="filter-suffix" data-i18n-placeholder="ph_filter_suffix" placeholder="z. B. railway">
         </div>
 
         <div class="form-group">
@@ -679,17 +679,22 @@ footer .credits-sep { color: var(--border); }
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
         <div class="form-group">
           <label class="field-label" data-i18n="label_name">Name</label>
-          <input type="text" id="new-preset-name" placeholder="z. B. Schienennetz">
+          <input type="text" id="new-preset-name" data-i18n-placeholder="ph_preset_name" placeholder="z. B. Schienennetz">
         </div>
         <div class="form-group">
           <label class="field-label" data-i18n="label_suffix">Suffix</label>
-          <input type="text" id="new-preset-suffix" placeholder="z. B. railway">
+          <input type="text" id="new-preset-suffix" data-i18n-placeholder="ph_preset_suffix" placeholder="z. B. railway">
         </div>
       </div>
 
       <div class="form-group">
         <label class="field-label">OSM-Tags <span class="info" data-i18n="osm_tags_hint">(eine pro Zeile)</span></label>
         <textarea id="new-preset-tags" rows="3" placeholder="railway=rail&#10;railway=light_rail"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label"><span data-i18n="label_exclude_tags">OSM-Tags zum Ausschließen</span> <span class="info" data-i18n="exclude_tags_hint">(optional, eine pro Zeile)</span></label>
+        <textarea id="new-preset-exclude-tags" rows="2" placeholder="railway:traffic_mode=passenger&#10;access=private"></textarea>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
@@ -752,7 +757,7 @@ footer .credits-sep { color: var(--border); }
     <div class="form-group">
       <label class="field-label" data-i18n="onboard_label">Verzeichnis (Windows-Pfad)</label>
       <div class="path-input-wrap">
-        <input type="text" id="onboarding-path" placeholder="z. B. C:\Users\Martin\osm-data">
+        <input type="text" id="onboarding-path" data-i18n-placeholder="ph_data_dir" placeholder="z. B. C:\Users\Martin\osm-data">
         <button class="btn btn-secondary" id="btn-browse-onboarding" type="button" title="Ordner durchsuchen" data-i18n="onboard_browse">📂 Durchsuchen</button>
       </div>
     </div>
@@ -782,7 +787,7 @@ footer .credits-sep { color: var(--border); }
     <div class="form-group">
       <label class="field-label" data-i18n="cd_label">Neues Verzeichnis (Windows-Pfad)</label>
       <div class="path-input-wrap">
-        <input type="text" id="change-dir-input" placeholder="z. B. C:\Users\Martin\osm-data">
+        <input type="text" id="change-dir-input" data-i18n-placeholder="ph_data_dir" placeholder="z. B. C:\Users\Martin\osm-data">
         <button class="btn btn-secondary" id="btn-browse-changedir" type="button" title="Ordner durchsuchen" data-i18n="onboard_browse">📂 Durchsuchen</button>
       </div>
     </div>
@@ -851,9 +856,15 @@ const TRANSLATIONS = {
     card_filter_settings: 'Filtereinstellungen',
     label_source_files: 'Quelldatei(en)',
     osm_tags_hint: '(eine pro Zeile)',
+    label_exclude_tags: 'OSM-Tags zum Ausschließen',
+    exclude_tags_hint: '(optional, eine pro Zeile)',
     label_geo_types: 'Geometrietypen',
     label_suffix: 'Suffix',
     suffix_hint: '(Dateinamen-Anhang)',
+    ph_preset_name: 'z. B. Schienennetz',
+    ph_preset_suffix: 'z. B. railway',
+    ph_filter_suffix: 'z. B. railway',
+    ph_data_dir: 'z. B. C:\\Users\\Martin\\osm-data',
     label_output_format: 'Ausgabeformat',
     label_osm_attrs: 'OSM-Attribute',
     radio_standard: 'Standard',
@@ -985,9 +996,15 @@ const TRANSLATIONS = {
     card_filter_settings: 'Filter settings',
     label_source_files: 'Source file(s)',
     osm_tags_hint: '(one per line)',
+    label_exclude_tags: 'OSM tags to exclude',
+    exclude_tags_hint: '(optional, one per line)',
     label_geo_types: 'Geometry types',
     label_suffix: 'Suffix',
     suffix_hint: '(filename appendix)',
+    ph_preset_name: 'e.g. Railway Network',
+    ph_preset_suffix: 'e.g. railway',
+    ph_filter_suffix: 'e.g. railway',
+    ph_data_dir: 'e.g. C:\\Users\\Martin\\osm-data',
     label_output_format: 'Output format',
     label_osm_attrs: 'OSM Attributes',
     radio_standard: 'Standard',
@@ -1114,6 +1131,9 @@ function applyLang() {
   });
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.title = t(el.dataset.i18nTitle);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
   });
   document.getElementById('url-hint-p').innerHTML = t('url_hint');
   document.getElementById('lock-p').innerHTML = t('lock_p');
@@ -1799,7 +1819,8 @@ function loadPreset(id) {
   const p = presetList.find(x => x.id === id);
   if (!p) return;
 
-  document.getElementById('filter-tags').value    = (p.tags || []).join('\n');
+  document.getElementById('filter-tags').value         = (p.tags || []).join('\n');
+  document.getElementById('filter-exclude-tags').value = (p.exclude_tags || []).join('\n');
   document.getElementById('filter-suffix').value  = p.suffix || '';
   document.getElementById('geo-nodes').checked     = (p.geometry_types||[]).includes('nodes');
   document.getElementById('geo-ways').checked      = (p.geometry_types||[]).includes('ways');
@@ -1842,6 +1863,7 @@ function _cancelEdit() {
   document.getElementById('new-preset-name').value = '';
   document.getElementById('new-preset-suffix').value = '';
   document.getElementById('new-preset-tags').value = '';
+  document.getElementById('new-preset-exclude-tags').value = '';
 }
 
 function editPreset(id) {
@@ -1851,6 +1873,7 @@ function editPreset(id) {
   document.getElementById('new-preset-name').value = p.name || '';
   document.getElementById('new-preset-suffix').value = p.suffix || '';
   document.getElementById('new-preset-tags').value = (p.tags || []).join('\n');
+  document.getElementById('new-preset-exclude-tags').value = (p.exclude_tags || []).join('\n');
   ['nodes','ways','relations'].forEach(g =>
     document.getElementById('np-' + g).checked = (p.geometry_types || []).includes(g)
   );
@@ -1872,6 +1895,7 @@ async function savePreset() {
   if (!name) { errEl.textContent = t('err_preset_name'); errEl.style.display='block'; return; }
 
   const tags = document.getElementById('new-preset-tags').value.trim().split('\n').map(t2=>t2.trim()).filter(Boolean);
+  const excludeTags = document.getElementById('new-preset-exclude-tags').value.trim().split('\n').map(t2=>t2.trim()).filter(Boolean);
   const suffix = document.getElementById('new-preset-suffix').value.trim();
 
   const geoTypes = [];
@@ -1891,13 +1915,14 @@ async function savePreset() {
   const url = _editingPresetId ? `/api/presets/${_editingPresetId}` : '/api/presets';
   await fetch(url, {
     method, headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ name, tags, geometry_types:geoTypes, output_formats:fmts, suffix, columns_mode:cols, manual_keys:manualKeys })
+    body: JSON.stringify({ name, tags, exclude_tags:excludeTags, geometry_types:geoTypes, output_formats:fmts, suffix, columns_mode:cols, manual_keys:manualKeys })
   });
   _editingPresetId = null;
   _setEditMode(false);
   await loadPresets();
   document.getElementById('new-preset-name').value = '';
   document.getElementById('new-preset-tags').value = '';
+  document.getElementById('new-preset-exclude-tags').value = '';
   document.getElementById('new-preset-suffix').value = '';
 }
 
