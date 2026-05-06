@@ -41,7 +41,7 @@ cd pbf-forge
 ./start.sh
 ```
 
-Logs stream in the terminal. Open <http://127.0.0.1:8000>. Stop with Ctrl+C, then `./stop.sh` (or `docker compose down`).
+Logs stream in the terminal. Browser opens automatically once the container is ready. Stop with Ctrl+C (shuts down the container) or `./stop.sh`.
 
 > **Linux:** if you get `permission denied while trying to connect to the Docker daemon socket`, your user is not in the `docker` group yet. Run `sudo usermod -aG docker $USER`, then log out and back in (or run `newgrp docker` in the current shell). Then retry `./start.sh`.
 
