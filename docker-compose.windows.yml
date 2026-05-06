@@ -1,0 +1,8 @@
+# Windows-only compose override.
+# Adds the Docker Desktop drive mount used by the folder browser.
+# Applied automatically by start.bat via -f flag.
+# Do NOT use this file directly on Linux or macOS.
+services:
+  pbf-forge:
+    volumes:
+      - /mnt:/host_drives:ro

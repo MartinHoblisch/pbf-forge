@@ -9,7 +9,6 @@ services:
     volumes:
       - "${DATA_DIR:-./data}:/data"
       - ./user-config.json:/app/user-config.json
-      - /mnt:/host_drives:ro  # Docker Desktop (Windows) only; not present on Linux (gracefully ignored by the app)
     environment:
       - DATA_DIR=/data
       - HOST_DATA_DIR=${DATA_DIR:-./data}

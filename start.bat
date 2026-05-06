@@ -53,8 +53,8 @@ REM Create data directory before Docker creates it as root
 if not exist "!DATA_DIR!" mkdir "!DATA_DIR!" 2>nul
 
 REM Restart Docker with current DATA_DIR
-docker compose down --remove-orphans 2>nul
-docker compose up --build -d
+docker compose -f docker-compose.yml -f docker-compose.windows.yml down --remove-orphans 2>nul
+docker compose -f docker-compose.yml -f docker-compose.windows.yml up --build -d
 
 if errorlevel 1 (
     echo ERROR: Docker Compose failed.
