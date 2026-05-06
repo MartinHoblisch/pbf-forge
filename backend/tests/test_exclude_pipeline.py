@@ -1,4 +1,5 @@
 """Integration test: two-pass osmium exclusion pipeline."""
+
 from __future__ import annotations
 
 import subprocess
