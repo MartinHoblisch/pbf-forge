@@ -103,7 +103,6 @@ logs/
 .osm_tool_presets.json
 .osm_tool_urls.json
 .filter_history.json
-user-config.json
 
 # === GeoParquet ===
 *.parquet
