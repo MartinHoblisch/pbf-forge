@@ -8,7 +8,7 @@
 [![CI](https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml)
 
 <p align="center">
-  <img src="docs/assets/hero.gif" alt="PBF Forge — download a Geofabrik extract, filter by tag, export GeoPackage in under a minute" width="100%">
+  <img src="docs/assets/hero.gif" alt="PBF Forge — download a Geofabrik extract, filter by tag, export GeoPackage in under a minute" width="90%">
 </p>
 
 <details>
