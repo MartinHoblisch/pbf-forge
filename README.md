@@ -28,6 +28,12 @@
 
 ---
 
+## Why I built this
+
+I needed reproducible OSM tag-filtered extracts for small GIS jobs and grew tired of stitching `wget` + `osmium tags-filter` + `ogr2ogr` shell pipelines for each request. PBF Forge wraps that pipeline in a browser UI so a non-CLI user can run the same workflow without memorising flags. It does not replace `osmium-tool` or QGIS — it removes friction for the narrow "download → filter → export" loop.
+
+---
+
 ## Quickstart
 
 **Requires Docker Desktop or Docker Engine ≥ 24.**
@@ -57,10 +63,6 @@ Docker Desktop starts automatically if not running. The browser opens at <http:/
 `start.sh` / `start.bat` handle first-run setup (config file creation, data directory). Running `docker compose up` directly is not recommended on a fresh clone — it skips this setup step.
 
 The container binds to `127.0.0.1` only and ships without authentication. **Do not expose it to a LAN or public internet.** See [SECURITY.md](SECURITY.md).
-
----
-
-I needed reproducible OSM tag-filtered extracts for small GIS jobs and grew tired of stitching `wget` + `osmium tags-filter` + `ogr2ogr` shell pipelines for each request. PBF Forge wraps that pipeline in a browser UI so a non-CLI user can run the same workflow without memorising flags. It does not replace `osmium-tool` or QGIS — it removes friction for the narrow "download → filter → export" loop.
 
 ---
 
