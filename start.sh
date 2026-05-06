@@ -18,6 +18,9 @@ if [ ! -f "user-config.json" ]; then
         "$CONFIGURED" "$DATA_DIR_ENV" > user-config.json
 fi
 
+# Tell git to ignore local changes to user config (written by the backend)
+git update-index --skip-worktree user-config.json 2>/dev/null || true
+
 # Read host_data_dir from config (fallback ./data)
 DATA_DIR=$(python3 -c "import json; c=json.load(open('user-config.json')); print(c.get('host_data_dir',''))" 2>/dev/null || true)
 if [ -z "$DATA_DIR" ]; then
