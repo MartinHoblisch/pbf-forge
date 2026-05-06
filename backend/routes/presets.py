@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/presets")
 class PresetBody(BaseModel):
     name: str
     tags: list[str]
+    exclude_tags: list[str] = []
     geometry_types: list[Literal["nodes", "ways", "relations"]]
     output_formats: list[Literal["pbf", "geojson", "gpkg"]] = ["gpkg"]
     suffix: str = ""
