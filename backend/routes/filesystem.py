@@ -37,6 +37,11 @@ def _is_visible(name: str) -> bool:
     return not name.startswith((".", "$"))
 
 
+@router.get("/platform")
+def platform_info() -> dict:
+    return {"windows_host": _HOST_DRIVES.exists()}
+
+
 @router.get("/fs/browse")
 def browse_fs(path: str = "") -> dict:
     """List subdirectories for the folder browser.

@@ -1940,7 +1940,23 @@ function showTab(name) {
 
 // ─── Show/hide manual keys based on radio ─────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  applyLang();
+  (async () => {
+    try {
+      const res = await fetch('/api/platform');
+      const { windows_host } = await res.json();
+      if (!windows_host) {
+        TRANSLATIONS.en.onboard_label = 'Directory';
+        TRANSLATIONS.en.cd_label = 'New directory';
+        TRANSLATIONS.en.ph_data_dir = 'e.g. /home/martin/osm-data';
+        TRANSLATIONS.en.cd_p = 'After saving, <strong>start.sh</strong> must be run again for the change to take effect.';
+        TRANSLATIONS.de.onboard_label = 'Verzeichnis';
+        TRANSLATIONS.de.cd_label = 'Neues Verzeichnis';
+        TRANSLATIONS.de.ph_data_dir = 'z. B. /home/martin/osm-daten';
+        TRANSLATIONS.de.cd_p = TRANSLATIONS.de.cd_p.replace('start.bat', 'start.sh');
+      }
+    } catch { /* keep Windows defaults on error */ }
+    applyLang();
+  })();
 
   document.querySelectorAll('input[name="cols"]').forEach(r =>
     r.addEventListener('change', () => {
