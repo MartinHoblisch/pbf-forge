@@ -8,7 +8,6 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <p align="center">
   <img src="docs/assets/hero.gif" alt="PBF Forge — download a Geofabrik extract, filter by tag, export GeoPackage in under a minute" width="100%">
@@ -61,12 +60,7 @@ The container binds to `127.0.0.1` only and ships without authentication. **Do n
 
 ---
 
-<details>
-<summary><strong>Why I built this</strong></summary>
-
 I needed reproducible OSM tag-filtered extracts for small GIS jobs and grew tired of stitching `wget` + `osmium tags-filter` + `ogr2ogr` shell pipelines for each request. PBF Forge wraps that pipeline in a browser UI so a non-CLI user can run the same workflow without memorising flags. It does not replace `osmium-tool` or QGIS — it removes friction for the narrow "download → filter → export" loop.
-
-</details>
 
 ---
 
