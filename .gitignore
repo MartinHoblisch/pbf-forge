@@ -106,6 +106,9 @@ logs/
 
 # user-config.json is runtime state — never commit
 config/user-config.json
+config/.osm_tool_presets.json
+config/.osm_tool_urls.json
+config/.filter_history.json
 
 # === GeoParquet ===
 *.parquet
