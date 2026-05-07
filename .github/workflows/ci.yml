@@ -35,7 +35,54 @@ jobs:
         run: pip install pytest pytest-cov pytest-asyncio httpx
       - name: Run tests
         working-directory: backend
-        run: pytest tests/ --cov=. --cov-report=term-missing
+        run: pytest tests/ --cov=. --cov-report=term-missing --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: backend/coverage.xml
+          fail_ci_if_error: false
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Python deps (skip osmium — no Windows wheels)
+        shell: pwsh
+        run: |
+          (Get-Content backend\requirements.txt) |
+            Where-Object { $_ -notmatch '^\s*osmium' -and $_.Trim() -ne '' } |
+            Set-Content backend\requirements-win-tmp.txt
+          pip install -r backend\requirements-win-tmp.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
+      - name: Run tests (platform-safe subset)
+        working-directory: backend
+        run: pytest tests/ -m "not docker and not posix and not integration"
+
+  launcher-smoke-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify start.bat structure
+        shell: pwsh
+        run: |
+          $content = Get-Content start.bat -Raw
+          if ($content -notmatch 'docker compose') {
+            Write-Error 'start.bat: missing docker compose call'; exit 1
+          }
+          if ($content -notmatch 'docker info') {
+            Write-Error 'start.bat: missing docker info check'; exit 1
+          }
+          Write-Host "start.bat structure OK"
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get install -y --no-install-recommends shellcheck
+      - run: shellcheck start.sh stop.sh
 
   docker-build:
     runs-on: ubuntu-latest
