@@ -137,6 +137,9 @@ class DownloadManager:
         self._loop = loop
 
     def _load_url_mapping(self) -> None:
+        _old = DATA_DIR / ".osm_tool_urls.json"
+        if not URLS_FILE.exists() and _old.exists():
+            shutil.copy(_old, URLS_FILE)
         self._url_mapping = dict(CONTINENTAL_URLS)
         if URLS_FILE.exists():
             try:

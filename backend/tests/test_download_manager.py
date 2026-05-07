@@ -331,3 +331,34 @@ def test_download_worker_checksum_failure_marks_error(tmp_data_dir):
     with dm._lock:
         assert dm._files[filename].status == "error"
         assert "MD5 mismatch" in dm._files[filename].error
+
+
+def test_urls_migrate_from_data_dir(tmp_path, monkeypatch):
+    """Custom URLs in DATA_DIR are copied to CONFIG_DIR on first load."""
+    import json
+    import config as cfg
+    import download_manager as dm
+
+    tmp_data = tmp_path / "data"
+    tmp_data.mkdir(exist_ok=True)
+    tmp_cfg = tmp_path / "config"
+    tmp_cfg.mkdir(exist_ok=True)
+
+    old_file = tmp_data / ".osm_tool_urls.json"
+    new_file = tmp_cfg / ".osm_tool_urls.json"
+    old_file.write_text(
+        json.dumps({"custom.osm.pbf": "https://example.com/custom.osm.pbf"}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(cfg, "DATA_DIR", tmp_data)
+    monkeypatch.setattr(cfg, "URLS_FILE", new_file)
+    monkeypatch.setattr(dm, "DATA_DIR", tmp_data)
+    monkeypatch.setattr(dm, "URLS_FILE", new_file)
+
+    manager = dm.DownloadManager(ws_manager=MagicMock())
+    manager._load_url_mapping()
+
+    assert new_file.exists()
+    assert "custom.osm.pbf" in manager._url_mapping
+    assert old_file.exists()  # original not deleted
