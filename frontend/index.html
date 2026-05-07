@@ -35,6 +35,9 @@ header {
   display: flex;
   align-items: center;
   gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
 #ws-indicator {
@@ -71,6 +74,9 @@ nav.tabs {
   border-bottom: 1px solid var(--border);
   display: flex;
   padding: 0 1.5rem;
+  position: sticky;
+  top: 52px;
+  z-index: 99;
 }
 .tab-btn {
   padding: .75rem 1.25rem;
