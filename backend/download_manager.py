@@ -79,7 +79,7 @@ class FileState:
     speed_bps: float = 0.0
     eta_seconds: float = 0.0
     error: Optional[str] = None
-    retry_at: Optional[str] = None      # ISO timestamp of next slow retry
+    retry_at: Optional[str] = None  # ISO timestamp of next slow retry
     retry_attempt: Optional[int] = None  # slow retry attempt counter
 
     def to_dict(self) -> dict:
