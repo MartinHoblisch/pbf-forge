@@ -72,7 +72,6 @@ def test_get_preset_unknown_id_returns_none(tmp_data_dir):
 
 def test_presets_migrate_from_data_dir(tmp_path, monkeypatch):
     """Existing presets in DATA_DIR are copied to CONFIG_DIR on first load."""
-    import shutil as _shutil
     import config as cfg
     import presets as pm
 

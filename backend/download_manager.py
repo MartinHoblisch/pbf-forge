@@ -72,7 +72,8 @@ class FileState:
     local_mtime: Optional[str] = None
     server_size: Optional[int] = None
     server_mtime: Optional[str] = None
-    # unknown | not_downloaded | checking | up_to_date | update_available | downloading | waiting_retry | error
+    # unknown | not_downloaded | checking | up_to_date | update_available
+    # downloading | waiting_retry | error
     status: str = "unknown"
     downloaded_bytes: int = 0
     speed_bps: float = 0.0

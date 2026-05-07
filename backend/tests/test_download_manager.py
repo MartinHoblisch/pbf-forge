@@ -404,9 +404,9 @@ def test_download_worker_checksum_failure_marks_error(tmp_data_dir):
 
 def test_urls_migrate_from_data_dir(tmp_path, monkeypatch):
     """Custom URLs in DATA_DIR are copied to CONFIG_DIR on first load."""
-    import json
     import config as cfg
     import download_manager as dm
+    import json
 
     tmp_data = tmp_path / "data"
     tmp_data.mkdir(exist_ok=True)

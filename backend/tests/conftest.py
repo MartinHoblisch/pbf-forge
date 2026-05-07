@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Generator
 from unittest.mock import MagicMock
 
+import config
 import download_manager as dm_module
 import filter_manager as fm_module
 import httpx
@@ -14,8 +15,6 @@ import routes.settings as routes_settings_module
 import state
 from fastapi.testclient import TestClient
 from main import app
-
-import config
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
