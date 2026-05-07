@@ -35,18 +35,18 @@ echo Docker Desktop is ready.
 :docker_ready
 
 REM Create user-config.json if missing (with migration from .env if present)
-if not exist "user-config.json" (
+if not exist "config\user-config.json" (
     powershell -ExecutionPolicy Bypass -NoProfile -Command ^
         "$env_content = Get-Content '.env' -Raw -ErrorAction SilentlyContinue;" ^
         "$data_dir = if ($env_content -match 'DATA_DIR=([^\r\n]+)') { $matches[1].Trim() } else { '' };" ^
         "$configured = [bool]$data_dir;" ^
         "$cfg = [ordered]@{ configured = $configured; host_data_dir = $data_dir; pending_restart = $false };" ^
-        "$cfg | ConvertTo-Json | Set-Content -Encoding utf8 'user-config.json'"
+        "$cfg | ConvertTo-Json | Set-Content -Encoding utf8 'config\user-config.json'"
 )
 
 REM Read host_data_dir from user-config.json (empty = fallback to .\data)
 set "DATA_DIR="
-for /f "usebackq delims=" %%D in (`powershell -ExecutionPolicy Bypass -NoProfile -Command "(Get-Content 'user-config.json' -Raw | ConvertFrom-Json).host_data_dir"`) do set "DATA_DIR=%%D"
+for /f "usebackq delims=" %%D in (`powershell -ExecutionPolicy Bypass -NoProfile -Command "(Get-Content 'config\user-config.json' -Raw | ConvertFrom-Json).host_data_dir"`) do set "DATA_DIR=%%D"
 if "!DATA_DIR!"=="" set "DATA_DIR=.\data"
 
 REM Create data directory before Docker creates it as root
