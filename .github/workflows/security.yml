@@ -88,6 +88,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
+          limit-severities-for-sarif: true
 
       - name: Upload SARIF
         if: always()
