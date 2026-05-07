@@ -17,7 +17,7 @@ from typing import Literal, Optional
 
 from filter_history import FilterHistory
 
-from config import ATTRIBUTION, DATA_DIR
+from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR
 
 _log = logging.getLogger(__name__)
 
