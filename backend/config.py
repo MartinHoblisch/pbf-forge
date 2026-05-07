@@ -5,10 +5,12 @@ import time
 from pathlib import Path
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
-URLS_FILE = DATA_DIR / ".osm_tool_urls.json"
-PRESETS_FILE = DATA_DIR / ".osm_tool_presets.json"
+CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/app/config"))
 
-USER_CONFIG_FILE = Path("/app/user-config.json")
+URLS_FILE = CONFIG_DIR / ".osm_tool_urls.json"
+PRESETS_FILE = CONFIG_DIR / ".osm_tool_presets.json"
+
+USER_CONFIG_FILE = CONFIG_DIR / "user-config.json"
 STARTUP_TIME = time.time()
 
 ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0). Data sourced via Geofabrik."
