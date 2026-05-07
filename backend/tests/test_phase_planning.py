@@ -142,3 +142,22 @@ def test_missing_file_fallback_weight(tmp_path, monkeypatch):
 
     assert len(phases) == 1
     assert phases[0].weight == pytest.approx(1.0)
+
+
+# ── filter history migration ──────────────────────────────────────────────────
+
+
+def test_filter_history_migrates_from_data_dir(tmp_data_dir, tmp_config_dir):
+    # Arrange: old history file exists in DATA_DIR, not in CONFIG_DIR
+    old_history = tmp_data_dir / ".filter_history.json"
+    old_history.write_text('{"v": 1, "entries": []}', encoding="utf-8")
+
+    # Act: instantiate FilterManager (triggers migration in __init__)
+    _make_manager()
+
+    # Assert: new file exists in CONFIG_DIR
+    new_history = tmp_config_dir / ".filter_history.json"
+    assert new_history.exists(), "history file should be copied to CONFIG_DIR"
+
+    # Assert: old file still exists (no deletion)
+    assert old_history.exists(), "original history file must not be deleted"

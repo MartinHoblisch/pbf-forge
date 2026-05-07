@@ -115,7 +115,11 @@ class FilterManager:
         self._ws = ws_manager
         self._jobs: dict[str, FilterJob] = {}
         self._procs: dict[str, asyncio.subprocess.Process] = {}
-        self._history = FilterHistory(DATA_DIR / ".filter_history.json")
+        _old_history = DATA_DIR / ".filter_history.json"
+        _new_history = CONFIG_DIR / ".filter_history.json"
+        if not _new_history.exists() and _old_history.exists():
+            shutil.copy(_old_history, _new_history)
+        self._history = FilterHistory(_new_history)
 
     def list_jobs(self) -> list[dict]:
         return [j.to_dict() for j in reversed(list(self._jobs.values()))]
