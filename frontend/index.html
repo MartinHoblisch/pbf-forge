@@ -917,6 +917,8 @@ const TRANSLATIONS = {
     status_not_downloaded: 'Nicht vorhanden',
     status_downloading: 'Lädt …',
     status_checking: 'Wird geprüft',
+    status_waiting_retry: 'Verbindung unterbrochen',
+    retry_countdown: 'Neuer Versuch in {time} (Versuch {n})',
     status_error: 'Fehler',
     status_unknown: 'Unbekannt',
     ws_connecting: 'Verbinde …',
@@ -1057,6 +1059,8 @@ const TRANSLATIONS = {
     status_not_downloaded: 'Not downloaded',
     status_downloading: 'Downloading…',
     status_checking: 'Checking',
+    status_waiting_retry: 'Connection lost',
+    retry_countdown: 'Retry in {time} (attempt {n})',
     status_error: 'Error',
     status_unknown: 'Unknown',
     ws_connecting: 'Connecting…',
@@ -1159,6 +1163,7 @@ function toggleLang() {
 // ─── State ───────────────────────────────────────────────────────────────────
 let files = [];
 let filterJobs = [];
+let _retryCountdownTimer = null;
 let presetList = [];
 let _editingPresetId = null;
 let urlInfoData = null;
@@ -1316,6 +1321,7 @@ function getStatusLabels() {
     not_downloaded:   ['badge-gray',   '↓ ' + t('status_not_downloaded')],
     downloading:      ['badge-blue',   '↓ ' + t('status_downloading')],
     checking:         ['badge-blue',   '⟳ ' + t('status_checking')],
+    waiting_retry:    ['badge-orange', '⟳ ' + t('status_waiting_retry')],
     error:            ['badge-red',    '✗ ' + t('status_error')],
     unknown:          ['badge-gray',   '? ' + t('status_unknown')],
   };
@@ -1419,21 +1425,30 @@ function renderFiles() {
     tbody.innerHTML = `<tr><td colspan="6" style="color:var(--gray);text-align:center;padding:2rem">${t('no_files')}</td></tr>`;
     return;
   }
+  clearInterval(_retryCountdownTimer);
   tbody.innerHTML = sorted.map(f => {
     const pct = (f.server_size && f.downloaded_bytes)
       ? Math.round(f.downloaded_bytes / f.server_size * 100)
       : (f.status === 'up_to_date' && f.local_size && f.server_size ? 100 : 0);
 
     const eta = fmtEta(f.eta_seconds);
-    const progressCell = f.status === 'downloading'
-      ? `<div class="progress-wrap">
+    let progressCell;
+    if (f.status === 'downloading') {
+      progressCell = `<div class="progress-wrap">
            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
            <div class="progress-meta">${pct}%${fmtSpeed(f.speed_bps) ? ' · ' + fmtSpeed(f.speed_bps) : ''}${eta ? ' · ' + eta : ''}</div>
-         </div>`
-      : '—';
+         </div>`;
+    } else if (f.status === 'waiting_retry' && f.retry_at) {
+      const secsLeft = Math.max(0, Math.round((new Date(f.retry_at) - Date.now()) / 1000));
+      const attempt = f.retry_attempt ?? 1;
+      const countdown = t('retry_countdown').replace('{time}', fmtEta(secsLeft)).replace('{n}', attempt);
+      progressCell = `<span data-retry-at="${escHtml(f.retry_at)}" data-retry-attempt="${attempt}" style="font-size:.82rem;color:var(--orange)">${countdown}</span>`;
+    } else {
+      progressCell = '—';
+    }
 
     const canDownload = f.url && ['update_available','not_downloaded','unknown','error'].includes(f.status);
-    const canCancel   = f.status === 'downloading';
+    const canCancel   = ['downloading', 'waiting_retry'].includes(f.status);
 
     const actions = `
       ${canDownload ? `<button class="btn btn-secondary btn-sm" onclick="downloadOne('${f.filename}')">${t('btn_download')}</button>` : ''}
@@ -1452,6 +1467,16 @@ function renderFiles() {
       <td style="white-space:nowrap">${actions || '—'}</td>
     </tr>`;
   }).join('');
+
+  if (files.some(f => f.status === 'waiting_retry')) {
+    _retryCountdownTimer = setInterval(() => {
+      document.querySelectorAll('[data-retry-at]').forEach(cell => {
+        const secsLeft = Math.max(0, Math.round((new Date(cell.dataset.retryAt) - Date.now()) / 1000));
+        const attempt = parseInt(cell.dataset.retryAttempt, 10);
+        cell.textContent = t('retry_countdown').replace('{time}', fmtEta(secsLeft)).replace('{n}', attempt);
+      });
+    }, 5000);
+  }
 }
 
 async function loadFiles() {

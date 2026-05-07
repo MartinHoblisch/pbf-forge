@@ -17,7 +17,12 @@ ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0). Data sourced via Geofab
 
 MAX_CONCURRENT_DOWNLOADS = 3
 CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
-MAX_RETRIES = 3
+MAX_RETRIES = 5
+
+PERMANENT_HTTP_STATUSES: frozenset[int] = frozenset({400, 401, 403, 404, 405, 410, 451})
+TRANSIENT_HTTP_STATUSES: frozenset[int] = frozenset({408, 429, 500, 502, 503, 504})
+SLOW_RETRY_INTERVAL_SECONDS = 600  # 10 minutes between network-error retries
+MAX_RETRY_AFTER_SECONDS = 60  # cap on Retry-After header value
 
 # Europe-latest ~30 GB. 100 GB leaves headroom but blocks pathological URLs.
 MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100 GB

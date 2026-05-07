@@ -11,7 +11,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Optional
@@ -25,12 +25,31 @@ from config import (
     MAX_CONCURRENT_DOWNLOADS,
     MAX_DOWNLOAD_SIZE,
     MAX_RETRIES,
+    MAX_RETRY_AFTER_SECONDS,
     MIN_FREE_DISK_BUFFER,
+    PERMANENT_HTTP_STATUSES,
+    SLOW_RETRY_INTERVAL_SECONDS,
+    TRANSIENT_HTTP_STATUSES,
     URLS_FILE,
     USER_AGENT,
 )
 
 _log = logging.getLogger(__name__)
+
+
+def _retry_delay(response: requests.Response | None, attempt: int) -> float:
+    """Return seconds to wait before next fast retry.
+
+    Honors Retry-After header on 429 responses (capped); otherwise exponential backoff.
+    """
+    if response is not None:
+        header = response.headers.get("Retry-After")
+        if header:
+            try:
+                return min(float(header), MAX_RETRY_AFTER_SECONDS)
+            except ValueError:
+                pass  # HTTP-date form — ignore, use backoff
+    return float(2**attempt)
 
 
 def url_to_filename(url: str) -> str:
@@ -53,12 +72,14 @@ class FileState:
     local_mtime: Optional[str] = None
     server_size: Optional[int] = None
     server_mtime: Optional[str] = None
-    # unknown | not_downloaded | checking | up_to_date | update_available | downloading | error
+    # unknown | not_downloaded | checking | up_to_date | update_available | downloading | waiting_retry | error
     status: str = "unknown"
     downloaded_bytes: int = 0
     speed_bps: float = 0.0
     eta_seconds: float = 0.0
     error: Optional[str] = None
+    retry_at: Optional[str] = None      # ISO timestamp of next slow retry
+    retry_attempt: Optional[int] = None  # slow retry attempt counter
 
     def to_dict(self) -> dict:
         return {
@@ -73,6 +94,8 @@ class FileState:
             "speed_bps": self.speed_bps,
             "eta_seconds": self.eta_seconds,
             "error": self.error,
+            "retry_at": self.retry_at,
+            "retry_attempt": self.retry_attempt,
         }
 
 
@@ -385,11 +408,71 @@ class DownloadManager:
                             url, dest, start_byte, size, tracker, state, cancel, session
                         )
                         break
-                    except (requests.ConnectionError, requests.Timeout):
+                    except requests.HTTPError as exc:
+                        code = exc.response.status_code if exc.response is not None else 0
+                        reason = exc.response.reason if exc.response is not None else ""
+                        is_permanent = code in PERMANENT_HTTP_STATUSES or (
+                            400 <= code < 500 and code not in TRANSIENT_HTTP_STATUSES
+                        )
+                        if is_permanent:
+                            raise RuntimeError(
+                                f"HTTP {code} {reason} — permanent error, not retrying"
+                            ) from exc
                         if attempt == MAX_RETRIES - 1:
-                            raise
-                        time.sleep(2**attempt)
+                            raise RuntimeError(
+                                f"HTTP {code} {reason} — failed after {MAX_RETRIES} retries"
+                            ) from exc
+                        time.sleep(_retry_delay(exc.response, attempt))
                         start_byte = dest.stat().st_size if dest.exists() else start_byte
+                    except requests.exceptions.SSLError as exc:
+                        raise RuntimeError(f"SSL error — not retrying: {exc}") from exc
+                    except (
+                        requests.ConnectionError,
+                        requests.Timeout,
+                        requests.exceptions.ChunkedEncodingError,
+                    ):
+                        # Network unreachable — slow retry loop (10-min interval, until cancelled)
+                        slow_attempt = 0
+                        while not cancel.is_set():
+                            slow_attempt += 1
+                            retry_at = datetime.now(timezone.utc) + timedelta(
+                                seconds=SLOW_RETRY_INTERVAL_SECONDS
+                            )
+                            with self._lock:
+                                state.status = "waiting_retry"
+                                state.retry_at = retry_at.isoformat()
+                                state.retry_attempt = slow_attempt
+                            self._broadcast({"type": "file_update", "file": state.to_dict()})
+                            # Block until cancelled or timeout expires — no busy-spin
+                            cancel.wait(timeout=SLOW_RETRY_INTERVAL_SECONDS)
+                            if cancel.is_set():
+                                break
+                            start_byte = dest.stat().st_size if dest.exists() else start_byte
+                            with self._lock:
+                                state.status = "downloading"
+                                state.retry_at = None
+                            self._broadcast({"type": "file_update", "file": state.to_dict()})
+                            try:
+                                self._do_download(
+                                    url,
+                                    dest,
+                                    start_byte,
+                                    size,
+                                    tracker,
+                                    state,
+                                    cancel,
+                                    session,
+                                )
+                                break  # success — exit slow retry loop
+                            except (
+                                requests.ConnectionError,
+                                requests.Timeout,
+                                requests.exceptions.ChunkedEncodingError,
+                            ):
+                                continue  # still offline — wait again
+                            except Exception:
+                                raise  # other error — bubble up
+                        break  # exit fast retry loop (slow loop handled everything)
 
             if cancel.is_set():
                 with self._lock:

@@ -182,20 +182,89 @@ def test_same_version_becomes_up_to_date(tmp_data_dir):
         assert dm._files[filename].status == "up_to_date"
 
 
-def test_three_errors_sets_status_error(tmp_data_dir):
+def test_http_5xx_exhausted_sets_status_error(tmp_data_dir):
+    """Transient HTTP errors (5xx) exhaust MAX_RETRIES fast retries then mark error."""
     import download_manager as dm_module
 
     filename = "test.osm.pbf"
     dm = _make_dm(tmp_data_dir)
     _setup_downloading(dm, filename)
 
+    mock_resp = MagicMock()
+    mock_resp.status_code = 503
+    mock_resp.reason = "Service Unavailable"
+    mock_resp.headers = {}
+    http_error = requests.HTTPError(response=mock_resp)
+
     with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME_OLD)):
-        with patch.object(dm, "_do_download", side_effect=requests.ConnectionError("fail")):
-            with patch.object(dm_module.time, "sleep"):  # skip actual sleep
+        with patch.object(dm, "_do_download", side_effect=http_error):
+            with patch.object(dm_module.time, "sleep"):  # skip backoff sleeps
                 dm._download_worker(filename, threading.Event())
 
     with dm._lock:
         assert dm._files[filename].status == "error"
+        assert "503" in dm._files[filename].error
+
+
+def test_http_404_fails_immediately_no_retry(tmp_data_dir):
+    """Permanent HTTP errors (404) fail on first attempt — no retries."""
+    import download_manager as dm_module
+
+    filename = "test.osm.pbf"
+    dm = _make_dm(tmp_data_dir)
+    _setup_downloading(dm, filename)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 404
+    mock_resp.reason = "Not Found"
+    mock_resp.headers = {}
+    http_error = requests.HTTPError(response=mock_resp)
+
+    do_download_mock = MagicMock(side_effect=http_error)
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME_OLD)):
+        with patch.object(dm, "_do_download", do_download_mock):
+            with patch.object(dm_module.time, "sleep"):
+                dm._download_worker(filename, threading.Event())
+
+    with dm._lock:
+        assert dm._files[filename].status == "error"
+        assert "404" in dm._files[filename].error
+        assert "permanent" in dm._files[filename].error
+    assert do_download_mock.call_count == 1  # no retries
+
+
+def test_connection_error_sets_waiting_retry_then_cancel_exits(tmp_data_dir):
+    """ConnectionError triggers slow retry loop; cancel during wait ends cleanly."""
+    filename = "test.osm.pbf"
+    dm = _make_dm(tmp_data_dir)
+    _setup_downloading(dm, filename)
+    cancel = threading.Event()
+    waiting_retry_seen = []
+
+    original_broadcast = dm._broadcast
+
+    def capture_broadcast(msg):
+        if msg.get("type") == "file_update":
+            s = msg["file"].get("status")
+            if s == "waiting_retry":
+                waiting_retry_seen.append(True)
+        original_broadcast(msg)
+
+    def fake_wait(timeout=None):
+        # Simulate user cancelling while waiting for slow retry
+        cancel.set()
+        return True  # True = event was set (cancelled)
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME_OLD)):
+        with patch.object(dm, "_do_download", side_effect=requests.ConnectionError("net down")):
+            with patch.object(dm, "_broadcast", side_effect=capture_broadcast):
+                with patch.object(cancel, "wait", side_effect=fake_wait):
+                    dm._download_worker(filename, cancel)
+
+    with dm._lock:
+        assert dm._files[filename].status == "unknown"  # cancelled → unknown
+    assert waiting_retry_seen, "status 'waiting_retry' was never broadcast"
 
 
 # ── Concurrency ───────────────────────────────────────────────────────────────
