@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Package versions locked by Ubuntu 24.04 LTS APT snapshot (Noble):
 #   osmium-tool ~2.19  gdal-bin ~3.8  python3 ~3.12
 # To verify installed versions: apt-cache policy <package>
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     osmium-tool \
     gdal-bin \
     python3 \
