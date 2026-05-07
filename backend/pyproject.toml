@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: tests that invoke real external binaries (osmium, ogr2ogr)",
+    "docker: tests requiring Docker daemon or external binaries unavailable on Windows runners",
+    "posix: tests using POSIX-only features (symlinks, fork, signals, chmod modes)",
+]

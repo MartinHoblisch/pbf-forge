@@ -52,6 +52,7 @@ def test_fs_browse_outside_allowed_returns_error(client, mock_host_drives):
     assert "error" in resp.json()
 
 
+@pytest.mark.posix
 def test_fs_browse_symlink_outside_returns_error(client, mock_host_drives, tmp_path):
     outside = tmp_path / "outside"
     outside.mkdir()

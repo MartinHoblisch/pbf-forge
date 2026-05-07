@@ -73,6 +73,7 @@ def mini_rail_pbf(tmp_data_dir):
 
 
 @pytest.mark.integration
+@pytest.mark.docker
 async def test_exclude_pipeline_removes_passenger_rail(mini_rail_pbf, tmp_data_dir):
     fm = FilterManager(ws_manager=AsyncMock())
     job = fm.create_job(
@@ -98,6 +99,7 @@ async def test_exclude_pipeline_removes_passenger_rail(mini_rail_pbf, tmp_data_d
 
 
 @pytest.mark.integration
+@pytest.mark.docker
 async def test_include_only_baseline(mini_rail_pbf, tmp_data_dir):
     """Without exclude_tags, both rail ways appear (baseline comparison)."""
     fm = FilterManager(ws_manager=AsyncMock())
