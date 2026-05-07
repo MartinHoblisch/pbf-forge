@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
+
 from config import (
     CHUNK_SIZE,
     CONTINENTAL_URLS,

@@ -5,8 +5,9 @@ import sqlite3
 from unittest.mock import MagicMock
 
 import pytest
-from config import ATTRIBUTION
 from filter_manager import FilterManager
+
+from config import ATTRIBUTION
 
 # ── Provenance ────────────────────────────────────────────────────────────────
 

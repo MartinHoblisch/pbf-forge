@@ -4,9 +4,10 @@ import json
 import logging
 import re
 
-from config import STARTUP_TIME, USER_CONFIG_FILE
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+from config import STARTUP_TIME, USER_CONFIG_FILE
 
 _log = logging.getLogger(__name__)
 

@@ -4,9 +4,10 @@ import re
 from typing import Literal, Optional
 
 import state
-from config import DATA_DIR
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, field_validator
+
+from config import DATA_DIR
 
 router = APIRouter(prefix="/api/filter")
 
