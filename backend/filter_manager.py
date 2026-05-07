@@ -549,7 +549,8 @@ class FilterManager:
             return f'"{f}"'
 
         if job.columns_mode == "manual" and job.manual_keys:
-            col_list = ", ".join(q(k) for k in job.manual_keys)
+            available = set(fields)
+            col_list = ", ".join(q(k) for k in job.manual_keys if k in available)
         else:
             col_list = ", ".join(q(f) for f in fields)
 
