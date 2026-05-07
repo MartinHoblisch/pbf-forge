@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import filter_manager as fm_module
 import pytest
+
+import filter_manager as fm_module
 from filter_manager import FilterJob, FilterManager
 
 

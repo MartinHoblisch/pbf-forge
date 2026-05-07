@@ -6,6 +6,7 @@ import subprocess
 from unittest.mock import AsyncMock
 
 import pytest
+
 from filter_manager import FilterManager
 
 _MINI_RAIL_OSM = """\

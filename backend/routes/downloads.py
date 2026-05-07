@@ -4,10 +4,11 @@ import ipaddress
 from typing import Optional
 from urllib.parse import urlparse
 
-import state
-from download_manager import url_to_filename
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
+
+import state
+from download_manager import url_to_filename
 
 _BLOCKED_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})
 

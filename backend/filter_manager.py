@@ -15,9 +15,8 @@ from pathlib import Path
 from statistics import median
 from typing import Literal, Optional
 
-from filter_history import FilterHistory
-
 from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR
+from filter_history import FilterHistory
 
 _log = logging.getLogger(__name__)
 

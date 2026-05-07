@@ -17,7 +17,6 @@ import routes.settings as routes_settings_module
 import state
 from main import app
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+
 from download_manager import DownloadManager, FileState
 
 

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-import presets as presets_mod
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+import presets as presets_mod
 
 router = APIRouter(prefix="/api/presets")
 

@@ -8,19 +8,19 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
-import state
-from download_manager import DownloadManager
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+import state
+from config import USER_CONFIG_FILE
+from download_manager import DownloadManager
 from filter_manager import FilterManager
 from routes import downloads, presets
 from routes import filesystem as filesystem_routes
 from routes import filter as filter_routes
 from routes import settings as settings_routes
 from ws_manager import ConnectionManager
-
-from config import USER_CONFIG_FILE
 
 _log = logging.getLogger(__name__)
 _STATIC = Path(__file__).parent.parent / "frontend"

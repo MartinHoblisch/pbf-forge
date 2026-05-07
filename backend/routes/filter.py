@@ -3,10 +3,10 @@ from __future__ import annotations
 import re
 from typing import Literal, Optional
 
-import state
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, field_validator
 
+import state
 from config import DATA_DIR
 
 router = APIRouter(prefix="/api/filter")
