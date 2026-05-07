@@ -3,3 +3,17 @@ line-length = 100
 
 [lint]
 select = ["E", "W", "F", "I"]
+
+[lint.isort]
+known-first-party = [
+    "config",
+    "download_manager",
+    "filter_history",
+    "filter_manager",
+    "main",
+    "pbf_tag_reducer",
+    "presets",
+    "routes",
+    "state",
+    "ws_manager",
+]
