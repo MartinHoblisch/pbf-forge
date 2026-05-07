@@ -2,7 +2,7 @@
 # For fully reproducible builds, replace the tag with a digest:
 #   docker pull ubuntu:24.04 && docker inspect ubuntu:24.04 --format='{{index .RepoDigests 0}}'
 # Refresh quarterly or when security advisories appear — see CONTRIBUTING.md.
-FROM ubuntu:24.04
+FROM ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
 
 # Avoid interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
