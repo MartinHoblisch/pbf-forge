@@ -6,8 +6,15 @@
 
 > Self-hosted web UI for downloading OSM PBF extracts from Geofabrik and filtering them by tag. Docker-only. Exports GeoPackage, GeoJSON, GeoParquet.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/martinhoblisch/pbf-forge/releases/latest"><img src="https://img.shields.io/github/v/release/martinhoblisch/pbf-forge" alt="Release"></a>
+  <a href="https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml"><img src="https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml"><img src="https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml/badge.svg" alt="Security (CodeQL · Trivy)"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/martinhoblisch/pbf-forge"><img src="https://api.scorecard.dev/projects/github.com/martinhoblisch/pbf-forge/badge" alt="OpenSSF Scorecard"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue" alt="Platform: Windows | Linux">
+  <a href="https://codecov.io/gh/martinhoblisch/pbf-forge"><img src="https://codecov.io/gh/martinhoblisch/pbf-forge/branch/main/graph/badge.svg" alt="Coverage"></a>
+</p>
 
 <p align="center">
   <img src="docs/assets/hero.gif" alt="PBF Forge — download a Geofabrik extract, filter by tag, export GeoPackage in under a minute" width="90%">
@@ -158,6 +165,22 @@ User-facing features under consideration are tracked in [docs/ROADMAP.md](docs/R
 **Privacy.** PBF Forge does not collect telemetry, analytics, crash reports, or usage statistics. It does not phone home for update checks. The HTML/CSS/JS are served locally from the container — no Google Fonts, no CDN scripts, no third-party trackers. The only outbound network calls at runtime are to `download.geofabrik.de` for the PBF you requested and its `.md5` checksum file. Container logs (uvicorn access log, application stderr) stay inside the container; nothing is shipped off the host.
 
 **Commercial use.** OpenStreetMap data is licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright). PBF Forge embeds ODbL attribution in every GeoPackage, GeoParquet, and GeoJSON it produces — you must keep that attribution intact in any downstream product. **Geofabrik downloads themselves are free for non-commercial use; commercial users should review <https://www.geofabrik.de/geofabrik/agb.html> before deploying PBF Forge in a commercial workflow.**
+
+---
+
+## Security
+
+CI verifies builds on Ubuntu and runs the full test suite on Windows; all images are CVE-scanned via Trivy on every push.
+
+| What | How |
+|---|---|
+| Static analysis (SAST) | [CodeQL](https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml) runs on every push and pull request |
+| Dependency vulnerabilities | [Dependabot](https://github.com/martinhoblisch/pbf-forge/security/dependabot) watches pip packages and GitHub Actions |
+| Docker image CVEs | [Trivy](https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml) scans the image on every push — build fails on CRITICAL or HIGH findings |
+| Supply-chain posture | [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/martinhoblisch/pbf-forge) runs weekly |
+| Secret leak prevention | GitHub Push Protection is active on this repository |
+
+See [SECURITY.md](SECURITY.md) for the vulnerability disclosure process, scope, and response SLA.
 
 ---
 
