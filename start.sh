@@ -4,7 +4,7 @@ set -e
 echo "Starting PBF Forge..."
 
 # Create user-config.json if missing (migrate from .env if present)
-if [ ! -f "user-config.json" ]; then
+if [ ! -f "config/user-config.json" ]; then
     DATA_DIR_ENV=""
     if [ -f ".env" ]; then
         DATA_DIR_ENV=$(grep -oP '(?<=DATA_DIR=)[^\r\n]+' .env | head -1 | tr -d '[:space:]' || true)
@@ -14,15 +14,13 @@ if [ ! -f "user-config.json" ]; then
     else
         CONFIGURED="false"
     fi
+    mkdir -p config
     printf '{\n  "configured": %s,\n  "host_data_dir": "%s",\n  "pending_restart": false\n}\n' \
-        "$CONFIGURED" "$DATA_DIR_ENV" > user-config.json
+        "$CONFIGURED" "$DATA_DIR_ENV" > config/user-config.json
 fi
 
-# Tell git to ignore local changes to user config (written by the backend)
-git update-index --skip-worktree user-config.json 2>/dev/null || true
-
 # Read host_data_dir from config (fallback ./data)
-DATA_DIR=$(python3 -c "import json; c=json.load(open('user-config.json')); print(c.get('host_data_dir',''))" 2>/dev/null || true)
+DATA_DIR=$(python3 -c "import json; c=json.load(open('config/user-config.json')); print(c.get('host_data_dir',''))" 2>/dev/null || true)
 if [ -z "$DATA_DIR" ]; then
     DATA_DIR="./data"
 fi
