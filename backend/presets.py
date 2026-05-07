@@ -7,7 +7,9 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from config import PRESETS_FILE
+import shutil
+
+from config import DATA_DIR, PRESETS_FILE
 
 _lock = threading.Lock()
 _log = logging.getLogger(__name__)
@@ -35,6 +37,9 @@ def _migrate(presets: list[dict]) -> tuple[list[dict], bool]:
 
 
 def _load() -> list[dict]:
+    _old = DATA_DIR / ".osm_tool_presets.json"
+    if not PRESETS_FILE.exists() and _old.exists():
+        shutil.copy(_old, PRESETS_FILE)
     if not PRESETS_FILE.exists():
         if _DEFAULT_FILE.exists():
             try:

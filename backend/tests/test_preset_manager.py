@@ -70,6 +70,33 @@ def test_get_preset_unknown_id_returns_none(tmp_data_dir):
     assert pm.get_preset("non-existent-uuid") is None
 
 
+def test_presets_migrate_from_data_dir(tmp_path, monkeypatch):
+    """Existing presets in DATA_DIR are copied to CONFIG_DIR on first load."""
+    import shutil as _shutil
+    import config as cfg
+    import presets as pm
+
+    tmp_data = tmp_path / "data"
+    tmp_data.mkdir(exist_ok=True)
+    tmp_cfg = tmp_path / "config"
+    tmp_cfg.mkdir(exist_ok=True)
+
+    old_file = tmp_data / ".osm_tool_presets.json"
+    new_file = tmp_cfg / ".osm_tool_presets.json"
+    old_file.write_text('[{"id": "migrated", "name": "Migrated"}]', encoding="utf-8")
+
+    monkeypatch.setattr(cfg, "DATA_DIR", tmp_data)
+    monkeypatch.setattr(cfg, "PRESETS_FILE", new_file)
+    monkeypatch.setattr(pm, "PRESETS_FILE", new_file)
+    monkeypatch.setattr(pm, "DATA_DIR", tmp_data)
+
+    result = pm.list_presets()
+
+    assert new_file.exists()
+    assert result[0]["id"] == "migrated"
+    assert old_file.exists()  # original not deleted
+
+
 def test_all_schema_fields_present_after_create(tmp_data_dir):
     data = {
         "name": "Full Preset",
