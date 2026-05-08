@@ -25,16 +25,19 @@ def test_allow_empty_origin_string():
     assert _is_allowed_origin("") is True
 
 
-@pytest.mark.parametrize("origin", [
-    "http://localhost",
-    "http://localhost:5000",
-    "https://localhost:8080",
-    "http://127.0.0.1",
-    "http://127.0.0.1:5000",
-    "ws://127.0.0.1:5000",
-    "http://[::1]",
-    "http://[::1]:5000",
-])
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost",
+        "http://localhost:5000",
+        "https://localhost:8080",
+        "http://127.0.0.1",
+        "http://127.0.0.1:5000",
+        "ws://127.0.0.1:5000",
+        "http://[::1]",
+        "http://[::1]:5000",
+    ],
+)
 def test_allow_loopback_origins(origin: str):
     assert _is_allowed_origin(origin) is True
 
@@ -42,15 +45,18 @@ def test_allow_loopback_origins(origin: str):
 # ── Deny paths ────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("origin", [
-    "http://evil.com",
-    "https://attacker.example",
-    "http://10.0.0.1",
-    "http://192.168.1.5:5000",
-    # Hostname that *contains* localhost as substring but isn't loopback:
-    "http://notlocalhost.com",
-    "http://localhost.evil.com",  # subdomain attack
-])
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://evil.com",
+        "https://attacker.example",
+        "http://10.0.0.1",
+        "http://192.168.1.5:5000",
+        # Hostname that *contains* localhost as substring but isn't loopback:
+        "http://notlocalhost.com",
+        "http://localhost.evil.com",  # subdomain attack
+    ],
+)
 def test_deny_non_loopback_origins(origin: str):
     assert _is_allowed_origin(origin) is False
 

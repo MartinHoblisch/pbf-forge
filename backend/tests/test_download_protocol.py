@@ -34,8 +34,7 @@ def _make_dm(tmp_data_dir) -> DownloadManager:
 
 
 def _state(filename: str) -> FileState:
-    return FileState(filename=filename, url="https://example.com/x.osm.pbf",
-                     status="downloading")
+    return FileState(filename=filename, url="https://example.com/x.osm.pbf", status="downloading")
 
 
 def _streaming_response(status_code: int, chunks: list[bytes]) -> MagicMock:
@@ -83,9 +82,16 @@ def test_do_download_starts_fresh_without_range_header(tmp_data_dir):
     cancel = threading.Event()
 
     session = _session_returning(_streaming_response(200, [b"hello"]))
-    dm._do_download("https://example.com/x.osm.pbf", dest,
-                    start_byte=0, total_size=5,
-                    tracker=tracker, state=state, cancel=cancel, session=session)
+    dm._do_download(
+        "https://example.com/x.osm.pbf",
+        dest,
+        start_byte=0,
+        total_size=5,
+        tracker=tracker,
+        state=state,
+        cancel=cancel,
+        session=session,
+    )
 
     # No Range header on fresh start
     call_kwargs = session.get.call_args.kwargs
@@ -104,10 +110,16 @@ def test_do_download_resume_sets_range_header_and_appends(tmp_data_dir):
     tracker = _SpeedTracker()
 
     session = _session_returning(_streaming_response(206, [b"BBB"]))
-    dm._do_download("https://example.com/x.osm.pbf", dest,
-                    start_byte=5, total_size=8,
-                    tracker=tracker, state=state, cancel=threading.Event(),
-                    session=session)
+    dm._do_download(
+        "https://example.com/x.osm.pbf",
+        dest,
+        start_byte=5,
+        total_size=8,
+        tracker=tracker,
+        state=state,
+        cancel=threading.Event(),
+        session=session,
+    )
 
     assert session.get.call_args.kwargs["headers"] == {"Range": "bytes=5-"}
     assert dest.read_bytes() == b"AAAAABBB"
@@ -124,10 +136,16 @@ def test_do_download_416_returns_early_no_write(tmp_data_dir):
     original = dest.read_bytes()
 
     session = _session_returning(_streaming_response(416, [b"ignored"]))
-    dm._do_download("https://example.com/x.osm.pbf", dest,
-                    start_byte=8, total_size=8,
-                    tracker=_SpeedTracker(), state=_state("x.osm.pbf"),
-                    cancel=threading.Event(), session=session)
+    dm._do_download(
+        "https://example.com/x.osm.pbf",
+        dest,
+        start_byte=8,
+        total_size=8,
+        tracker=_SpeedTracker(),
+        state=_state("x.osm.pbf"),
+        cancel=threading.Event(),
+        session=session,
+    )
 
     assert dest.read_bytes() == original
 
@@ -144,10 +162,16 @@ def test_do_download_200_during_resume_resets_to_full_write(tmp_data_dir):
     tracker = _SpeedTracker()
 
     session = _session_returning(_streaming_response(200, [b"FRESH"]))
-    dm._do_download("https://example.com/x.osm.pbf", dest,
-                    start_byte=10, total_size=5,
-                    tracker=tracker, state=_state("x.osm.pbf"),
-                    cancel=threading.Event(), session=session)
+    dm._do_download(
+        "https://example.com/x.osm.pbf",
+        dest,
+        start_byte=10,
+        total_size=5,
+        tracker=tracker,
+        state=_state("x.osm.pbf"),
+        cancel=threading.Event(),
+        session=session,
+    )
 
     assert dest.read_bytes() == b"FRESH"
     # tracker reset to 0 on the 200 path (verify via internal total)
@@ -179,10 +203,16 @@ def test_do_download_cancel_mid_stream_stops_writing(tmp_data_dir):
     cm.__exit__ = MagicMock(return_value=None)
     session = _session_returning(cm)
 
-    dm._do_download("https://example.com/x.osm.pbf", dest,
-                    start_byte=0, total_size=9,
-                    tracker=_SpeedTracker(), state=_state("x.osm.pbf"),
-                    cancel=cancel, session=session)
+    dm._do_download(
+        "https://example.com/x.osm.pbf",
+        dest,
+        start_byte=0,
+        total_size=9,
+        tracker=_SpeedTracker(),
+        state=_state("x.osm.pbf"),
+        cancel=cancel,
+        session=session,
+    )
 
     # Only the first chunk was written
     assert dest.read_bytes() == b"AAA"
@@ -198,10 +228,16 @@ def test_do_download_updates_state_during_stream(tmp_data_dir):
     tracker = _SpeedTracker()
 
     session = _session_returning(_streaming_response(200, [b"X" * 100]))
-    dm._do_download("https://example.com/x.osm.pbf", dest,
-                    start_byte=0, total_size=100,
-                    tracker=tracker, state=state,
-                    cancel=threading.Event(), session=session)
+    dm._do_download(
+        "https://example.com/x.osm.pbf",
+        dest,
+        start_byte=0,
+        total_size=100,
+        tracker=tracker,
+        state=state,
+        cancel=threading.Event(),
+        session=session,
+    )
 
     assert state.downloaded_bytes == 100
 
@@ -217,7 +253,8 @@ def test_fast_retry_loop_breaks_when_cancelled_between_attempts(tmp_data_dir):
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
     with dm._lock:
         dm._files[filename] = FileState(
-            filename=filename, url=dm._url_mapping[filename], status="downloading")
+            filename=filename, url=dm._url_mapping[filename], status="downloading"
+        )
     cancel = threading.Event()
 
     mock_resp = MagicMock()
@@ -260,7 +297,8 @@ def test_slow_retry_recovers_after_network_returns(tmp_data_dir):
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
     with dm._lock:
         dm._files[filename] = FileState(
-            filename=filename, url=dm._url_mapping[filename], status="downloading")
+            filename=filename, url=dm._url_mapping[filename], status="downloading"
+        )
 
     waiting_retry_seen = []
     original_broadcast = dm._broadcast
@@ -312,7 +350,8 @@ def test_slow_retry_continues_when_still_offline(tmp_data_dir):
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
     with dm._lock:
         dm._files[filename] = FileState(
-            filename=filename, url=dm._url_mapping[filename], status="downloading")
+            filename=filename, url=dm._url_mapping[filename], status="downloading"
+        )
 
     call_count = {"n": 0}
 
@@ -350,7 +389,8 @@ def test_slow_retry_bubbles_other_exception(tmp_data_dir):
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
     with dm._lock:
         dm._files[filename] = FileState(
-            filename=filename, url=dm._url_mapping[filename], status="downloading")
+            filename=filename, url=dm._url_mapping[filename], status="downloading"
+        )
 
     call_count = {"n": 0}
 

@@ -87,12 +87,14 @@ def test_uuid_id_unchanged(tmp_data_dir):
 
 def test_mixed_legacy_and_modern_only_legacy_migrated(tmp_data_dir):
     uuid_str = "abcdef01-2345-6789-abcd-ef0123456789"
-    _write([
-        {"id": "preset-schienennetz", "name": "Schienennetz"},
-        {"id": "preset-railway-network", "name": "Railway Network"},
-        {"id": uuid_str, "name": "Custom"},
-        {"id": "preset-gebaeude", "name": "Gebäude"},
-    ])
+    _write(
+        [
+            {"id": "preset-schienennetz", "name": "Schienennetz"},
+            {"id": "preset-railway-network", "name": "Railway Network"},
+            {"id": uuid_str, "name": "Custom"},
+            {"id": "preset-gebaeude", "name": "Gebäude"},
+        ]
+    )
 
     result = pm.list_presets()
     ids = [p["id"] for p in result]

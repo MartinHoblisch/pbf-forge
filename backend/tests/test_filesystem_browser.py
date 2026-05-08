@@ -58,15 +58,18 @@ def test_to_windows_path_multichar_segment_not_drive():
 # ── _is_visible ───────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("name,expected", [
-    ("regular_dir", True),
-    ("Documents", True),
-    (".git", False),
-    (".hidden", False),
-    ("$Recycle.Bin", False),
-    ("$SysReset", False),
-    ("normal.txt", True),
-])
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("regular_dir", True),
+        ("Documents", True),
+        (".git", False),
+        (".hidden", False),
+        ("$Recycle.Bin", False),
+        ("$SysReset", False),
+        ("normal.txt", True),
+    ],
+)
 def test_is_visible_filter(name: str, expected: bool):
     assert _is_visible(name) is expected
 

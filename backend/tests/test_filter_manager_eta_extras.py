@@ -44,10 +44,10 @@ def _job(phases, **overrides) -> FilterJob:
     return j
 
 
-def _phase(label="p", source="berlin.osm.pbf", step="filter", fmt="pbf",
-           duration=None) -> Phase:
-    return Phase(label=label, source=source, step=step, weight=1.0,
-                 fmt=fmt, duration_seconds=duration)
+def _phase(label="p", source="berlin.osm.pbf", step="filter", fmt="pbf", duration=None) -> Phase:
+    return Phase(
+        label=label, source=source, step=step, weight=1.0, fmt=fmt, duration_seconds=duration
+    )
 
 
 # ── Completed phase with no recorded duration ────────────────────────────────

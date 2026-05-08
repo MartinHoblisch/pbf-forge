@@ -64,17 +64,13 @@ def test_embed_attribution_geojson_missing_file_does_not_raise(fm, tmp_path):
 
 def test_embed_provenance_gpkg_invalid_path_does_not_raise(fm, tmp_path):
     bogus = tmp_path / "no_such_dir" / "out.gpkg"
-    fm._embed_provenance(
-        bogus, "gpkg", "berlin.osm.pbf", ["amenity"], [], ["nodes"]
-    )
+    fm._embed_provenance(bogus, "gpkg", "berlin.osm.pbf", ["amenity"], [], ["nodes"])
 
 
 def test_embed_provenance_gpkg_corrupt_file_does_not_raise(fm, tmp_path):
     bogus = tmp_path / "corrupt.gpkg"
     bogus.write_bytes(b"not sqlite")
-    fm._embed_provenance(
-        bogus, "gpkg", "berlin.osm.pbf", ["amenity"], [], ["nodes"]
-    )
+    fm._embed_provenance(bogus, "gpkg", "berlin.osm.pbf", ["amenity"], [], ["nodes"])
 
 
 # ── _embed_provenance_geojson exception swallow ──────────────────────────────
@@ -85,15 +81,17 @@ def test_embed_provenance_geojson_invalid_json_does_not_raise(fm, tmp_path):
     bogus.write_text("{nope", encoding="utf-8")
     original = bogus.read_text(encoding="utf-8")
 
-    fm._embed_provenance(
-        bogus, "geojson", "berlin.osm.pbf", ["amenity"], [], ["nodes"]
-    )
+    fm._embed_provenance(bogus, "geojson", "berlin.osm.pbf", ["amenity"], [], ["nodes"])
 
     assert bogus.read_text(encoding="utf-8") == original
 
 
 def test_embed_provenance_geojson_missing_file_does_not_raise(fm, tmp_path):
     fm._embed_provenance(
-        tmp_path / "missing.geojson", "geojson",
-        "berlin.osm.pbf", ["amenity"], [], ["nodes"],
+        tmp_path / "missing.geojson",
+        "geojson",
+        "berlin.osm.pbf",
+        ["amenity"],
+        [],
+        ["nodes"],
     )

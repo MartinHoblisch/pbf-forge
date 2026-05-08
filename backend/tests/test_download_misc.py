@@ -1,13 +1,13 @@
 """Misc download_manager edge cases not covered elsewhere:
-  - get_url_info shape + already_exists flag
-  - SSL error during download (must not retry)
-  - _save_url_mapping disk failure (must log+swallow)
-  - check_file early return when no URL resolvable
-  - check_file partial-local-size → update_available
-  - start_download early returns (already downloading, no URL)
-  - register_url branch where file is on disk but not yet tracked
-  - _head: real method behavior (Content-Length/Last-Modified parsing)
-  - /api/check with explicit filenames dispatches per-file (routes/downloads:67-68)
+- get_url_info shape + already_exists flag
+- SSL error during download (must not retry)
+- _save_url_mapping disk failure (must log+swallow)
+- check_file early return when no URL resolvable
+- check_file partial-local-size → update_available
+- start_download early returns (already downloading, no URL)
+- register_url branch where file is on disk but not yet tracked
+- _head: real method behavior (Content-Length/Last-Modified parsing)
+- /api/check with explicit filenames dispatches per-file (routes/downloads:67-68)
 """
 
 from __future__ import annotations
@@ -63,7 +63,8 @@ def test_ssl_error_during_download_marks_error_no_retry(tmp_data_dir):
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
     with dm._lock:
         dm._files[filename] = FileState(
-            filename=filename, url=dm._url_mapping[filename], status="downloading")
+            filename=filename, url=dm._url_mapping[filename], status="downloading"
+        )
 
     do_download_mock = MagicMock(side_effect=requests.exceptions.SSLError("bad cert"))
 

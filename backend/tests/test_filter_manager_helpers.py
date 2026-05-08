@@ -217,6 +217,7 @@ async def test_reduce_pbf_tags_success_replaces_pbf_returns_zero(tmp_path):
 
     def fake_reduce(src, dst, keep):
         from pathlib import Path as _P
+
         _P(dst).write_bytes(b"reduced")
 
     with _swap_pbf_tag_reducer_module(fake_reduce):
@@ -237,6 +238,7 @@ async def test_reduce_pbf_tags_failure_returns_one_and_cleans_tmp(tmp_path):
 
     def fake_reduce(src, dst, keep):
         from pathlib import Path as _P
+
         _P(dst).write_bytes(b"partial-then-fail")
         raise RuntimeError("osmium parse error")
 

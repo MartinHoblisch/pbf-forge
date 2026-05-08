@@ -22,6 +22,7 @@ import pytest
 
 class _FakeSimpleHandler:
     """Stand-in for osmium.SimpleHandler so _TagReducer can subclass it."""
+
     def __init__(self, *args, **kwargs):
         pass
 
@@ -45,6 +46,7 @@ from pbf_tag_reducer import _TagReducer, reduce_tags  # noqa: E402
 class _FakeOsmObject:
     """Minimal stand-in for osmium.osm.Node/Way/Relation supporting
     `.tags` iteration and `.replace(tags=...)`."""
+
     def __init__(self, tags: list[tuple[str, str]]):
         self.tags = tags
 
@@ -64,11 +66,14 @@ def _writer() -> MagicMock:
 # ── filter logic on each entity type ─────────────────────────────────────────
 
 
-@pytest.mark.parametrize("entity_method,writer_method", [
-    ("node", "add_node"),
-    ("way", "add_way"),
-    ("relation", "add_relation"),
-])
+@pytest.mark.parametrize(
+    "entity_method,writer_method",
+    [
+        ("node", "add_node"),
+        ("way", "add_way"),
+        ("relation", "add_relation"),
+    ],
+)
 def test_tag_reducer_filters_tags_via_keep_set(entity_method, writer_method):
     w = _writer()
     reducer = _TagReducer(writer=w, keep={"a", "c"})
@@ -131,6 +136,7 @@ def test_reduce_tags_closes_writer_after_apply(monkeypatch):
         return w
 
     import pbf_tag_reducer as ptr
+
     monkeypatch.setattr(ptr.osmium, "SimpleWriter", fake_writer_factory)
 
     reduce_tags(src="src.osm.pbf", dst="dst.osm.pbf", keep={"name"})

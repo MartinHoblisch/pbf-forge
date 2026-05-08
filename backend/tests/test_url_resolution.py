@@ -19,8 +19,7 @@ from download_manager import DownloadManager, url_to_filename
 
 def test_url_to_filename_strips_latest():
     assert (
-        url_to_filename("https://download.geofabrik.de/europe-latest.osm.pbf")
-        == "europe.osm.pbf"
+        url_to_filename("https://download.geofabrik.de/europe-latest.osm.pbf") == "europe.osm.pbf"
     )
 
 
@@ -33,23 +32,18 @@ def test_url_to_filename_nested_path_uses_last_segment():
 
 def test_url_to_filename_trailing_slash_handled():
     assert (
-        url_to_filename("https://download.geofabrik.de/europe-latest.osm.pbf/")
-        == "europe.osm.pbf"
+        url_to_filename("https://download.geofabrik.de/europe-latest.osm.pbf/") == "europe.osm.pbf"
     )
 
 
 def test_url_to_filename_without_latest_returns_as_is():
-    assert (
-        url_to_filename("https://download.geofabrik.de/europe.osm.pbf")
-        == "europe.osm.pbf"
-    )
+    assert url_to_filename("https://download.geofabrik.de/europe.osm.pbf") == "europe.osm.pbf"
 
 
 def test_url_to_filename_latest_only_matches_when_anchored():
     """'-latest' inside the stem (not before .osm.pbf$) must not be stripped."""
     assert (
-        url_to_filename("https://example.com/foo-latest-test.osm.pbf")
-        == "foo-latest-test.osm.pbf"
+        url_to_filename("https://example.com/foo-latest-test.osm.pbf") == "foo-latest-test.osm.pbf"
     )
 
 
@@ -63,17 +57,16 @@ def _dm() -> DownloadManager:
 def test_resolve_url_direct_match(tmp_data_dir):
     dm = _dm()
     # Pre-populated CONTINENTAL_URLS contains europe.osm.pbf
-    assert dm._resolve_url("europe.osm.pbf") == "https://download.geofabrik.de/europe-latest.osm.pbf"
+    assert (
+        dm._resolve_url("europe.osm.pbf") == "https://download.geofabrik.de/europe-latest.osm.pbf"
+    )
 
 
 def test_resolve_url_date_stamped_strips_six_digits(tmp_data_dir):
     dm = _dm()
     dm._url_mapping["africa.osm.pbf"] = "https://example.com/africa.osm.pbf"
     # 6-digit YYMMDD-style date stripped → falls back to 'africa.osm.pbf'
-    assert (
-        dm._resolve_url("africa-260427.osm.pbf")
-        == "https://example.com/africa.osm.pbf"
-    )
+    assert dm._resolve_url("africa-260427.osm.pbf") == "https://example.com/africa.osm.pbf"
 
 
 def test_resolve_url_five_digits_does_not_match(tmp_data_dir):
@@ -93,10 +86,7 @@ def test_resolve_url_seven_digits_does_not_match(tmp_data_dir):
 def test_resolve_url_latest_variant_strips_to_base(tmp_data_dir):
     dm = _dm()
     dm._url_mapping["germany.osm.pbf"] = "https://example.com/germany.osm.pbf"
-    assert (
-        dm._resolve_url("germany-latest.osm.pbf")
-        == "https://example.com/germany.osm.pbf"
-    )
+    assert dm._resolve_url("germany-latest.osm.pbf") == "https://example.com/germany.osm.pbf"
 
 
 def test_resolve_url_unknown_returns_none(tmp_data_dir):
@@ -109,7 +99,4 @@ def test_resolve_url_priority_direct_beats_stripped(tmp_data_dir):
     dm = _dm()
     dm._url_mapping["africa-260427.osm.pbf"] = "https://example.com/exact.osm.pbf"
     dm._url_mapping["africa.osm.pbf"] = "https://example.com/stripped.osm.pbf"
-    assert (
-        dm._resolve_url("africa-260427.osm.pbf")
-        == "https://example.com/exact.osm.pbf"
-    )
+    assert dm._resolve_url("africa-260427.osm.pbf") == "https://example.com/exact.osm.pbf"

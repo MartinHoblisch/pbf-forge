@@ -24,6 +24,7 @@ def test_get_settings_corrupt_config_returns_defaults(client):
     """Bad JSON in USER_CONFIG_FILE → log warning, fall through to defaults,
     serve a 200 so the frontend can guide the user back into setup."""
     import routes.settings as rs
+
     rs.USER_CONFIG_FILE.write_text("{not json", encoding="utf-8")
 
     resp = client.get("/api/settings")

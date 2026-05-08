@@ -44,11 +44,13 @@ def test_pending_cleared_when_env_matches_saved_dir(tmp_config_dir):
     """Compose recreated the container with new HOST_DATA_DIR matching the
     saved value → pending_restart flips to false and is persisted."""
     main_module.USER_CONFIG_FILE.write_text(
-        json.dumps({
-            "configured": True,
-            "host_data_dir": "H:\\new_data",
-            "pending_restart": True,
-        }),
+        json.dumps(
+            {
+                "configured": True,
+                "host_data_dir": "H:\\new_data",
+                "pending_restart": True,
+            }
+        ),
         encoding="utf-8",
     )
     with patch.dict("os.environ", {"HOST_DATA_DIR": "H:\\new_data"}, clear=False):
@@ -60,11 +62,13 @@ def test_pending_cleared_when_env_matches_saved_dir(tmp_config_dir):
 def test_pending_persists_when_env_differs(tmp_config_dir):
     """Plain `docker restart` (env still old, saved value new) → flag stays True."""
     main_module.USER_CONFIG_FILE.write_text(
-        json.dumps({
-            "configured": True,
-            "host_data_dir": "H:\\new_data",
-            "pending_restart": True,
-        }),
+        json.dumps(
+            {
+                "configured": True,
+                "host_data_dir": "H:\\new_data",
+                "pending_restart": True,
+            }
+        ),
         encoding="utf-8",
     )
     with patch.dict("os.environ", {"HOST_DATA_DIR": "H:\\old_data"}, clear=False):
@@ -76,16 +80,19 @@ def test_pending_persists_when_env_differs(tmp_config_dir):
 def test_pending_persists_when_env_unset(tmp_config_dir):
     """No HOST_DATA_DIR env var → can't confirm compose-up happened → keep flag."""
     main_module.USER_CONFIG_FILE.write_text(
-        json.dumps({
-            "configured": True,
-            "host_data_dir": "H:\\new_data",
-            "pending_restart": True,
-        }),
+        json.dumps(
+            {
+                "configured": True,
+                "host_data_dir": "H:\\new_data",
+                "pending_restart": True,
+            }
+        ),
         encoding="utf-8",
     )
     # Remove env var if present
     with patch.dict("os.environ", {}, clear=False):
         import os
+
         os.environ.pop("HOST_DATA_DIR", None)
         main_module._clear_pending_restart()
     cfg = _read(main_module.USER_CONFIG_FILE)
@@ -106,11 +113,13 @@ def test_empty_saved_host_dir_clears_flag_unconditionally(tmp_config_dir):
     truthiness guard `if host_data_dir and ...` short-circuits and the flag
     gets cleared — documented behavior, not a bug."""
     main_module.USER_CONFIG_FILE.write_text(
-        json.dumps({
-            "configured": False,
-            "host_data_dir": "",
-            "pending_restart": True,
-        }),
+        json.dumps(
+            {
+                "configured": False,
+                "host_data_dir": "",
+                "pending_restart": True,
+            }
+        ),
         encoding="utf-8",
     )
     main_module._clear_pending_restart()

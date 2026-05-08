@@ -34,9 +34,7 @@ def throwing_client(reset_state):
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
-    app.router.routes = [
-        r for r in app.router.routes if getattr(r, "path", None) != "/_test_throw"
-    ]
+    app.router.routes = [r for r in app.router.routes if getattr(r, "path", None) != "/_test_throw"]
 
 
 def test_unhandled_exception_returns_500(throwing_client):
@@ -64,4 +62,4 @@ def test_unhandled_exception_does_not_leak_traceback(throwing_client):
     text = resp.text
     assert "Traceback" not in text
     assert "main.py" not in text
-    assert ".py\", line" not in text
+    assert '.py", line' not in text

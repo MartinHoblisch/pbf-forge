@@ -45,10 +45,12 @@ def _job_with_phases(phases: list[Phase], **kwargs) -> FilterJob:
     return j
 
 
-def _phase(label: str, source: str, step: str, fmt: str = "pbf",
-           duration: float | None = None) -> Phase:
-    return Phase(label=label, source=source, step=step, weight=1.0,
-                 fmt=fmt, duration_seconds=duration)
+def _phase(
+    label: str, source: str, step: str, fmt: str = "pbf", duration: float | None = None
+) -> Phase:
+    return Phase(
+        label=label, source=source, step=step, weight=1.0, fmt=fmt, duration_seconds=duration
+    )
 
 
 # ── (a) No phases ─────────────────────────────────────────────────────────────

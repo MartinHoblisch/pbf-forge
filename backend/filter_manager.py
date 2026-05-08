@@ -124,7 +124,7 @@ class FilterManager:
         return [j.to_dict() for j in reversed(list(self._jobs.values()))]
 
     def clear_completed_jobs(self) -> None:
-        keep = {'running', 'pending'}
+        keep = {"running", "pending"}
         self._jobs = {jid: j for jid, j in self._jobs.items() if j.status in keep}
 
     def get_job(self, job_id: str) -> Optional[dict]:

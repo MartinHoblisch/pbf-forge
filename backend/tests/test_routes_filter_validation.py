@@ -46,14 +46,17 @@ def test_empty_output_formats_returns_422(client):
 # ── source_files filename guard ──────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("bad_filename", [
-    "../etc.osm.pbf",
-    "foo bar.osm.pbf",
-    "foo.txt",
-    "foo.osm",            # missing .pbf
-    "foo.osm.pbf.bak",
-    "/abs/path.osm.pbf",
-])
+@pytest.mark.parametrize(
+    "bad_filename",
+    [
+        "../etc.osm.pbf",
+        "foo bar.osm.pbf",
+        "foo.txt",
+        "foo.osm",  # missing .pbf
+        "foo.osm.pbf.bak",
+        "/abs/path.osm.pbf",
+    ],
+)
 def test_invalid_source_filename_returns_400(client, bad_filename):
     body = {**_VALID, "source_files": [bad_filename]}
     resp = client.post("/api/filter/run", json=body)
@@ -92,9 +95,16 @@ def test_clear_jobs_endpoint_purges_completed_keeps_active(client):
 
     def _job(jid: str, status: str) -> FilterJob:
         j = FilterJob(
-            id=jid, source_files=["x.osm.pbf"], tags=["a"], exclude_tags=[],
-            geometry_types=["nodes"], suffix="t", output_formats=["pbf"],
-            output_dir="/tmp", columns_mode="other_tags", manual_keys=[],
+            id=jid,
+            source_files=["x.osm.pbf"],
+            tags=["a"],
+            exclude_tags=[],
+            geometry_types=["nodes"],
+            suffix="t",
+            output_formats=["pbf"],
+            output_dir="/tmp",
+            columns_mode="other_tags",
+            manual_keys=[],
         )
         j.status = status
         return j
@@ -125,9 +135,16 @@ def test_cancel_running_job_returns_cancelling(client):
     from filter_manager import FilterJob
 
     job = FilterJob(
-        id="run-id", source_files=["x.osm.pbf"], tags=["a"], exclude_tags=[],
-        geometry_types=["nodes"], suffix="t", output_formats=["pbf"],
-        output_dir="/tmp", columns_mode="other_tags", manual_keys=[],
+        id="run-id",
+        source_files=["x.osm.pbf"],
+        tags=["a"],
+        exclude_tags=[],
+        geometry_types=["nodes"],
+        suffix="t",
+        output_formats=["pbf"],
+        output_dir="/tmp",
+        columns_mode="other_tags",
+        manual_keys=[],
     )
     job.status = "running"
     state.filter_manager._jobs["run-id"] = job

@@ -43,53 +43,69 @@ def test_accepts_public_ip_literal():
     _validate_url("http://8.8.8.8/foo.osm.pbf")  # no raise
 
 
-@pytest.mark.parametrize("url", [
-    "ftp://example.com/foo.osm.pbf",
-    "file:///etc/passwd",
-    "javascript:alert(1)",
-    "gopher://example.com/foo",
-    "data:text/plain,hello",
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "ftp://example.com/foo.osm.pbf",
+        "file:///etc/passwd",
+        "javascript:alert(1)",
+        "gopher://example.com/foo",
+        "data:text/plain,hello",
+    ],
+)
 def test_rejects_non_http_schemes(url: str):
     with pytest.raises(ValueError, match="Only http/https"):
         _validate_url(url)
 
 
-@pytest.mark.parametrize("url", [
-    "http://",
-    "https://",
-])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://",
+        "https://",
+    ],
+)
 def test_rejects_empty_hostname(url: str):
     with pytest.raises(ValueError, match="no hostname"):
         _validate_url(url)
 
 
-@pytest.mark.parametrize("hostname", [
-    "localhost",
-    "LOCALHOST",
-    "Localhost",
-    "127.0.0.1",
-    "::1",
-    "0.0.0.0",
-])
+@pytest.mark.parametrize(
+    "hostname",
+    [
+        "localhost",
+        "LOCALHOST",
+        "Localhost",
+        "127.0.0.1",
+        "::1",
+        "0.0.0.0",
+    ],
+)
 def test_rejects_blocked_hostnames(hostname: str):
     """The literal blocklist must be case-insensitive (matches lower())."""
-    url = f"http://{hostname}/foo.osm.pbf" if ":" not in hostname else f"http://[{hostname}]/foo.osm.pbf"
+    url = (
+        f"http://{hostname}/foo.osm.pbf"
+        if ":" not in hostname
+        else f"http://[{hostname}]/foo.osm.pbf"
+    )
     with pytest.raises(ValueError, match="internal host"):
         _validate_url(url)
 
 
-@pytest.mark.parametrize("ip", [
-    "10.0.0.1",       # 10/8 private
-    "10.255.255.254",
-    "172.16.0.1",     # 172.16/12 private
-    "172.31.255.254",
-    "192.168.0.1",    # 192.168/16 private
-    "192.168.255.254",
-    "127.0.0.5",      # loopback (additional to literal blocklist)
-    "169.254.1.1",    # link-local
-    "240.0.0.1",      # reserved (240/4)
-])
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "10.0.0.1",  # 10/8 private
+        "10.255.255.254",
+        "172.16.0.1",  # 172.16/12 private
+        "172.31.255.254",
+        "192.168.0.1",  # 192.168/16 private
+        "192.168.255.254",
+        "127.0.0.5",  # loopback (additional to literal blocklist)
+        "169.254.1.1",  # link-local
+        "240.0.0.1",  # reserved (240/4)
+    ],
+)
 def test_rejects_private_ipv4_literals(ip: str):
     with pytest.raises(ValueError, match="internal host"):
         _validate_url(f"http://{ip}/foo.osm.pbf")
