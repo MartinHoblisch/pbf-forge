@@ -595,23 +595,6 @@ class FilterManager:
         finally:
             tmp_geojson.unlink(missing_ok=True)
 
-    async def _osmium_export_direct(self, src: Path, out_file: Path, job: FilterJob) -> int:
-        """Export PBF to GeoJSON via osmium export without any column filtering."""
-        return await self._run_cmd(
-            [
-                "osmium",
-                "export",
-                "--format=geojson",
-                "--attributes",
-                "id",
-                "-o",
-                str(out_file),
-                str(src),
-                "--overwrite",
-            ],
-            job,
-        )
-
     async def _reduce_pbf_tags(self, pbf_path: Path, job: FilterJob) -> int:
         """Use pyosmium to strip all tags not in job.manual_keys from a PBF file in-place."""
         from pbf_tag_reducer import reduce_tags  # imported here to keep module-level clean
