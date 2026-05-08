@@ -11,10 +11,9 @@ Bug class to prevent:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
-
 
 _VALID = {
     "source_files": ["berlin.osm.pbf"],

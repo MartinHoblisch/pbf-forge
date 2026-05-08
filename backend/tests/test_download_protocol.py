@@ -21,12 +21,10 @@ import threading
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
 import requests
 
 import download_manager as dm_module
 from download_manager import DownloadManager, FileState, _SpeedTracker
-
 
 _OLD = datetime(2020, 1, 1, tzinfo=timezone.utc)
 

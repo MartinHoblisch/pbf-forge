@@ -17,13 +17,9 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 import requests
 
-import config as cfg_module
-import download_manager as dm_module
 from download_manager import DownloadManager, FileState
-
 
 _OLD = datetime(2020, 1, 1, tzinfo=timezone.utc)
 

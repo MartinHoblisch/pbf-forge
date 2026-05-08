@@ -12,7 +12,6 @@ Each test mocks asyncio.create_subprocess_exec so no real ogrinfo is required.
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest

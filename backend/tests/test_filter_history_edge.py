@@ -17,11 +17,8 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-import pytest
-
 import filter_history as fh_module
 from filter_history import FilterHistory
-
 
 # ── _MAX_ENTRIES trim ────────────────────────────────────────────────────────
 

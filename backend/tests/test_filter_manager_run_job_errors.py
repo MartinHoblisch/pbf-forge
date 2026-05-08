@@ -19,14 +19,9 @@ orchestration error paths:
 
 from __future__ import annotations
 
-import asyncio
-import os
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import pytest
-
-import filter_manager as fm_module
 from filter_manager import FilterJob, FilterManager
 
 

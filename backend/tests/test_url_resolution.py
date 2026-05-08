@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 from download_manager import DownloadManager, url_to_filename
 
-
 # ── url_to_filename ──────────────────────────────────────────────────────────
 
 

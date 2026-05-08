@@ -16,10 +16,7 @@ duplicated here.
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, patch
 
 from filter_manager import FilterJob, FilterManager
 

@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 import main as main_module
-from main import app, _is_configured
+from main import _is_configured, app
 
 
 def _write_config(payload: dict | str) -> None:
@@ -121,7 +121,6 @@ def test_lifespan_runs_real_delayed_check_all_when_configured(reset_state, tmp_c
     import asyncio
     import threading
     from unittest.mock import patch
-    from fastapi.testclient import TestClient
 
     _write_config({"configured": True, "host_data_dir": "H:\\d", "pending_restart": False})
 
@@ -149,7 +148,6 @@ def test_lifespan_does_not_check_all_when_not_configured(reset_state, tmp_config
     import asyncio
     import threading
     from unittest.mock import patch
-    from fastapi.testclient import TestClient
 
     # No config file → _is_configured() returns False
     called = threading.Event()

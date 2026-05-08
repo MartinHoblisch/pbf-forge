@@ -17,7 +17,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import filter_manager as fm_module
 from filter_manager import FilterJob, FilterManager
 
 
@@ -188,8 +187,8 @@ async def test_run_cmd_no_broadcast_when_all_chunks_within_500ms():
 def _swap_pbf_tag_reducer_module(reduce_fn):
     """Return a context manager that installs a fake pbf_tag_reducer module
     exposing the given reduce_tags fn, then restores the original on exit."""
-    from contextlib import contextmanager
     import sys
+    from contextlib import contextmanager
 
     @contextmanager
     def _ctx():

@@ -27,7 +27,6 @@ import pytest
 
 from routes.downloads import _validate_url
 
-
 # ── _validate_url — direct unit tests ────────────────────────────────────────
 
 

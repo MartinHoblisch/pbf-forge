@@ -12,7 +12,6 @@ import pytest
 
 from main import _is_allowed_origin
 
-
 # ── Allow paths ───────────────────────────────────────────────────────────────
 
 

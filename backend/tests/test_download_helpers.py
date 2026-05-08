@@ -16,13 +16,9 @@ import threading
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
-import requests
-
 import config as cfg_module
 import download_manager as dm_module
 from download_manager import DownloadManager, FileState, _retry_delay
-
 
 _OLD = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
@@ -126,7 +122,8 @@ def test_download_worker_proceeds_when_disk_check_oserrors(tmp_data_dir):
     downloads. `free` becomes None → check is skipped."""
     filename = "ok.osm.pbf"
     dest = tmp_data_dir / filename
-    dest.write_bytes(b"x" * 1000)  # _do_download is mocked; pre-create file so post-DL os.utime works
+    # _do_download is mocked; pre-create file so post-DL os.utime works
+    dest.write_bytes(b"x" * 1000)
 
     dm = _make_dm()
     dm._url_mapping[filename] = "https://example.com/ok.osm.pbf"
