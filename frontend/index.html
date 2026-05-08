@@ -1595,7 +1595,8 @@ async function loadFilterJobs() {
   } catch {}
 }
 
-function clearFilterJobs() {
+async function clearFilterJobs() {
+  await fetch('/api/filter/jobs', { method: 'DELETE' }).catch(() => {});
   filterJobs = filterJobs.filter(j => j.status === 'running' || j.status === 'pending');
   renderFilterJobs();
 }

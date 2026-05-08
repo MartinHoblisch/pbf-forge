@@ -106,6 +106,12 @@ def list_jobs():
     return state.filter_manager.list_jobs()
 
 
+@router.delete("/jobs")
+def clear_jobs():
+    state.filter_manager.clear_completed_jobs()
+    return {"ok": True}
+
+
 @router.get("/jobs/{job_id}")
 def get_job(job_id: str):
     job = state.filter_manager.get_job(job_id)
