@@ -11,7 +11,7 @@
   <a href="https://github.com/martinhoblisch/pbf-forge/releases/latest"><img src="https://img.shields.io/github/v/release/martinhoblisch/pbf-forge" alt="Release"></a>
   <a href="https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml"><img src="https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml"><img src="https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml/badge.svg" alt="Security (CodeQL · Trivy)"></a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/martinhoblisch/pbf-forge"><img src="https://api.scorecard.dev/projects/github.com/martinhoblisch/pbf-forge/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge"><img src="https://api.scorecard.dev/projects/github.com/MartinHoblisch/pbf-forge/badge" alt="OpenSSF Scorecard"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue" alt="Platform: Windows | Linux">
   <a href="https://codecov.io/gh/martinhoblisch/pbf-forge"><img src="https://codecov.io/gh/martinhoblisch/pbf-forge/branch/main/graph/badge.svg" alt="Coverage"></a>
 </p>
@@ -177,7 +177,7 @@ CI verifies builds on Ubuntu and runs the full test suite on Windows; all images
 | Static analysis (SAST) | [CodeQL](https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml) runs on every push and pull request |
 | Dependency vulnerabilities | [Dependabot](https://github.com/martinhoblisch/pbf-forge/security/dependabot) watches pip packages and GitHub Actions |
 | Docker image CVEs | [Trivy](https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml) scans the image on every push — build fails on CRITICAL or HIGH findings |
-| Supply-chain posture | [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/martinhoblisch/pbf-forge) runs weekly |
+| Supply-chain posture | [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge) runs weekly |
 | Secret leak prevention | GitHub Push Protection is active on this repository |
 
 See [SECURITY.md](SECURITY.md) for the vulnerability disclosure process, scope, and response SLA.
