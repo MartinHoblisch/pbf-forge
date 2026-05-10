@@ -1,8 +1,6 @@
-# Ubuntu 24.04 LTS (Noble Numbat). Dependabot bumps the tag when a new LTS ships.
-# For fully reproducible builds, replace the tag with a digest:
-#   docker pull ubuntu:24.04 && docker inspect ubuntu:24.04 --format='{{index .RepoDigests 0}}'
-# Refresh quarterly or when security advisories appear — see CONTRIBUTING.md.
-FROM ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+# THROW-AWAY VERIFICATION — DO NOT MERGE. Tests Trivy fail-on-CRITICAL gate.
+# Original digest restored on main: ubuntu:24.04@sha256:c4a8d5503dfb...
+FROM ubuntu:18.04
 
 # Avoid interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
