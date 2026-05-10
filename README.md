@@ -8,12 +8,12 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://github.com/martinhoblisch/pbf-forge/releases/latest"><img src="https://img.shields.io/github/v/release/martinhoblisch/pbf-forge" alt="Release"></a>
-  <a href="https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml"><img src="https://github.com/martinhoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml"><img src="https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml/badge.svg" alt="Security (CodeQL · Trivy)"></a>
+  <a href="https://github.com/MartinHoblisch/pbf-forge/releases/latest"><img src="https://img.shields.io/github/v/release/MartinHoblisch/pbf-forge" alt="Release"></a>
+  <a href="https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml"><img src="https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml"><img src="https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml/badge.svg" alt="Security (CodeQL · Trivy)"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge"><img src="https://api.scorecard.dev/projects/github.com/MartinHoblisch/pbf-forge/badge" alt="OpenSSF Scorecard"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue" alt="Platform: Windows | Linux">
-  <a href="https://codecov.io/gh/martinhoblisch/pbf-forge"><img src="https://codecov.io/gh/martinhoblisch/pbf-forge/branch/main/graph/badge.svg" alt="Coverage"></a>
+  <a href="https://codecov.io/gh/MartinHoblisch/pbf-forge"><img src="https://codecov.io/gh/MartinHoblisch/pbf-forge/branch/main/graph/badge.svg" alt="Coverage"></a>
 </p>
 
 <p align="center">
@@ -48,7 +48,7 @@ I needed reproducible OSM tag-filtered extracts for small GIS jobs and grew tire
 **Linux / macOS**
 
 ```bash
-git clone https://github.com/martinhoblisch/pbf-forge.git
+git clone https://github.com/MartinHoblisch/pbf-forge.git
 cd pbf-forge
 ./start.sh
 ```
@@ -60,7 +60,7 @@ Logs stream in the terminal. Browser opens automatically once the container is r
 **Windows** — run in Command Prompt or PowerShell, or double-click `start.bat`:
 
 ```
-git clone https://github.com/martinhoblisch/pbf-forge.git
+git clone https://github.com/MartinHoblisch/pbf-forge.git
 cd pbf-forge
 start.bat
 ```
@@ -174,9 +174,9 @@ CI verifies builds on Ubuntu and runs the full test suite on Windows; all images
 
 | What | How |
 |---|---|
-| Static analysis (SAST) | [CodeQL](https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml) runs on every push and pull request |
-| Dependency vulnerabilities | [Dependabot](https://github.com/martinhoblisch/pbf-forge/security/dependabot) watches pip packages and GitHub Actions |
-| Docker image CVEs | [Trivy](https://github.com/martinhoblisch/pbf-forge/actions/workflows/security.yml) scans the image on every push — build fails on CRITICAL or HIGH findings |
+| Static analysis (SAST) | [CodeQL](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml) runs on every push and pull request |
+| Dependency vulnerabilities | [Dependabot](https://github.com/MartinHoblisch/pbf-forge/security/dependabot) watches pip packages and GitHub Actions |
+| Docker image CVEs | [Trivy](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml) scans the image on every push — build fails on CRITICAL or HIGH findings |
 | Supply-chain posture | [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge) runs weekly |
 | Secret leak prevention | GitHub Push Protection is active on this repository |
 
