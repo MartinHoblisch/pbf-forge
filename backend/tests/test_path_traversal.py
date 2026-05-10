@@ -28,6 +28,27 @@ def test_traversal_dotslash_rejected(client):
     assert resp.status_code == 400
 
 
+@pytest.mark.parametrize(
+    "evil_dir",
+    [
+        "../escape",
+        "subdir/../../etc",
+        "a;b",
+        "subdir;rm -rf /",
+        "$(whoami)",
+        "<script>",
+        "subdir\x00null",
+        "abs/../../../root",
+        "with space",
+        ".hidden",
+    ],
+)
+def test_output_dir_allowlist_rejects_unsafe_chars(client, evil_dir):
+    body = {**_VALID_BODY, "output_dir": evil_dir}
+    resp = client.post("/api/filter/run", json=body)
+    assert resp.status_code == 400
+
+
 def test_valid_subdir_accepted(client, tmp_data_dir):
     body = {**_VALID_BODY, "output_dir": "valid/subdir"}
     resp = client.post("/api/filter/run", json=body)
@@ -50,6 +71,27 @@ def test_fs_browse_outside_allowed_returns_error(client, mock_host_drives):
     resp = client.get("/api/fs/browse", params={"path": "../../../etc"})
     assert resp.status_code == 200
     assert "error" in resp.json()
+
+
+@pytest.mark.parametrize(
+    "evil_path",
+    [
+        "..",
+        "h/../..",
+        "a;b",
+        "$(whoami)",
+        "<script>",
+        "h\x00null",
+        "with space",
+        "h/../etc",
+    ],
+)
+def test_fs_browse_allowlist_rejects_unsafe_chars(client, mock_host_drives, evil_path):
+    resp = client.get("/api/fs/browse", params={"path": evil_path})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body.get("error") == "Invalid path"
+    assert body["dirs"] == []
 
 
 @pytest.mark.posix

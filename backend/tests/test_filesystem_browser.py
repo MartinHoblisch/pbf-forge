@@ -151,8 +151,8 @@ def test_browse_fs_subdir_filters_hidden(client, host_drives):
 
 def test_browse_fs_target_is_file_returns_not_a_directory(client, host_drives, tmp_path):
     (host_drives / "h").mkdir()
-    (host_drives / "h" / "regular.txt").write_text("data")
-    resp = client.get("/api/fs/browse", params={"path": "h/regular.txt"})
+    (host_drives / "h" / "regular_file").write_text("data")
+    resp = client.get("/api/fs/browse", params={"path": "h/regular_file"})
     body = resp.json()
     assert body["error"] == "Not a directory"
     assert body["dirs"] == []
