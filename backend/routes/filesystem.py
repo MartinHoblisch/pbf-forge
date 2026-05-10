@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -7,6 +8,7 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/api")
 
 _HOST_DRIVES = Path("/host_drives")
+_SAFE_BROWSE_PATH = re.compile(r"^[a-zA-Z0-9_\-/]*$")
 
 
 def _to_windows_path(rel: str) -> str:
@@ -58,6 +60,9 @@ def browse_fs(path: str = "") -> dict:
             "parent": None,
             "error": "Directory browser not available (only in Docker Desktop for Windows)",
         }
+
+    if not _SAFE_BROWSE_PATH.match(path) or ".." in path.split("/"):
+        return {"path": "", "windows_path": "", "dirs": [], "parent": None, "error": "Invalid path"}
 
     target = (_HOST_DRIVES / path) if path else _HOST_DRIVES
     # Resolve to catch symlinks, then guard against traversal

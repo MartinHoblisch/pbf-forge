@@ -41,6 +41,8 @@ class FilterRequest(BaseModel):
 def _resolve_output_dir(req: FilterRequest) -> str:
     if not req.output_dir:
         return str(DATA_DIR)
+    if not _SAFE_OUTPUT_DIR.match(req.output_dir) or ".." in req.output_dir.split("/"):
+        raise HTTPException(status_code=400, detail="Invalid output_dir")
     try:
         resolved = (DATA_DIR / req.output_dir).resolve()
         # is_relative_to (Py 3.9+) avoids the prefix-string trap where /data2
@@ -55,6 +57,7 @@ def _resolve_output_dir(req: FilterRequest) -> str:
 
 
 _SAFE_SOURCE = re.compile(r"^[a-zA-Z0-9_\-\.]+\.osm\.pbf$")
+_SAFE_OUTPUT_DIR = re.compile(r"^[a-zA-Z0-9_\-/]+$")
 
 
 def _validate_source_files(source_files: list[str]) -> None:
