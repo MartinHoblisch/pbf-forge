@@ -23,6 +23,7 @@ from config import (
     CONFIG_DIR,
     DATA_DIR,
     TEMP_DIR,
+    USER_CONFIG_FILE,
 )
 from filter_history import FilterHistory
 
@@ -102,6 +103,8 @@ class FilterJob:
     timeout_seconds: float | None = None
     queue_position: int | None = None
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
+    _proc_env: dict = field(default_factory=dict, init=False, repr=False)
+    _nice_level: int = field(default=0, init=False, repr=False)
 
     @property
     def log(self) -> str:
@@ -251,6 +254,15 @@ class FilterManager:
         total_bytes = sum(self._source_size(s) for s in job.source_files)
         job.timeout_seconds = max(300.0, total_bytes / (10 * 1024 * 1024))
 
+        # Resource limits — computed once, carried on job for subprocess use
+        threads, nice = self._resource_limits()
+        job._proc_env = {
+            **os.environ,
+            "OSMIUM_POOL_THREADS": str(threads),
+            "GDAL_NUM_THREADS": str(threads),
+        }
+        job._nice_level = nice
+
         # Startup header
         lines = [f"{_ts()}=== Job started ==="]
         for s in job.source_files:
@@ -262,6 +274,7 @@ class FilterManager:
         if job.geometry_types:
             lines.append(f"{_ts()}Geometry : {', '.join(job.geometry_types)}")
         lines.append(f"{_ts()}Timeout  : {int(job.timeout_seconds)}s")
+        lines.append(f"{_ts()}Resources: {threads} threads, nice {nice}")
         job.append_log("\n".join(lines) + "\n")
 
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
@@ -509,6 +522,22 @@ class FilterManager:
             return (DATA_DIR / source).stat().st_size
         except OSError:
             return 1
+
+    def _resource_limits(self) -> tuple[int, int]:
+        """Return (thread_count, nice_level) from user config + presets."""
+        try:
+            cfg = json.loads(USER_CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            cfg = {}
+        cpu = os.cpu_count() or 1
+        mode = cfg.get("resource_mode", "full")
+        preset_threads = max(1, cpu // 2) if mode == "background" else cpu
+        preset_nice = 10 if mode == "background" else 0
+        raw_threads = cfg.get("osmium_threads_override")
+        raw_nice = cfg.get("nice_override")
+        threads = int(raw_threads) if raw_threads else preset_threads
+        nice = int(raw_nice) if raw_nice is not None else preset_nice
+        return max(1, min(cpu, threads)), max(0, min(19, nice))
 
     async def _start_phase(self, job: FilterJob) -> None:
         if job.current_phase_index >= len(job.phases):
@@ -836,6 +865,8 @@ class FilterManager:
         return False
 
     async def _run_cmd(self, cmd: list[str], job: FilterJob) -> int:
+        if job._nice_level > 0:
+            cmd = ["nice", "-n", str(job._nice_level), *cmd]
         job.append_log(f"\n$ {' '.join(cmd)}\n")
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
@@ -843,6 +874,7 @@ class FilterManager:
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
+            env=job._proc_env or None,
         )
         if proc.stdout is None:
             raise RuntimeError("subprocess stdout is None despite PIPE")

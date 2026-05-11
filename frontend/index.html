@@ -488,6 +488,16 @@ footer {
 footer a { color: var(--gray); text-decoration: none; }
 footer a:hover { color: var(--blue); text-decoration: underline; }
 footer .credits-sep { color: var(--border); }
+
+/* ── Resource limits modal ── */
+.resource-presets { display: flex; gap: .5rem; margin-bottom: .75rem; }
+.resource-preset-btn { flex: 1; padding: .45rem .75rem; border: 1.5px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; font-size: .875rem; transition: border-color .15s, background .15s; }
+.resource-preset-btn:hover { border-color: var(--blue); }
+.resource-preset-btn.active { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, var(--bg)); font-weight: 600; }
+.resource-hint { font-size: .78rem; color: var(--gray); margin-top: .35rem; }
+.resource-advanced summary { font-size: .8rem; color: var(--gray); cursor: pointer; user-select: none; margin-bottom: .5rem; }
+.resource-advanced summary:hover { color: var(--blue); }
+.resource-advanced .form-group { margin-bottom: .6rem; }
 </style>
 </head>
 <body>
@@ -498,6 +508,7 @@ footer .credits-sep { color: var(--border); }
     <span>📁</span>
     <span class="dir-badge-path" id="dir-badge-text"></span>
     <button class="dir-badge-edit" onclick="openChangeDirModal()" id="btn-dir-badge-edit" title="Verzeichnis ändern">✎</button>
+    <button class="dir-badge-edit" onclick="openResourceModal()" id="btn-resource-limits" title="Ressourcen-Limits">⚙</button>
   </div>
   <button id="lang-btn" onclick="toggleLang()">EN</button>
   <div id="ws-indicator">
@@ -811,6 +822,35 @@ footer .credits-sep { color: var(--border); }
       <button class="btn btn-primary" onclick="saveChangedDir()" data-i18n="cd_save">Speichern</button>
     </div>
     <div id="change-dir-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+  </div>
+</div>
+
+<!-- ── Resource limits modal ── -->
+<div id="modal-resource-limits" class="overlay" style="display:none">
+  <div class="overlay-box" style="max-width:420px">
+    <h2>Ressourcen-Limits</h2>
+    <p style="font-size:.85rem;color:var(--gray);margin-bottom:.75rem">Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.</p>
+    <div class="resource-presets">
+      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')">⚡ Vollgas</button>
+      <button class="resource-preset-btn" id="btn-preset-background" onclick="setResourcePreset('background')">🌙 Schonend</button>
+    </div>
+    <div class="resource-hint" id="resource-hint"></div>
+    <details class="resource-advanced" style="margin-top:.75rem">
+      <summary>Erweitert (Override)</summary>
+      <div class="form-group">
+        <label class="field-label">Threads <span style="font-weight:400;color:var(--gray)" id="resource-threads-range"></span></label>
+        <input type="number" id="resource-threads-input" class="form-control" min="1" placeholder="Auto">
+      </div>
+      <div class="form-group">
+        <label class="field-label">Priorität (nice) <span style="font-weight:400;color:var(--gray)">(0 = normal, 19 = minimal)</span></label>
+        <input type="number" id="resource-nice-input" class="form-control" min="0" max="19" placeholder="Auto">
+      </div>
+    </details>
+    <div id="resource-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-secondary" onclick="closeResourceModal()">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveResourceLimits()">Speichern</button>
+    </div>
   </div>
 </div>
 
@@ -1261,6 +1301,71 @@ async function saveChangedDir() {
   settingsState = { configured: true, host_data_dir: path, pending_restart: true };
   document.getElementById('lock-path').textContent = path;
   _showOverlay('lock');
+}
+
+// ─── Resource limits ──────────────────────────────────────────────────────────
+let _resourceState = { mode: 'full', cpu_count: 1, osmium_threads_override: null, nice_override: null, effective_threads: 1, effective_nice: 0 };
+
+async function openResourceModal() {
+  document.getElementById('resource-error').style.display = 'none';
+  try {
+    const res = await fetch('/api/resource-limits');
+    _resourceState = await res.json();
+  } catch (e) { /* keep defaults */ }
+  _applyResourceState();
+  document.getElementById('modal-resource-limits').style.display = 'flex';
+}
+
+function closeResourceModal() {
+  document.getElementById('modal-resource-limits').style.display = 'none';
+}
+
+function setResourcePreset(mode) {
+  _resourceState.mode = mode;
+  _applyResourceState();
+}
+
+function _applyResourceState() {
+  const { mode, cpu_count, osmium_threads_override, nice_override, effective_threads, effective_nice } = _resourceState;
+  document.getElementById('btn-preset-full').classList.toggle('active', mode === 'full');
+  document.getElementById('btn-preset-background').classList.toggle('active', mode === 'background');
+  document.getElementById('resource-threads-range').textContent = `(1–${cpu_count}, leer = Auto)`;
+  document.getElementById('resource-threads-input').max = cpu_count;
+  document.getElementById('resource-threads-input').value = osmium_threads_override ?? '';
+  document.getElementById('resource-nice-input').value = nice_override ?? '';
+  document.getElementById('resource-hint').textContent =
+    `Effektiv: ${effective_threads} Thread${effective_threads !== 1 ? 's' : ''}, Nice ${effective_nice}`;
+}
+
+async function saveResourceLimits() {
+  const errEl = document.getElementById('resource-error');
+  errEl.style.display = 'none';
+  const threadsVal = document.getElementById('resource-threads-input').value.trim();
+  const niceVal = document.getElementById('resource-nice-input').value.trim();
+  const body = {
+    mode: _resourceState.mode,
+    osmium_threads_override: threadsVal ? parseInt(threadsVal, 10) : null,
+    nice_override: niceVal !== '' ? parseInt(niceVal, 10) : null,
+  };
+  try {
+    const res = await fetch('/api/resource-limits', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      errEl.textContent = d.detail || 'Fehler beim Speichern.';
+      errEl.style.display = 'block';
+      return;
+    }
+    // Refresh effective values display
+    const updated = await fetch('/api/resource-limits').then(r => r.json());
+    _resourceState = updated;
+    _applyResourceState();
+    closeResourceModal();
+  } catch (e) {
+    errEl.textContent = 'Verbindungsfehler: ' + e.message;
+    errEl.style.display = 'block';
+  }
 }
 
 // ─── Formatting ───────────────────────────────────────────────────────────────

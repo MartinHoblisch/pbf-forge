@@ -80,22 +80,6 @@ def _cleanup_stale_temps() -> None:
                 _log.warning("Could not remove stale temp dir %s: %s", d, exc)
 
 
-def _cgroup_cpu_limit() -> int | None:
-    try:
-        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
-        if quota == "max":
-            return None
-        return max(1, int(int(quota) / int(period)))
-    except Exception:
-        return None
-
-
-def _configure_osmium_threads() -> None:
-    cpu_count = _cgroup_cpu_limit() or os.cpu_count() or 1
-    os.environ.setdefault("OSMIUM_POOL_THREADS", str(cpu_count))
-    _log.info("OSMIUM_POOL_THREADS=%s (cpu_count=%s)", os.environ["OSMIUM_POOL_THREADS"], cpu_count)
-
-
 async def _delayed_check_all() -> None:
     await asyncio.sleep(0.5)
     loop = asyncio.get_running_loop()
@@ -106,7 +90,6 @@ async def _delayed_check_all() -> None:
 async def lifespan(app: FastAPI):
     _validate_dirs()
     _cleanup_stale_temps()
-    _configure_osmium_threads()
     _clear_pending_restart()
     state.ws_manager = ConnectionManager()
     state.download_manager = DownloadManager(state.ws_manager)
