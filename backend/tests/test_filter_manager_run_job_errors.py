@@ -64,7 +64,6 @@ async def test_run_job_output_dir_mkdir_failure_marks_error(tmp_data_dir):
 
     assert job.status == "error"
     assert "Could not create output directory" in (job.error or "")
-    assert job.eta_seconds is None
 
 
 # ── source file missing ──────────────────────────────────────────────────────

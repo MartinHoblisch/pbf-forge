@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from filter_manager import FilterJob, FilterManager
 
@@ -117,3 +120,26 @@ async def test_output_file_simulated_via_touch(tmp_path):
 
     assert rc == 0
     assert output_path.exists()
+
+
+async def test_timeout_kills_process_and_raises():
+    fm = FilterManager(ws_manager=AsyncMock())
+    job = _make_job()
+    job.timeout_seconds = 0.05  # 50 ms — fires before stdout ever closes
+
+    class _HangingStdout:
+        async def read(self, n: int) -> bytes:  # noqa: ARG002
+            await asyncio.sleep(10)
+            return b""
+
+    proc = AsyncMock()
+    proc.stdout = _HangingStdout()
+    proc.kill = MagicMock()  # kill() is synchronous on asyncio subprocess
+    proc.wait = AsyncMock(return_value=-9)
+    proc.returncode = -9
+
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        with pytest.raises(RuntimeError, match="timed out"):
+            await fm._run_cmd(["sleep", "10"], job)
+
+    proc.kill.assert_called_once()

@@ -322,6 +322,29 @@ def test_fourth_download_accepted_not_simultaneous(tmp_data_dir):
     assert len(submitted) == 4
 
 
+def test_register_and_start_skips_if_already_downloading(tmp_data_dir):
+    """register_and_start must return False and not submit a second worker
+    when the filename is already being downloaded (B5 double-download guard)."""
+    dm = _make_dm(tmp_data_dir)
+    (tmp_data_dir / "test.osm.pbf").touch()
+    dm._refresh_local_files()
+
+    submitted_count = 0
+
+    def counting_submit(fn, *args, **kwargs):
+        nonlocal submitted_count
+        submitted_count += 1
+        return MagicMock()
+
+    with patch.object(dm._executor, "submit", side_effect=counting_submit):
+        r1 = dm.register_and_start("https://example.com/test.osm.pbf", "test.osm.pbf")
+        r2 = dm.register_and_start("https://example.com/test.osm.pbf", "test.osm.pbf")
+
+    assert r1 is True
+    assert r2 is False
+    assert submitted_count == 1
+
+
 # ── Checksum verification ─────────────────────────────────────────────────────
 
 

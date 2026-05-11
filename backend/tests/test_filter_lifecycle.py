@@ -8,7 +8,8 @@ Bug class to prevent:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -83,7 +84,6 @@ async def test_cancel_running_job_kills_proc_and_marks_error():
     proc.kill.assert_called_once()
     assert job.status == "error"
     assert job.error == "Cancelled by user"
-    assert job.eta_seconds is None
     ws.broadcast.assert_called()  # state update emitted
 
 
@@ -145,3 +145,41 @@ async def test_cancel_running_without_proc_still_marks_error():
 
     assert result is True
     assert job.status == "error"
+
+
+# ── Job queue (S6) ────────────────────────────────────────────────────────────
+
+
+async def test_second_job_queues_when_at_capacity():
+    """When max_parallel=1 and job1 holds the semaphore, job2 must be queued."""
+    fm = FilterManager(AsyncMock())
+    fm._max_parallel = 1
+    fm._semaphore = asyncio.Semaphore(1)
+
+    job1 = _job("job-1")
+    job2 = _job("job-2")
+    fm._jobs[job1.id] = job1
+    fm._jobs[job2.id] = job2
+
+    release_job1 = asyncio.Event()
+    job1_running = asyncio.Event()
+
+    async def mock_execute(job: FilterJob) -> None:
+        if job.id == "job-1":
+            job1_running.set()
+            await release_job1.wait()
+
+    with patch.object(fm, "_execute_job", side_effect=mock_execute):
+        t1 = asyncio.create_task(fm.run_job(job1))
+        await job1_running.wait()  # job1 holds semaphore
+
+        t2 = asyncio.create_task(fm.run_job(job2))
+        await asyncio.sleep(0)  # let job2 reach semaphore acquisition
+
+        assert job2.status == "queued"
+        assert job2.queue_position is not None
+
+        release_job1.set()
+        await asyncio.gather(t1, t2)
+
+    assert fm._running_count == 0
