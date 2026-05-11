@@ -151,7 +151,7 @@ class FilterManager:
         out_dir = Path(output_dir)
         paths = []
         for source in source_files:
-            base = source.replace(".osm.pbf", "")
+            base = source.removesuffix(".osm.pbf")
             stem = f"{base}_{suffix}"
             for fmt in output_formats:
                 ext = _FMT_EXT.get(fmt, "")
@@ -205,7 +205,7 @@ class FilterManager:
                             "No filter expressions. Please specify geometry types and tags."
                         )
 
-                    base = source.replace(".osm.pbf", "")
+                    base = source.removesuffix(".osm.pbf")
                     stem = f"{base}_{job.suffix}"
 
                     needs_pbf = "pbf" in job.output_formats
@@ -751,7 +751,7 @@ class FilterManager:
         if proc:
             try:
                 proc.kill()
-            except ProcessLookupError:
+            except OSError:
                 pass
         if job and job.status == "running":
             job.status = "error"

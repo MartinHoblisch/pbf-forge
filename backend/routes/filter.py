@@ -35,7 +35,8 @@ class FilterRequest(BaseModel):
     def validate_output_formats(cls, v: list) -> list:
         if not v:
             raise ValueError("At least one output format must be selected")
-        return v
+        seen: set = set()
+        return [x for x in v if not (x in seen or seen.add(x))]
 
 
 def _resolve_output_dir(req: FilterRequest) -> str:

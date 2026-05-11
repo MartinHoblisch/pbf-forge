@@ -336,7 +336,10 @@ class DownloadManager:
 
     def _broadcast(self, data: dict) -> None:
         if self._loop and not self._loop.is_closed():
-            asyncio.run_coroutine_threadsafe(self._ws.broadcast(data), self._loop)
+            try:
+                asyncio.run_coroutine_threadsafe(self._ws.broadcast(data), self._loop)
+            except RuntimeError:
+                pass
 
     @staticmethod
     def _new_session() -> requests.Session:
