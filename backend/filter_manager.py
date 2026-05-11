@@ -105,13 +105,35 @@ class FilterJob:
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
     _proc_env: dict = field(default_factory=dict, init=False, repr=False)
     _nice_level: int = field(default=0, init=False, repr=False)
+    _log_path: Optional[Path] = field(default=None, init=False, repr=False)
+    _log_fh: Optional[object] = field(default=None, init=False, repr=False)
 
     @property
     def log(self) -> str:
         return "".join(self._log_parts)
 
+    @property
+    def log_file(self) -> Optional[str]:
+        return str(self._log_path) if self._log_path else None
+
     def append_log(self, text: str) -> None:
         self._log_parts.append(text)
+        if self._log_path is not None:
+            try:
+                if self._log_fh is None:
+                    self._log_fh = open(self._log_path, "a", encoding="utf-8", buffering=1)
+                self._log_fh.write(text)
+            except OSError as exc:
+                # Log to stderr but never crash the pipeline on disk errors.
+                _log.warning("Failed to write job log to %s: %s", self._log_path, exc)
+
+    def close_log(self) -> None:
+        if self._log_fh is not None:
+            try:
+                self._log_fh.close()
+            except OSError:
+                pass
+            self._log_fh = None
 
     def to_dict(self) -> dict:
         return {
@@ -128,6 +150,7 @@ class FilterJob:
             "status": self.status,
             "finished_at": self.finished_at,
             "log": self.log,
+            "log_file": self.log_file,
             "output_files": self.output_files,
             "error": self.error,
             "phases": [p.to_dict() for p in self.phases],
@@ -138,6 +161,12 @@ class FilterJob:
             "speed_bps": self.speed_bps,
             "queue_position": self.queue_position,
         }
+
+    def to_manifest_dict(self) -> dict:
+        """Persist-friendly snapshot: drop in-memory log (lives on disk separately)."""
+        d = self.to_dict()
+        d.pop("log", None)
+        return d
 
 
 def _compute_max_parallel() -> int:
@@ -179,13 +208,92 @@ class FilterManager:
         if not _new_history.exists() and _old_history.exists():
             shutil.copy(_old_history, _new_history)
         self._history = FilterHistory(_new_history)
+        # Resolved at construction so monkeypatch-on-CONFIG_DIR (tests) works.
+        self._jobs_dir: Path = CONFIG_DIR / "jobs"
+        self._manifest_file: Path = self._jobs_dir / "manifest.json"
+        try:
+            self._jobs_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            _log.warning("Could not create jobs dir %s: %s", self._jobs_dir, exc)
+        self._recover_orphan_jobs()
+
+    def _recover_orphan_jobs(self) -> None:
+        """Load manifest from disk; mark in-flight jobs as crashed."""
+        if not self._manifest_file.exists():
+            return
+        try:
+            data = json.loads(self._manifest_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            _log.warning("Could not read job manifest: %s", exc)
+            return
+        in_flight = {"running", "pending", "queued"}
+        recovered = 0
+        for entry in data:
+            try:
+                # Reconstruct minimal FilterJob; in-flight ones are marked errored.
+                job = FilterJob(
+                    id=entry["id"],
+                    source_files=entry.get("source_files", []),
+                    tags=entry.get("tags", []),
+                    exclude_tags=entry.get("exclude_tags", []),
+                    geometry_types=entry.get("geometry_types", []),
+                    suffix=entry.get("suffix", ""),
+                    output_formats=entry.get("output_formats", []),
+                    output_dir=entry.get("output_dir", ""),
+                    columns_mode=entry.get("columns_mode", "other_tags"),
+                    manual_keys=entry.get("manual_keys", []),
+                )
+                job.status = entry.get("status", "error")
+                job.finished_at = entry.get("finished_at")
+                job.output_files = entry.get("output_files", [])
+                job.error = entry.get("error")
+                job.current_phase_index = entry.get("current_phase_index", 0)
+                job.phase_percent = entry.get("phase_percent")
+                lf = entry.get("log_file")
+                if lf:
+                    job._log_path = Path(lf)
+                if job.status in in_flight:
+                    job.status = "error"
+                    job.finished_at = datetime.now().strftime("%H:%M")
+                    job.error = (
+                        "Backend crashed or restarted mid-job. "
+                        "Check log_file for last activity (likely OOM — see `dmesg | grep -i kill`)."
+                    )
+                    job.phase_started_at = None
+                    recovered += 1
+                self._jobs[job.id] = job
+            except (KeyError, TypeError) as exc:
+                _log.warning("Skipping malformed manifest entry: %s", exc)
+        if recovered:
+            _log.warning("Recovered %d orphaned job(s) as errored after restart", recovered)
+            self._persist_jobs()
+
+    def _persist_jobs(self) -> None:
+        """Write atomic snapshot of all jobs to manifest.json."""
+        try:
+            self._jobs_dir.mkdir(parents=True, exist_ok=True)
+            payload = [j.to_manifest_dict() for j in self._jobs.values()]
+            tmp = self._manifest_file.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, self._manifest_file)
+        except OSError as exc:
+            _log.warning("Could not persist job manifest: %s", exc)
 
     def list_jobs(self) -> list[dict]:
         return [j.to_dict() for j in reversed(list(self._jobs.values()))]
 
     def clear_completed_jobs(self) -> None:
         keep = {"running", "pending"}
+        removed = [j for jid, j in self._jobs.items() if j.status not in keep]
         self._jobs = {jid: j for jid, j in self._jobs.items() if j.status in keep}
+        for j in removed:
+            j.close_log()
+            if j._log_path is not None:
+                try:
+                    j._log_path.unlink(missing_ok=True)
+                except OSError as exc:
+                    _log.warning("Could not delete job log %s: %s", j._log_path, exc)
+        self._persist_jobs()
 
     def get_job(self, job_id: str) -> Optional[dict]:
         j = self._jobs.get(job_id)
@@ -195,7 +303,13 @@ class FilterManager:
         if "manual_keys" in kwargs:
             kwargs["manual_keys"] = [k.strip() for k in kwargs["manual_keys"] if k.strip()]
         job = FilterJob(id=str(uuid.uuid4()), **kwargs)
+        try:
+            self._jobs_dir.mkdir(parents=True, exist_ok=True)
+            job._log_path = self._jobs_dir / f"{job.id}.log"
+        except OSError as exc:
+            _log.warning("Could not set up job log path: %s", exc)
         self._jobs[job.id] = job
+        self._persist_jobs()
         return job
 
     def list_pbf_files(self) -> list[str]:
@@ -235,6 +349,7 @@ class FilterManager:
         if self._running_count >= self._max_parallel:
             job.status = "queued"
             job.queue_position = sum(1 for j in self._jobs.values() if j.status == "queued")
+            self._persist_jobs()
             await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
         async with self._semaphore:
@@ -243,6 +358,8 @@ class FilterManager:
                 await self._execute_job(job)
             finally:
                 self._running_count -= 1
+                job.close_log()
+                self._persist_jobs()
 
     async def _execute_job(self, job: FilterJob) -> None:
         job.status = "running"
@@ -251,6 +368,7 @@ class FilterManager:
         job.current_phase_index = 0
         job.job_started_at = time.time()
         job.phase_started_at = job.job_started_at  # ticker starts immediately
+        self._persist_jobs()
         total_bytes = sum(self._source_size(s) for s in job.source_files)
         job.timeout_seconds = max(300.0, total_bytes / (10 * 1024 * 1024))
 
@@ -525,7 +643,9 @@ class FilterManager:
             job.error = str(exc)
             job.phase_started_at = None  # prevent stale elapsed ticker on client
             job.append_log(f"\nERROR: {exc}\n")
+            self._append_kernel_log_snapshot(job)
 
+        self._persist_jobs()
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
     _STEP_FACTORS: dict[str, float] = {
@@ -888,9 +1008,35 @@ class FilterManager:
         if job and job.status == "running":
             job.status = "error"
             job.error = "Cancelled by user"
+            self._persist_jobs()
             await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
             return True
         return False
+
+    def _append_kernel_log_snapshot(self, job: FilterJob) -> None:
+        """Best-effort: tail kernel log to capture OOM-killer messages.
+
+        Tries `journalctl -k` first (works rootless on most systemd distros),
+        falls back to `dmesg`. Both are Linux-only; silently no-ops elsewhere.
+        """
+        import subprocess
+
+        for cmd in (
+            ["journalctl", "-k", "--since", "5 min ago", "--no-pager", "-n", "50"],
+            ["dmesg", "-T"],
+        ):
+            try:
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=3, check=False
+                )
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                continue
+            out = (result.stdout or "").strip()
+            if not out:
+                continue
+            tail = "\n".join(out.splitlines()[-50:])
+            job.append_log(f"\n--- kernel log tail ({cmd[0]}) ---\n{tail}\n--- end ---\n")
+            return
 
     async def _run_cmd(self, cmd: list[str], job: FilterJob) -> int:
         if job._nice_level > 0:
@@ -976,4 +1122,14 @@ class FilterManager:
             self._procs.pop(job.id, None)
 
         await proc.wait()
-        return proc.returncode
+        rc = proc.returncode
+        if rc is not None and rc < 0:
+            sig = -rc
+            sig_names = {9: "SIGKILL (likely OOM)", 15: "SIGTERM", 11: "SIGSEGV", 6: "SIGABRT"}
+            label = sig_names.get(sig, f"signal {sig}")
+            job.append_log(
+                f"\n*** Subprocess killed by {label}. "
+                f"Inspect: `dmesg | grep -i 'killed process'` or "
+                f"`journalctl -k --since '5 min ago'` ***\n"
+            )
+        return rc
