@@ -1078,9 +1078,7 @@ class FilterManager:
             ["dmesg", "-T"],
         ):
             try:
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=3, check=False
-                )
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3, check=False)
             except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
                 continue
             out = (result.stdout or "").strip()
