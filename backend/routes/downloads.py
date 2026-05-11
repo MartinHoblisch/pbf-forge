@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import logging
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -9,6 +10,8 @@ from pydantic import BaseModel
 
 import state
 from download_manager import url_to_filename
+
+_log = logging.getLogger(__name__)
 
 _BLOCKED_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})
 
@@ -89,8 +92,11 @@ def url_info(req: UrlInfoRequest):
     try:
         _validate_url(req.url)
         return state.download_manager.get_url_info(req.url)
-    except Exception as exc:
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        _log.exception("Unexpected error in url_info")
+        raise HTTPException(status_code=500, detail="Internal error. Check server logs.")
 
 
 @router.post("/add-url")

@@ -40,8 +40,12 @@ def reset_state(tmp_data_dir, tmp_config_dir, monkeypatch):
     presets_file = tmp_config_dir / ".osm_tool_presets.json"
     user_config_file = tmp_config_dir / "user-config.json"
 
+    tmp_temp_dir = tmp_data_dir / "tmp"
+    tmp_temp_dir.mkdir()
+
     monkeypatch.setattr(config, "DATA_DIR", tmp_data_dir)
     monkeypatch.setattr(config, "CONFIG_DIR", tmp_config_dir)
+    monkeypatch.setattr(config, "TEMP_DIR", tmp_temp_dir)
     monkeypatch.setattr(config, "URLS_FILE", urls_file)
     monkeypatch.setattr(config, "PRESETS_FILE", presets_file)
     monkeypatch.setattr(config, "USER_CONFIG_FILE", user_config_file)
@@ -51,9 +55,13 @@ def reset_state(tmp_data_dir, tmp_config_dir, monkeypatch):
     monkeypatch.setattr(dm_module, "URLS_FILE", urls_file)
     monkeypatch.setattr(fm_module, "DATA_DIR", tmp_data_dir)
     monkeypatch.setattr(fm_module, "CONFIG_DIR", tmp_config_dir)
+    monkeypatch.setattr(fm_module, "TEMP_DIR", tmp_temp_dir)
     monkeypatch.setattr(presets_module, "PRESETS_FILE", presets_file)
     monkeypatch.setattr(routes_filter_module, "DATA_DIR", tmp_data_dir)
     monkeypatch.setattr(routes_settings_module, "USER_CONFIG_FILE", user_config_file)
+    monkeypatch.setattr(main_module, "DATA_DIR", tmp_data_dir)
+    monkeypatch.setattr(main_module, "CONFIG_DIR", tmp_config_dir)
+    monkeypatch.setattr(main_module, "TEMP_DIR", tmp_temp_dir)
     monkeypatch.setattr(main_module, "USER_CONFIG_FILE", user_config_file)
 
     state.ws_manager = None

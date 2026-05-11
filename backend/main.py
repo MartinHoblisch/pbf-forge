@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import os
+import shutil
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
@@ -13,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import state
-from config import USER_CONFIG_FILE
+from config import CONFIG_DIR, DATA_DIR, TEMP_DIR, USER_CONFIG_FILE
 from download_manager import DownloadManager
 from filter_manager import FilterManager
 from routes import downloads, presets
@@ -58,6 +60,42 @@ def _is_configured() -> bool:
         return False
 
 
+def _validate_dirs() -> None:
+    for label, path in [("DATA_DIR", DATA_DIR), ("CONFIG_DIR", CONFIG_DIR)]:
+        if not path.exists():
+            raise RuntimeError(f"{label} does not exist: {path}")
+        if not os.access(path, os.W_OK):
+            raise RuntimeError(f"{label} is not writable: {path}")
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _cleanup_stale_temps() -> None:
+    cutoff = time.time() - 86400  # 24 hours
+    for d in TEMP_DIR.glob("tmp*"):
+        if d.is_dir() and d.stat().st_mtime < cutoff:
+            try:
+                shutil.rmtree(d)
+                _log.info("Removed stale temp dir: %s", d)
+            except Exception as exc:
+                _log.warning("Could not remove stale temp dir %s: %s", d, exc)
+
+
+def _cgroup_cpu_limit() -> int | None:
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota == "max":
+            return None
+        return max(1, int(int(quota) / int(period)))
+    except Exception:
+        return None
+
+
+def _configure_osmium_threads() -> None:
+    cpu_count = _cgroup_cpu_limit() or os.cpu_count() or 1
+    os.environ.setdefault("OSMIUM_POOL_THREADS", str(cpu_count))
+    _log.info("OSMIUM_POOL_THREADS=%s (cpu_count=%s)", os.environ["OSMIUM_POOL_THREADS"], cpu_count)
+
+
 async def _delayed_check_all() -> None:
     await asyncio.sleep(0.5)
     loop = asyncio.get_running_loop()
@@ -66,6 +104,9 @@ async def _delayed_check_all() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _validate_dirs()
+    _cleanup_stale_temps()
+    _configure_osmium_threads()
     _clear_pending_restart()
     state.ws_manager = ConnectionManager()
     state.download_manager = DownloadManager(state.ws_manager)

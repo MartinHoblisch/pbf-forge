@@ -6,6 +6,7 @@ from pathlib import Path
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/app/config"))
+TEMP_DIR = Path(os.getenv("TEMP_DIR", str(DATA_DIR / "tmp")))
 
 URLS_FILE = CONFIG_DIR / ".osm_tool_urls.json"
 PRESETS_FILE = CONFIG_DIR / ".osm_tool_presets.json"
@@ -25,7 +26,7 @@ SLOW_RETRY_INTERVAL_SECONDS = 600  # 10 minutes between network-error retries
 MAX_RETRY_AFTER_SECONDS = 60  # cap on Retry-After header value
 
 # Europe-latest ~30 GB. 100 GB leaves headroom but blocks pathological URLs.
-MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100 GB
+MAX_DOWNLOAD_SIZE = int(os.getenv("MAX_DOWNLOAD_SIZE", str(100 * 1024 * 1024 * 1024)))  # 100 GB
 
 # Buffer required free on disk after a download.
 MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB

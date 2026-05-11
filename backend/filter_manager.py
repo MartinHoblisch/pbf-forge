@@ -15,7 +15,7 @@ from pathlib import Path
 from statistics import median
 from typing import Literal, Optional
 
-from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR
+from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR, TEMP_DIR
 from filter_history import FilterHistory
 
 _log = logging.getLogger(__name__)
@@ -192,7 +192,7 @@ class FilterManager:
             return
 
         try:
-            with tempfile.TemporaryDirectory() as _tmp:
+            with tempfile.TemporaryDirectory(dir=TEMP_DIR) as _tmp:
                 tmp = Path(_tmp)
                 for source in job.source_files:
                     source_path = DATA_DIR / source

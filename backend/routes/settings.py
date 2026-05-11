@@ -46,7 +46,7 @@ def get_settings() -> dict:
 def post_settings(payload: SettingsPayload) -> dict:
     if not payload.host_data_dir or len(payload.host_data_dir) > 500:
         raise HTTPException(status_code=422, detail="Invalid path")
-    if re.search(r'[&|;<>`"^]', payload.host_data_dir):
+    if not re.fullmatch(r'[A-Za-z0-9 _\-./:\\]+', payload.host_data_dir):
         raise HTTPException(status_code=422, detail="Path contains invalid characters")
     cfg = _read_config()
     cfg["host_data_dir"] = payload.host_data_dir
