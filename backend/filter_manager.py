@@ -22,7 +22,6 @@ from config import (
     ATTRIBUTION,
     CONFIG_DIR,
     DATA_DIR,
-    PYOSMIUM_BUFFER_SIZE,
     TEMP_DIR,
 )
 from filter_history import FilterHistory
@@ -674,7 +673,6 @@ class FilterManager:
                 str(pbf_path),
                 str(tmp_out),
                 keep,
-                PYOSMIUM_BUFFER_SIZE,
             )
             tmp_out.replace(pbf_path)
             return 0

@@ -28,10 +28,6 @@ MAX_RETRY_AFTER_SECONDS = 60  # cap on Retry-After header value
 # Europe-latest ~30 GB. 100 GB leaves headroom but blocks pathological URLs.
 MAX_DOWNLOAD_SIZE = int(os.getenv("MAX_DOWNLOAD_SIZE", str(100 * 1024 * 1024 * 1024)))  # 100 GB
 
-# pyosmium apply_file buffer: larger = fewer Python callbacks, more RSS.
-# 512 MB default is a reasonable balance for large PBF files.
-PYOSMIUM_BUFFER_SIZE = int(os.getenv("PYOSMIUM_BUFFER_SIZE", str(512 * 1024 * 1024)))
-
 # Buffer required free on disk after a download.
 MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB
 

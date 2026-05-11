@@ -4,11 +4,11 @@ import osmium
 import osmium.io
 
 
-def reduce_tags(src: str, dst: str, keep: set[str], buffer_size: int = 512 * 1024 * 1024) -> None:
+def reduce_tags(src: str, dst: str, keep: set[str]) -> None:
     """Write *src* PBF to *dst* keeping only tags whose key is in *keep*."""
     writer = osmium.SimpleWriter(dst)
     try:
-        _TagReducer(writer, keep).apply_file(src, buffer_size=buffer_size)
+        _TagReducer(writer, keep).apply_file(src)
     finally:
         writer.close()
 
