@@ -46,6 +46,18 @@ _PROGRESS_RE = re.compile(r"\]\s*(\d{1,3})%|^(\d{1,3})%\s*$")
 _VALID_KEY = re.compile(r"^[a-zA-Z0-9_:.\-]+$")
 
 
+def _ts() -> str:
+    return datetime.now().strftime("[%H:%M:%S] ")
+
+
+def _fmt_size(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} PB"
+
+
 @dataclass
 class Phase:
     label: str
@@ -239,6 +251,20 @@ class FilterManager:
         job.phase_started_at = job.job_started_at  # ticker starts immediately
         total_bytes = sum(self._source_size(s) for s in job.source_files)
         job.timeout_seconds = max(300.0, total_bytes / (10 * 1024 * 1024))
+
+        # Startup header
+        lines = [f"{_ts()}=== Job started ==="]
+        for s in job.source_files:
+            lines.append(f"{_ts()}Sources  : {s} ({_fmt_size(self._source_size(s))})")
+        lines.append(f"{_ts()}Formats  : {', '.join(f.upper() for f in job.output_formats)}")
+        lines.append(f"{_ts()}Tags     : {', '.join(job.tags)}")
+        if job.exclude_tags:
+            lines.append(f"{_ts()}Exclude  : {', '.join(job.exclude_tags)}")
+        if job.geometry_types:
+            lines.append(f"{_ts()}Geometry : {', '.join(job.geometry_types)}")
+        lines.append(f"{_ts()}Timeout  : {int(job.timeout_seconds)}s")
+        job.append_log("\n".join(lines) + "\n")
+
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
         out_dir = Path(job.output_dir)
@@ -444,6 +470,22 @@ class FilterManager:
                     if shared_geojson is not None:
                         shared_geojson.unlink(missing_ok=True)
 
+            # Output inventory
+            total_out = 0
+            inv_lines = [f"{_ts()}=== Output files ==="]
+            for f in job.output_files:
+                try:
+                    sz = Path(f).stat().st_size
+                except OSError:
+                    sz = 0
+                total_out += sz
+                inv_lines.append(f"{_ts()}  {f} ({_fmt_size(sz)})")
+            job_dur = time.time() - (job.job_started_at or time.time())
+            inv_lines.append(
+                f"{_ts()}Total: {_fmt_size(total_out)}  |  Job duration: {job_dur:.1f}s"
+            )
+            job.append_log("\n".join(inv_lines) + "\n")
+
             job.status = "done"
             job.finished_at = datetime.now().strftime("%H:%M")
 
@@ -475,6 +517,9 @@ class FilterManager:
         job.phase_started_at = time.time()
         job.phase_percent = None
         job.speed_bps = None
+        n, m = job.current_phase_index + 1, len(job.phases)
+        label = job.phases[job.current_phase_index].label
+        job.append_log(f"{_ts()}--- Phase {n}/{m}: {label} ---\n")
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
     async def _finish_phase(self, job: FilterJob) -> None:
@@ -489,6 +534,8 @@ class FilterManager:
             self._history.record(phase.source, size, phase.step, phase.fmt, duration)
         except Exception as exc:
             _log.warning("filter_history.record failed: %s", exc)
+        n, m = idx + 1, len(job.phases)
+        job.append_log(f"{_ts()}Phase {n}/{m} done in {duration:.1f}s\n")
         job.current_phase_index += 1
         job.phase_started_at = None
         job.speed_bps = None
