@@ -10,12 +10,9 @@ Covers:
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock
 
-import pytest
-
-from filter_manager import FilterJob, FilterManager
+from filter_manager import FilterManager
 
 
 def _fm() -> FilterManager:

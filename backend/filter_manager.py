@@ -268,7 +268,8 @@ class FilterManager:
                     job.finished_at = datetime.now().strftime("%H:%M")
                     job.error = (
                         "Backend crashed or restarted mid-job. "
-                        "Check log_file for last activity (likely OOM — see `dmesg | grep -i kill`)."
+                        "Check log_file for last activity "
+                        "(likely OOM — see `dmesg | grep -i kill`)."
                     )
                     job.phase_started_at = None
                     recovered += 1
