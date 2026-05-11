@@ -949,6 +949,7 @@ const TRANSLATIONS = {
     job_error: 'Fehler',
     job_err_prefix: 'Fehler:',
     job_output_prefix: 'Ausgabe:',
+    job_log_file_link: 'Log-Datei anzeigen →',
     card_presets: 'Gespeicherte Presets',
     no_presets: 'Keine Presets vorhanden.',
     card_new_preset: 'Neues Preset erstellen',
@@ -1102,6 +1103,7 @@ const TRANSLATIONS = {
     job_error: 'Error',
     job_err_prefix: 'Error:',
     job_output_prefix: 'Output:',
+    job_log_file_link: 'View log file →',
     card_presets: 'Saved presets',
     no_presets: 'No presets available.',
     card_new_preset: 'Create new preset',
@@ -1882,6 +1884,11 @@ function renderFilterJobs() {
            <div class="job-log">${escHtml(j.log)}</div>
          </details>`
       : '';
+    const logFileLinkHtml = j.log_file
+      ? `<a href="/api/filter/jobs/${escHtml(j.id)}/log" target="_blank" rel="noopener"
+            class="job-log-file-link"
+            style="font-size:.78rem;color:var(--blue);text-decoration:none;display:inline-block;margin-top:.25rem">${t('job_log_file_link')}</a>`
+      : '';
 
     return `<div class="card" style="margin-bottom:.75rem">
       <div class="card-header" style="justify-content:space-between">
@@ -1896,6 +1903,7 @@ function renderFilterJobs() {
         ${j.error ? `<div style="color:var(--red);font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_err_prefix')} ${escHtml(j.error)}</div>` : ''}
         ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${j.output_files.map(f => escHtml(f)).join('<br>')}</div>` : ''}
         ${logHtml}
+        ${logFileLinkHtml}
       </div>
     </div>`;
   }).join('');

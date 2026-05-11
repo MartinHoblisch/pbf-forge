@@ -71,7 +71,10 @@ def test_orphan_recovery_marks_running_jobs_as_errored(tmp_config_dir):
     fm2 = _fm()
     recovered = fm2._jobs[job.id]
     assert recovered.status == "error"
-    assert "Backend crashed" in (recovered.error or "")
+    err = recovered.error or ""
+    assert "Backend crashed" in err
+    # Error must reveal the log file path so the user knows where to look
+    assert f"{job.id}.log" in err
     # Recovery rewrites manifest with the new status
     data = json.loads((tmp_config_dir / "jobs" / "manifest.json").read_text())
     assert data[0]["status"] == "error"

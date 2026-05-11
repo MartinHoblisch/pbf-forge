@@ -4,8 +4,10 @@ import re
 from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, field_validator
 
+import config
 import state
 from config import DATA_DIR
 
@@ -132,3 +134,23 @@ async def cancel_job(job_id: str):
     if not cancelled:
         raise HTTPException(status_code=404, detail="Job not found or not running")
     return {"status": "cancelling"}
+
+
+_JOB_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
+
+
+@router.get("/jobs/{job_id}/log")
+def get_job_log(job_id: str):
+    if not _JOB_ID_RE.match(job_id):
+        raise HTTPException(status_code=400, detail="Invalid job_id")
+    jobs_dir = (config.CONFIG_DIR / "jobs").resolve()
+    log_path = (jobs_dir / f"{job_id}.log").resolve()
+    if not log_path.is_relative_to(jobs_dir):
+        raise HTTPException(status_code=400, detail="Invalid log path")
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Log file not found")
+    return FileResponse(
+        path=str(log_path),
+        media_type="text/plain; charset=utf-8",
+        filename=f"{job_id}.log",
+    )

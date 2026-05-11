@@ -266,10 +266,12 @@ class FilterManager:
                 if job.status in in_flight:
                     job.status = "error"
                     job.finished_at = datetime.now().strftime("%H:%M")
+                    log_hint = str(job._log_path) if job._log_path else "(no log file)"
                     job.error = (
-                        "Backend crashed or restarted mid-job. "
-                        "Check log_file for last activity "
-                        "(likely OOM — see `dmesg | grep -i kill`)."
+                        f"Backend crashed or restarted mid-job. "
+                        f"Log: {log_hint} "
+                        f"(in Docker: matches ./config/jobs/ on host via compose bind-mount). "
+                        f"Likely cause: OOM — verify with `dmesg | grep -i kill`."
                     )
                     job.phase_started_at = None
                     recovered += 1
