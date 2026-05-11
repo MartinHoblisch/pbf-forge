@@ -106,6 +106,5 @@ def add_url(req: AddUrlRequest, background_tasks: BackgroundTasks):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     filename = req.filename or url_to_filename(req.url)
-    state.download_manager.register_url(req.url, filename)
-    background_tasks.add_task(state.download_manager.start_download, filename)
+    background_tasks.add_task(state.download_manager.register_and_start, req.url, filename)
     return {"filename": filename, "status": "queued"}

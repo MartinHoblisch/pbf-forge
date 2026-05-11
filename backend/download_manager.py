@@ -334,6 +334,38 @@ class DownloadManager:
                 self._files[filename].url = url
         self._save_url_mapping()
 
+    def register_and_start(self, url: str, filename: str) -> bool:
+        """Atomically register URL and start download. Returns False if already downloading."""
+        with self._lock:
+            self._url_mapping[filename] = url
+            dest = DATA_DIR / filename
+            if filename not in self._files:
+                state = FileState(filename=filename, url=url)
+                if dest.exists():
+                    stat = dest.stat()
+                    state.local_size = stat.st_size
+                    state.local_mtime = datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.utc
+                    ).isoformat()
+                else:
+                    state.status = "not_downloaded"
+                self._files[filename] = state
+            else:
+                state = self._files[filename]
+                state.url = url
+            if state.status == "downloading":
+                return False
+            state.status = "downloading"
+            state.error = None
+            state.downloaded_bytes = 0
+            cancel = threading.Event()
+            self._cancel_flags[filename] = cancel
+            state_dict = state.to_dict()
+        self._save_url_mapping()
+        self._broadcast({"type": "file_update", "file": state_dict})
+        self._executor.submit(self._download_worker, filename, cancel)
+        return True
+
     def _broadcast(self, data: dict) -> None:
         if self._loop and not self._loop.is_closed():
             try:

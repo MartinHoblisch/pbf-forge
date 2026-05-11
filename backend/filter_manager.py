@@ -30,6 +30,9 @@ _FMT_EXT = {
 # (which would be interpreted as a CLI flag) or contain shell-special chars.
 _VALID_TAG = re.compile(r"^[^-\s\n\r\x00][^\n\r\x00]*$")
 
+# Matches osmium/ogr2ogr progress lines such as "[======>   ] 45%" or "45%"
+_PROGRESS_RE = re.compile(r"\]\s*(\d{1,3})%|^(\d{1,3})%\s*$")
+
 # Column names written into osmconf INI files must be safe identifiers.
 _VALID_KEY = re.compile(r"^[a-zA-Z0-9_:.\-]+$")
 
@@ -75,6 +78,8 @@ class FilterJob:
     phase_started_at: float | None = None
     job_started_at: float | None = None
     eta_seconds: float | None = None
+    phase_percent: int | None = None
+    timeout_seconds: float | None = None
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
 
     @property
@@ -106,6 +111,7 @@ class FilterJob:
             "phase_started_at": self.phase_started_at,
             "job_started_at": self.job_started_at,
             "eta_seconds": self.eta_seconds,
+            "phase_percent": self.phase_percent,
         }
 
 
@@ -178,6 +184,8 @@ class FilterManager:
         job.job_started_at = time.time()
         job.phase_started_at = job.job_started_at  # ticker starts immediately
         job.eta_seconds = self._compute_eta(job)
+        total_bytes = sum(self._source_size(s) for s in job.source_files)
+        job.timeout_seconds = max(300.0, total_bytes / (10 * 1024 * 1024))
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
         out_dir = Path(job.output_dir)
@@ -368,6 +376,7 @@ class FilterManager:
         if job.current_phase_index >= len(job.phases):
             return
         job.phase_started_at = time.time()
+        job.phase_percent = None
         job.eta_seconds = self._compute_eta(job)
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
@@ -774,16 +783,56 @@ class FilterManager:
             raise RuntimeError("subprocess stdout is None despite PIPE")
 
         self._procs[job.id] = proc
-        try:
+
+        async def _heartbeat() -> None:
+            try:
+                while True:
+                    await asyncio.sleep(2)
+                    await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
+            except asyncio.CancelledError:
+                pass
+
+        async def _read_output() -> None:
             loop = asyncio.get_running_loop()
             last_broadcast = loop.time()
-            async for line in proc.stdout:
-                job.append_log(line.decode("utf-8", errors="replace"))
+            buf = b""
+            while True:
+                chunk = await proc.stdout.read(4096)
+                if not chunk:
+                    break
+                buf += chunk
+                segments = re.split(rb"[\r\n]", buf)
+                buf = segments[-1]
+                for seg in segments[:-1]:
+                    text = seg.decode("utf-8", errors="replace").strip()
+                    if not text:
+                        continue
+                    job.append_log(text + "\n")
+                    m = _PROGRESS_RE.search(text)
+                    if m:
+                        job.phase_percent = int(m.group(1) or m.group(2))
                 now = loop.time()
                 if now - last_broadcast >= 0.5:
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
                     last_broadcast = now
+            if buf:
+                job.append_log(buf.decode("utf-8", errors="replace") + "\n")
+
+        heartbeat_task = asyncio.create_task(_heartbeat())
+        try:
+            if job.timeout_seconds is not None:
+                await asyncio.wait_for(_read_output(), timeout=job.timeout_seconds)
+            else:
+                await _read_output()
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+            raise RuntimeError(f"Subprocess timed out after {job.timeout_seconds:.0f}s")
         finally:
+            heartbeat_task.cancel()
+            await asyncio.gather(heartbeat_task, return_exceptions=True)
             self._procs.pop(job.id, None)
 
         await proc.wait()

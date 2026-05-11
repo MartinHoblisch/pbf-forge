@@ -104,17 +104,29 @@ async def test_run_cmd_raises_when_proc_stdout_none():
 
 
 class _AsyncLines:
+    """Supports both `async for` iteration and `.read()` so it works with
+    the chunk-based reader in _run_cmd (which calls proc.stdout.read(n))."""
+
     def __init__(self, lines: list[bytes]) -> None:
-        self._iter = iter(lines)
+        self._lines = list(lines)
+        self._pos = 0
 
     def __aiter__(self):
         return self
 
     async def __anext__(self) -> bytes:
-        try:
-            return next(self._iter)
-        except StopIteration:
+        if self._pos >= len(self._lines):
             raise StopAsyncIteration
+        line = self._lines[self._pos]
+        self._pos += 1
+        return line
+
+    async def read(self, n: int) -> bytes:  # noqa: ARG002
+        if self._pos >= len(self._lines):
+            return b""
+        chunk = self._lines[self._pos]
+        self._pos += 1
+        return chunk
 
 
 async def test_run_cmd_broadcasts_throttled_at_500ms_boundary():
