@@ -4,6 +4,7 @@ import asyncio
 import gc
 import json
 import logging
+import os
 import re
 import shutil
 import sqlite3
@@ -89,6 +90,7 @@ class FilterJob:
     eta_seconds: float | None = None
     phase_percent: int | None = None
     timeout_seconds: float | None = None
+    queue_position: int | None = None
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
 
     @property
@@ -121,7 +123,30 @@ class FilterJob:
             "job_started_at": self.job_started_at,
             "eta_seconds": self.eta_seconds,
             "phase_percent": self.phase_percent,
+            "queue_position": self.queue_position,
         }
+
+
+def _compute_max_parallel() -> int:
+    """Return max parallel jobs: max(1, min(cpu//4, ram_gb//8))."""
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        cpu = os.cpu_count() or 1 if quota == "max" else max(1, int(int(quota) / int(period)))
+    except Exception:
+        cpu = os.cpu_count() or 1
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                ram_gb = int(line.split()[1]) // (1024 * 1024)
+                break
+        else:
+            ram_gb = 0
+    except Exception:
+        ram_gb = 0
+    cap = max(1, cpu // 4)
+    if ram_gb >= 8:
+        cap = min(cap, ram_gb // 8)
+    return max(1, cap)
 
 
 class FilterManager:
@@ -132,6 +157,10 @@ class FilterManager:
         # Dedicated thread for pyosmium: keeps it off the default pool so
         # CPU-bound PBF reduction doesn't starve other async operations.
         self._pyosmium_executor = ThreadPoolExecutor(max_workers=1)
+        self._max_parallel: int = _compute_max_parallel()
+        self._semaphore = asyncio.Semaphore(self._max_parallel)
+        self._running_count: int = 0
+        _log.info("Job queue: max_parallel=%d", self._max_parallel)
         _old_history = DATA_DIR / ".filter_history.json"
         _new_history = CONFIG_DIR / ".filter_history.json"
         if not _new_history.exists() and _old_history.exists():
@@ -190,7 +219,21 @@ class FilterManager:
         ]
 
     async def run_job(self, job: FilterJob) -> None:
+        if self._running_count >= self._max_parallel:
+            job.status = "queued"
+            job.queue_position = sum(1 for j in self._jobs.values() if j.status == "queued")
+            await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
+
+        async with self._semaphore:
+            self._running_count += 1
+            try:
+                await self._execute_job(job)
+            finally:
+                self._running_count -= 1
+
+    async def _execute_job(self, job: FilterJob) -> None:
         job.status = "running"
+        job.queue_position = None
         job.phases = self._build_phases(job)
         job.current_phase_index = 0
         job.job_started_at = time.time()
