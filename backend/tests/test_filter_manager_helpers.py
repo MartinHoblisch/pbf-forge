@@ -227,7 +227,7 @@ async def test_reduce_pbf_tags_success_replaces_pbf_returns_zero(tmp_path):
     pbf_path.write_bytes(b"original")
     job = _job(columns_mode="manual", manual_keys=["name"])
 
-    def fake_reduce(src, dst, keep):
+    def fake_reduce(src, dst, keep, buffer_size=None):
         from pathlib import Path as _P
 
         _P(dst).write_bytes(b"reduced")
@@ -248,7 +248,7 @@ async def test_reduce_pbf_tags_failure_returns_one_and_cleans_tmp(tmp_path):
     pbf_path.write_bytes(b"original")
     job = _job(columns_mode="manual", manual_keys=["name"])
 
-    def fake_reduce(src, dst, keep):
+    def fake_reduce(src, dst, keep, buffer_size=None):
         from pathlib import Path as _P
 
         _P(dst).write_bytes(b"partial-then-fail")

@@ -26,7 +26,7 @@ class _FakeSimpleHandler:
     def __init__(self, *args, **kwargs):
         pass
 
-    def apply_file(self, src):
+    def apply_file(self, src, buffer_size=None):
         return None
 
 
@@ -157,7 +157,7 @@ def test_reduce_tags_closes_writer_on_apply_failure(monkeypatch):
         return w
 
     class _RaisingHandler(_FakeSimpleHandler):
-        def apply_file(self, src):
+        def apply_file(self, src, buffer_size=None):
             raise RuntimeError("simulated osmium parse error")
 
     monkeypatch.setattr(ptr.osmium, "SimpleWriter", fake_writer_factory)

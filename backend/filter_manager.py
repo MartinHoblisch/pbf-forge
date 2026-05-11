@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import json
 import logging
 import re
@@ -15,7 +16,7 @@ from pathlib import Path
 from statistics import median
 from typing import Literal, Optional
 
-from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR, TEMP_DIR
+from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR, PYOSMIUM_BUFFER_SIZE, TEMP_DIR
 from filter_history import FilterHistory
 
 _log = logging.getLogger(__name__)
@@ -344,6 +345,7 @@ class FilterManager:
                             job.geometry_types,
                         )
                         job.output_files.append(str(out_file))
+                        gc.collect()
 
             job.status = "done"
             job.finished_at = datetime.now().strftime("%H:%M")
@@ -600,7 +602,12 @@ class FilterManager:
             ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
             cmd = ["ogr2ogr", "-f", ogr_fmt, str(out_file), str(tmp_geojson), "-sql", sql]
             if fmt == "gpkg":
-                cmd += ["-nln", out_file.stem, "-a_srs", "EPSG:4326"]
+                cmd += [
+                    "-nln", out_file.stem,
+                    "-a_srs", "EPSG:4326",
+                    "-gt", "65536",
+                    "--config", "OGR_SQLITE_SYNCHRONOUS", "OFF",
+                ]
             return await self._run_cmd(cmd, job)
         finally:
             tmp_geojson.unlink(missing_ok=True)
@@ -615,7 +622,9 @@ class FilterManager:
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
         try:
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, reduce_tags, str(pbf_path), str(tmp_out), keep)
+            await loop.run_in_executor(
+            None, reduce_tags, str(pbf_path), str(tmp_out), keep, PYOSMIUM_BUFFER_SIZE
+        )
             tmp_out.replace(pbf_path)
             return 0
         except Exception as exc:
@@ -636,7 +645,11 @@ class FilterManager:
         ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
         cmd = ["ogr2ogr", "-f", ogr_fmt, out_file, src]
         if fmt == "gpkg":
-            cmd += ["-a_srs", "EPSG:4326"]
+            cmd += [
+                "-a_srs", "EPSG:4326",
+                "-gt", "65536",
+                "--config", "OGR_SQLITE_SYNCHRONOUS", "OFF",
+            ]
         return cmd
 
     def _osmconf(self, keys: list[str]) -> str:
