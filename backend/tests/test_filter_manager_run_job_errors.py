@@ -207,29 +207,35 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["geojson"])
 
-    run_cmd = AsyncMock(return_value=0)
-    export_convert = AsyncMock(return_value=0)
+    captured_cmds = []
 
-    def make_output(*args, **kwargs):
-        # Simulate _osmium_export_convert creating the output file
-        out_file = args[2]  # (src, fmt, out_file, job, tmp)
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        out_file.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        if cmd[0] == "osmium" and "export" in cmd:
+            # Create the shared geojson so _get_fields can be called
+            out_path = Path(cmd[cmd.index("-o") + 1])
+            out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            out = Path(cmd[3])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         return 0
 
-    export_convert.side_effect = make_output
-
-    with patch.object(fm, "_run_cmd", run_cmd):
-        with patch.object(fm, "_osmium_export_convert", export_convert):
-            await fm.run_job(job)
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
 
     assert job.status == "done"
     # No PBF output file (only geojson was requested)
     assert all(not p.endswith(".osm.pbf") for p in job.output_files)
     assert any(p.endswith(".geojson") for p in job.output_files)
-    # filter ran in tmp (1 call); export_convert ran (1 call)
-    assert run_cmd.await_count == 1
-    assert export_convert.await_count == 1
+    # filter (1) + osmium export (2) + ogr2ogr (3)
+    assert len(captured_cmds) == 3
+    assert captured_cmds[0][1] == "tags-filter"
+    assert captured_cmds[1][1] == "export"
+    assert captured_cmds[2][0] == "ogr2ogr"
 
 
 async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir):
@@ -237,23 +243,28 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["geojson"], exclude_tags=["x=y"])
 
-    run_cmd = AsyncMock(return_value=0)
-    export_convert = AsyncMock(return_value=0)
+    captured_cmds = []
 
-    def make_output(*args, **kwargs):
-        out_file = args[2]
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        out_file.write_text("{}", encoding="utf-8")
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        if cmd[0] == "osmium" and "export" in cmd:
+            out_path = Path(cmd[cmd.index("-o") + 1])
+            out_path.write_text("{}", encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            out = Path(cmd[3])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text("{}", encoding="utf-8")
         return 0
 
-    export_convert.side_effect = make_output
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
 
-    with patch.object(fm, "_run_cmd", run_cmd):
-        with patch.object(fm, "_osmium_export_convert", export_convert):
-            await fm.run_job(job)
-
-    # filter + invert-match → 2 _run_cmd calls
-    assert run_cmd.await_count == 2
+    # filter + invert-match + osmium export + ogr2ogr = 4 _run_cmd calls
+    filter_cmds = [c for c in captured_cmds if c[0] == "osmium" and c[1] == "tags-filter"]
+    assert len(filter_cmds) == 2
     assert job.status == "done"
 
 
@@ -262,38 +273,31 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
 
 async def test_run_job_gpkg_other_tags_uses_build_ogr_cmd_path(tmp_data_dir):
     """columns_mode='other_tags' + format='gpkg' → uses _build_ogr_cmd
-    (GDAL OSM driver), not _osmium_export_convert."""
+    (GDAL OSM driver), skips osmium export step."""
     _ensure_source(tmp_data_dir)
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["gpkg"], columns_mode="other_tags")
 
-    run_cmd = AsyncMock(return_value=0)
-    export_convert = AsyncMock(return_value=0)
+    captured_cmds = []
 
-    def make_run_output(cmd, job):
-        # When ogr2ogr-style cmd is invoked (the second _run_cmd call),
-        # produce the output file so embed_* doesn't error.
-        if "ogr2ogr" in cmd[0]:
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        if cmd[0] == "ogr2ogr":
             out = Path(cmd[3])
             out.parent.mkdir(parents=True, exist_ok=True)
-            # Minimal valid GPKG (sqlite header) — tests don't open it; just exists
             out.write_bytes(b"")
         return 0
 
-    run_cmd.side_effect = make_run_output
-
-    with patch.object(fm, "_run_cmd", run_cmd):
-        with patch.object(fm, "_osmium_export_convert", export_convert):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_embed_attribution"):
+            with patch.object(fm, "_embed_provenance"):
+                await fm.run_job(job)
 
     assert job.status == "done"
-    # _osmium_export_convert NOT called for the other_tags+gpkg combo
-    export_convert.assert_not_awaited()
-    # ogr2ogr was invoked via _run_cmd (second call after filter)
-    cmds = [call.args[0] for call in run_cmd.await_args_list]
-    assert any(c[0] == "ogr2ogr" for c in cmds)
+    # No osmium export for other_tags+gpkg — GDAL OSM driver goes direct
+    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
+    # ogr2ogr was invoked via _run_cmd
+    assert any(c[0] == "ogr2ogr" for c in captured_cmds)
 
 
 # ── attribution + provenance embedded after success ──────────────────────────
@@ -304,14 +308,18 @@ async def test_run_job_embeds_attribution_and_provenance(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["geojson"])
 
-    def make_output(*args, **kwargs):
-        out_file = args[2]
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        out_file.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    async def fake_run_cmd(cmd, _job):
+        if cmd[0] == "osmium" and "export" in cmd:
+            out_path = Path(cmd[cmd.index("-o") + 1])
+            out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            out = Path(cmd[3])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         return 0
 
-    with patch.object(fm, "_run_cmd", AsyncMock(return_value=0)):
-        with patch.object(fm, "_osmium_export_convert", AsyncMock(side_effect=make_output)):
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
             with patch.object(fm, "_embed_attribution") as embed_a:
                 with patch.object(fm, "_embed_provenance") as embed_p:
                     await fm.run_job(job)
@@ -333,13 +341,20 @@ async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["pbf"])
 
-    with patch.object(fm, "_run_cmd", AsyncMock(return_value=0)):
-        with patch.object(fm, "_osmium_export_convert", AsyncMock(return_value=0)) as conv:
-            with patch.object(fm, "_embed_attribution") as embed_a:
-                with patch.object(fm, "_embed_provenance") as embed_p:
-                    await fm.run_job(job)
+    captured_cmds = []
+
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_embed_attribution") as embed_a:
+            with patch.object(fm, "_embed_provenance") as embed_p:
+                await fm.run_job(job)
 
     assert job.status == "done"
-    conv.assert_not_awaited()
+    # PBF-only: no osmium export, no ogr2ogr, no embed
+    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
+    assert not any(c[0] == "ogr2ogr" for c in captured_cmds)
     embed_a.assert_not_called()
     embed_p.assert_not_called()

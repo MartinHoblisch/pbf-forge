@@ -28,7 +28,8 @@ def test_filter_run_missing_source_files_returns_422(client):
 
 
 def test_filter_check_with_conflicts(client, tmp_data_dir):
-    # output_dir=None → resolves to DATA_DIR; pre-create the expected output file
+    # output_dir=None → resolves to DATA_DIR; pre-create source + expected output file
+    (tmp_data_dir / "berlin.osm.pbf").touch()
     out_dir = tmp_data_dir / "gpkg"
     out_dir.mkdir()
     (out_dir / "berlin_test.gpkg").touch()

@@ -61,10 +61,12 @@ _SAFE_SOURCE = re.compile(r"^[a-zA-Z0-9_\-\.]+\.osm\.pbf$")
 _SAFE_OUTPUT_DIR = re.compile(r"^[a-zA-Z0-9_\-/]+$")
 
 
-def _validate_source_files(source_files: list[str]) -> None:
+def _validate_source_files(source_files: list[str], *, check_exists: bool = False) -> None:
     for source in source_files:
         if not _SAFE_SOURCE.match(source):
             raise HTTPException(status_code=400, detail=f"Invalid filename: {source}")
+        if check_exists and not (DATA_DIR / source).exists():
+            raise HTTPException(status_code=422, detail=f"File not found: {source}")
 
 
 @router.get("/files")
@@ -74,7 +76,7 @@ def list_filterable_files():
 
 @router.post("/check")
 def check_overwrite(req: FilterRequest):
-    _validate_source_files(req.source_files)
+    _validate_source_files(req.source_files, check_exists=True)
     resolved_output_dir = _resolve_output_dir(req)
     would_overwrite = state.filter_manager.check_would_overwrite(
         source_files=req.source_files,

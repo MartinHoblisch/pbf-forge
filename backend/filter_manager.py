@@ -10,13 +10,21 @@ import sqlite3
 import tempfile
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import median
 from typing import Literal, Optional
 
-from config import ATTRIBUTION, CONFIG_DIR, DATA_DIR, PYOSMIUM_BUFFER_SIZE, TEMP_DIR
+from config import (
+    ATTRIBUTION,
+    CONFIG_DIR,
+    DATA_DIR,
+    OSMIUM_INDEX_THRESHOLD,
+    PYOSMIUM_BUFFER_SIZE,
+    TEMP_DIR,
+)
 from filter_history import FilterHistory
 
 _log = logging.getLogger(__name__)
@@ -121,6 +129,9 @@ class FilterManager:
         self._ws = ws_manager
         self._jobs: dict[str, FilterJob] = {}
         self._procs: dict[str, asyncio.subprocess.Process] = {}
+        # Dedicated thread for pyosmium: keeps it off the default pool so
+        # CPU-bound PBF reduction doesn't starve other async operations.
+        self._pyosmium_executor = ThreadPoolExecutor(max_workers=1)
         _old_history = DATA_DIR / ".filter_history.json"
         _new_history = CONFIG_DIR / ".filter_history.json"
         if not _new_history.exists() and _old_history.exists():
@@ -228,6 +239,7 @@ class FilterManager:
                             "tags-filter",
                             str(source_path),
                             *exprs,
+                            *self._osmium_index_flags(source_path, tmp, stem),
                             "-o",
                             str(pbf_out),
                             "--overwrite",
@@ -273,6 +285,7 @@ class FilterManager:
                             "tags-filter",
                             str(source_path),
                             *exprs,
+                            *self._osmium_index_flags(source_path, tmp, stem),
                             "-o",
                             str(intermediate),
                             "--overwrite",
@@ -304,6 +317,10 @@ class FilterManager:
                     else:
                         continue
 
+                    # G2: run osmium export at most once per source, share across formats.
+                    shared_geojson: Path | None = None
+                    shared_fields: list[str] = []
+
                     for fmt in non_pbf:
                         if fmt == "geojson":
                             out_file = out_dir / "geojson" / f"{stem}.geojson"
@@ -312,23 +329,65 @@ class FilterManager:
 
                         out_file.unlink(missing_ok=True)
                         await self._start_phase(job)
-                        if fmt == "geojson" and job.columns_mode in ("other_tags", "all"):
-                            # GeoJSON: Standard and Expand-all are identical (all tags exported).
-                            # Route through _osmium_export_convert so @id is renamed to osm_id.
-                            rc = await self._osmium_export_convert(
-                                intermediate, fmt, out_file, job, tmp
-                            )
-                        elif fmt == "gpkg" and job.columns_mode == "other_tags":
+
+                        if fmt == "gpkg" and job.columns_mode == "other_tags":
                             # GPKG Standard: GDAL OSM driver with other_tags HSTORE column.
                             ogr_cmd = self._build_ogr_cmd(
                                 fmt, str(out_file), str(intermediate), job, tmp
                             )
                             rc = await self._run_cmd(ogr_cmd, job)
                         else:
-                            # Expand-all+GPKG and manual+GeoJSON/GPKG: osmium export → SELECT.
-                            rc = await self._osmium_export_convert(
-                                intermediate, fmt, out_file, job, tmp
+                            # osmium export path (all non-PBF formats except other_tags+GPKG).
+                            # Run export once; reuse shared_geojson for subsequent formats.
+                            if shared_geojson is None:
+                                shared_geojson = tmp / f"{stem}_export.geojson"
+                                rc = await self._run_cmd(
+                                    [
+                                        "osmium",
+                                        "export",
+                                        "--format=geojson",
+                                        "--attributes",
+                                        "id",
+                                        "-o",
+                                        str(shared_geojson),
+                                        str(intermediate),
+                                        "--overwrite",
+                                    ],
+                                    job,
+                                )
+                                if rc != 0:
+                                    raise RuntimeError(
+                                        f"osmium export exited with code {rc}"
+                                    )
+                                shared_fields = await self._get_fields(shared_geojson)
+
+                            sql = self._build_export_sql(
+                                shared_geojson.stem, job, shared_fields
                             )
+                            ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
+                            cmd = [
+                                "ogr2ogr",
+                                "-f",
+                                ogr_fmt,
+                                str(out_file),
+                                str(shared_geojson),
+                                "-sql",
+                                sql,
+                            ]
+                            if fmt == "gpkg":
+                                cmd += [
+                                    "-nln",
+                                    out_file.stem,
+                                    "-a_srs",
+                                    "EPSG:4326",
+                                    "-gt",
+                                    "65536",
+                                    "--config",
+                                    "OGR_SQLITE_SYNCHRONOUS",
+                                    "OFF",
+                                ]
+                            rc = await self._run_cmd(cmd, job)
+
                         if rc != 0:
                             raise RuntimeError(f"Conversion exited with code {rc}")
                         await self._finish_phase(job)
@@ -346,6 +405,10 @@ class FilterManager:
                         )
                         job.output_files.append(str(out_file))
                         gc.collect()
+
+                    # Eager cleanup: free disk space from shared export temp.
+                    if shared_geojson is not None:
+                        shared_geojson.unlink(missing_ok=True)
 
             job.status = "done"
             job.finished_at = datetime.now().strftime("%H:%M")
@@ -455,6 +518,17 @@ class FilterManager:
             cap = current_pred * scale if current_pred is not None else elapsed_current
             eta = max(0.0, eta - min(elapsed_current, cap))
         return eta
+
+    def _osmium_index_flags(self, source_path: Path, tmp: Path, stem: str) -> list[str]:
+        """Return osmium -i flag list for large source files; empty list otherwise."""
+        try:
+            size = source_path.stat().st_size
+        except OSError:
+            return []
+        if size < OSMIUM_INDEX_THRESHOLD:
+            return []
+        idx_path = tmp / f"{stem}_idx"
+        return ["-i", f"sparse_file_array,{idx_path}"]
 
     def _build_phases(self, job: FilterJob) -> list[Phase]:
         phases: list[Phase] = []
@@ -573,45 +647,6 @@ class FilterManager:
         suffix = f", {col_list}" if col_list else ""
         return f'SELECT "@id" AS osm_id{suffix} FROM {q(layer)}'
 
-    async def _osmium_export_convert(
-        self, src: Path, fmt: str, out_file: Path, job: FilterJob, tmp: Path
-    ) -> int:
-        """osmium export → ogrinfo → ogr2ogr SQL to ensure fid/osm_id come first."""
-        tmp_geojson = tmp / f"{out_file.stem}_export.geojson"
-        try:
-            rc = await self._run_cmd(
-                [
-                    "osmium",
-                    "export",
-                    "--format=geojson",
-                    "--attributes",
-                    "id",
-                    "-o",
-                    str(tmp_geojson),
-                    str(src),
-                    "--overwrite",
-                ],
-                job,
-            )
-            if rc != 0:
-                return rc
-
-            fields = await self._get_fields(tmp_geojson)
-            sql = self._build_export_sql(tmp_geojson.stem, job, fields)
-
-            ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
-            cmd = ["ogr2ogr", "-f", ogr_fmt, str(out_file), str(tmp_geojson), "-sql", sql]
-            if fmt == "gpkg":
-                cmd += [
-                    "-nln", out_file.stem,
-                    "-a_srs", "EPSG:4326",
-                    "-gt", "65536",
-                    "--config", "OGR_SQLITE_SYNCHRONOUS", "OFF",
-                ]
-            return await self._run_cmd(cmd, job)
-        finally:
-            tmp_geojson.unlink(missing_ok=True)
-
     async def _reduce_pbf_tags(self, pbf_path: Path, job: FilterJob) -> int:
         """Use pyosmium to strip all tags not in job.manual_keys from a PBF file in-place."""
         from pbf_tag_reducer import reduce_tags  # imported here to keep module-level clean
@@ -623,8 +658,13 @@ class FilterManager:
         try:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(
-            None, reduce_tags, str(pbf_path), str(tmp_out), keep, PYOSMIUM_BUFFER_SIZE
-        )
+                self._pyosmium_executor,
+                reduce_tags,
+                str(pbf_path),
+                str(tmp_out),
+                keep,
+                PYOSMIUM_BUFFER_SIZE,
+            )
             tmp_out.replace(pbf_path)
             return 0
         except Exception as exc:
