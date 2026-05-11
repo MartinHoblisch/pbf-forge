@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import collections
 import gc
 import json
 import logging
@@ -15,7 +16,6 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from statistics import median
 from typing import Literal, Optional
 
 from config import (
@@ -87,8 +87,8 @@ class FilterJob:
     current_phase_index: int = 0
     phase_started_at: float | None = None
     job_started_at: float | None = None
-    eta_seconds: float | None = None
     phase_percent: int | None = None
+    speed_bps: float | None = None
     timeout_seconds: float | None = None
     queue_position: int | None = None
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
@@ -121,8 +121,8 @@ class FilterJob:
             "current_phase_index": self.current_phase_index,
             "phase_started_at": self.phase_started_at,
             "job_started_at": self.job_started_at,
-            "eta_seconds": self.eta_seconds,
             "phase_percent": self.phase_percent,
+            "speed_bps": self.speed_bps,
             "queue_position": self.queue_position,
         }
 
@@ -238,7 +238,6 @@ class FilterManager:
         job.current_phase_index = 0
         job.job_started_at = time.time()
         job.phase_started_at = job.job_started_at  # ticker starts immediately
-        job.eta_seconds = self._compute_eta(job)
         total_bytes = sum(self._source_size(s) for s in job.source_files)
         job.timeout_seconds = max(300.0, total_bytes / (10 * 1024 * 1024))
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
@@ -250,7 +249,6 @@ class FilterManager:
         except Exception as exc:
             job.status = "error"
             job.error = f"Could not create output directory: {exc}"
-            job.eta_seconds = None
             await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
             return
 
@@ -455,13 +453,11 @@ class FilterManager:
 
             job.status = "done"
             job.finished_at = datetime.now().strftime("%H:%M")
-            job.eta_seconds = 0.0
 
         except Exception as exc:
             job.status = "error"
             job.finished_at = datetime.now().strftime("%H:%M")
             job.error = str(exc)
-            job.eta_seconds = None
             job.phase_started_at = None  # prevent stale elapsed ticker on client
             job.append_log(f"\nERROR: {exc}\n")
 
@@ -485,7 +481,7 @@ class FilterManager:
             return
         job.phase_started_at = time.time()
         job.phase_percent = None
-        job.eta_seconds = self._compute_eta(job)
+        job.speed_bps = None
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
     async def _finish_phase(self, job: FilterJob) -> None:
@@ -502,65 +498,8 @@ class FilterManager:
             _log.warning("filter_history.record failed: %s", exc)
         job.current_phase_index += 1
         job.phase_started_at = None
-        job.eta_seconds = self._compute_eta(job)
+        job.speed_bps = None
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
-
-    def _compute_eta(self, job: FilterJob) -> float | None:
-        """Sum predicted durations for remaining phases, scaled by actual-vs-predicted
-        ratio of completed phases. Returns None if any remaining phase has no
-        prediction and no same-kind phase has completed in this job yet."""
-        if not job.phases:
-            return None
-        completed = job.phases[: job.current_phase_index]
-        remaining = job.phases[job.current_phase_index :]
-        if not remaining:
-            return 0.0
-
-        actual_total = 0.0
-        predicted_total = 0.0
-        for p in completed:
-            if p.duration_seconds is None:
-                continue
-            pred = self._history.predict(self._source_size(p.source), p.step, p.fmt)
-            if pred is not None and pred > 0:
-                actual_total += p.duration_seconds
-                predicted_total += pred
-        scale = (actual_total / predicted_total) if predicted_total > 0 else 1.0
-
-        eta = 0.0
-        for p in remaining:
-            pred = self._history.predict(self._source_size(p.source), p.step, p.fmt)
-            if pred is not None:
-                eta += pred * scale
-                continue
-            same_kind = [
-                c.duration_seconds
-                for c in completed
-                if c.step == p.step and c.fmt == p.fmt and c.duration_seconds is not None
-            ]
-            if same_kind:
-                eta += median(same_kind)
-            else:
-                return None
-
-        if job.phase_started_at is not None and remaining:
-            current_phase = remaining[0]
-            current_pred = self._history.predict(
-                self._source_size(current_phase.source), current_phase.step, current_phase.fmt
-            )
-            if current_pred is None:
-                same = [
-                    c.duration_seconds
-                    for c in completed
-                    if c.step == current_phase.step
-                    and c.fmt == current_phase.fmt
-                    and c.duration_seconds is not None
-                ]
-                current_pred = median(same) if same else None
-            elapsed_current = time.time() - job.phase_started_at
-            cap = current_pred * scale if current_pred is not None else elapsed_current
-            eta = max(0.0, eta - min(elapsed_current, cap))
-        return eta
 
     def _osmium_index_flags(self, source_path: Path, tmp: Path, stem: str) -> list[str]:
         """Return osmium -i flag list for large source files; empty list otherwise."""
@@ -861,7 +800,6 @@ class FilterManager:
         if job and job.status == "running":
             job.status = "error"
             job.error = "Cancelled by user"
-            job.eta_seconds = None
             await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
             return True
         return False
@@ -892,6 +830,9 @@ class FilterManager:
             loop = asyncio.get_running_loop()
             last_broadcast = loop.time()
             buf = b""
+            total_bytes = sum(self._source_size(s) for s in job.source_files)
+            # 10-second sliding window: (monotonic_time, bytes_processed)
+            speed_window: collections.deque[tuple[float, float]] = collections.deque()
             while True:
                 chunk = await proc.stdout.read(4096)
                 if not chunk:
@@ -907,6 +848,18 @@ class FilterManager:
                     m = _PROGRESS_RE.search(text)
                     if m:
                         job.phase_percent = int(m.group(1) or m.group(2))
+                        if total_bytes > 0:
+                            now_mono = loop.time()
+                            processed = (job.phase_percent / 100) * total_bytes
+                            speed_window.append((now_mono, processed))
+                            cutoff = now_mono - 10.0
+                            while speed_window and speed_window[0][0] < cutoff:
+                                speed_window.popleft()
+                            if len(speed_window) >= 2:
+                                t0, b0 = speed_window[0]
+                                t1, b1 = speed_window[-1]
+                                dt = t1 - t0
+                                job.speed_bps = (b1 - b0) / dt if dt > 0 else None
                 now = loop.time()
                 if now - last_broadcast >= 0.5:
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})

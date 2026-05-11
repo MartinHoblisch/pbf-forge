@@ -278,6 +278,15 @@ textarea { resize: vertical; min-height: 90px; font-family: inherit; }
   font-style: italic;
   margin-bottom: .25rem;
 }
+.job-activity {
+  font-size: .72rem;
+  color: var(--gray);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-top: .15rem;
+}
 details.job-log-wrap > summary {
   cursor: pointer;
   font-size: .75rem;
@@ -891,6 +900,7 @@ const TRANSLATIONS = {
     btn_cancel_jobs: 'Abbrechen',
     no_jobs: 'Noch keine Jobs.',
     job_pending: 'Ausstehend',
+    job_queued: 'Warteschlange',
     job_running: 'Läuft …',
     job_done: 'Fertig',
     job_error: 'Fehler',
@@ -1033,6 +1043,7 @@ const TRANSLATIONS = {
     btn_cancel_jobs: 'Cancel',
     no_jobs: 'No jobs yet.',
     job_pending: 'Pending',
+    job_queued: 'Queued',
     job_running: 'Running…',
     job_done: 'Done',
     job_error: 'Error',
@@ -1655,6 +1666,7 @@ function renderFilterJobs() {
   }
   const jobStatusMap = {
     pending: t('job_pending'),
+    queued: t('job_queued'),
     running: t('job_running'),
     done: t('job_done'),
     error: t('job_error'),
@@ -1668,22 +1680,33 @@ function renderFilterJobs() {
     const fmts = (j.output_formats || (j.output_format ? [j.output_format] : [])).map(f => f.toUpperCase()).join(', ');
 
     const isRunning = j.status === 'running';
+    const isQueued = j.status === 'queued';
     const nowSec = Date.now() / 1000;
     const elapsedJob = j.job_started_at ? nowSec - j.job_started_at : 0;
     const showProgress = isRunning && elapsedJob > 2 && j.phases && j.phases.length > 0;
 
     let progressHtml = '';
-    if (showProgress) {
+    if (isQueued) {
+      const pos = j.queue_position != null ? ` (#${j.queue_position})` : '';
+      progressHtml = `<div style="font-size:.82rem;color:var(--gray);padding:.25rem 0">${t('job_queued')}${escHtml(pos)}</div>`;
+    } else if (showProgress) {
       runningIds.add(j.id);
       const pct = _jobProgressPct(j);
-      const etaStr = (j.eta_seconds != null && j.eta_seconds > 0)
-        ? t('eta_remaining', formatDuration(j.eta_seconds))
-        : '';
+      const speedStr = fmtSpeed(j.speed_bps);
       const phaseIdx = j.current_phase_index || 0;
       const totalPhases = j.phases.length;
       const curPhase = j.phases[phaseIdx];
       const phaseLabel = curPhase ? curPhase.label : '';
       const elapsedPhase = j.phase_started_at ? nowSec - j.phase_started_at : 0;
+      const lastActivity = (() => {
+        if (!j.log) return '';
+        const lines = j.log.trimEnd().split('\n');
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const l = lines[i].trim();
+          if (l && !l.startsWith('[') && !l.startsWith('$')) return l;
+        }
+        return '';
+      })();
 
       progressHtml = `
         <div class="job-progress">
@@ -1692,13 +1715,14 @@ function renderFilterJobs() {
           </div>
           <div class="job-progress-meta">
             <span>${pct}%</span>
-            <span>${escHtml(etaStr)}</span>
+            ${speedStr ? `<span>${escHtml(speedStr)}</span>` : ''}
           </div>
           <div class="job-phase-text">
             ${t('job_step', phaseIdx + 1, totalPhases)} ${escHtml(phaseLabel)}
             — <span id="phase-elapsed-${escHtml(j.id)}"
                     data-started="${j.phase_started_at || ''}">${formatDuration(elapsedPhase)}</span>
           </div>
+          ${lastActivity ? `<div class="job-activity">${escHtml(lastActivity)}</div>` : ''}
         </div>`;
     }
 
@@ -1714,7 +1738,7 @@ function renderFilterJobs() {
       <div class="card-header" style="justify-content:space-between">
         <span>${escHtml(j.source_files.join(', '))} → <em>${escHtml(j.suffix)}</em> (${escHtml(fmts)})</span>
         <div style="display:flex;align-items:center;gap:.5rem">
-          ${(j.status === 'running' || j.status === 'pending') ? `<button class="btn btn-danger btn-sm" onclick="cancelJob('${escHtml(j.id)}')">${t('btn_cancel_job')}</button>` : ''}
+          ${(j.status === 'running' || j.status === 'pending' || j.status === 'queued') ? `<button class="btn btn-danger btn-sm" onclick="cancelJob('${escHtml(j.id)}')">${t('btn_cancel_job')}</button>` : ''}
           <span class="badge ${cls}">${statusLabel}</span>
         </div>
       </div>
