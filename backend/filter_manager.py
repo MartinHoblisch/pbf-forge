@@ -991,11 +991,60 @@ class FilterManager:
 
     def _embed_attribution_geojson(self, path: Path) -> None:
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            data["attribution"] = ATTRIBUTION
-            path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            self._stream_inject_geojson_keys(path, {"attribution": ATTRIBUTION})
         except Exception as exc:
             _log.warning("Failed to embed attribution in GeoJSON: %s", exc)
+
+    def _stream_inject_geojson_keys(self, path: Path, extras: dict) -> None:
+        """Insert top-level keys before the `"features"` array.
+
+        Streams 64-KB chunks to a sibling tmp file then atomically replaces the
+        original. Peak RAM ~128 KB regardless of file size — critical for
+        multi-GB GeoJSON outputs where json.loads() blows the heap.
+        """
+        if not extras:
+            return
+        fragment = json.dumps(extras, ensure_ascii=False)[1:-1].encode("utf-8") + b","
+        target = b'"features"'
+        tmp_path = path.with_suffix(path.suffix + ".tmp")
+        chunk_size = 64 * 1024
+        try:
+            with open(path, "rb") as src, open(tmp_path, "wb") as dst:
+                injected = False
+                carry = b""
+                while True:
+                    chunk = src.read(chunk_size)
+                    if not chunk:
+                        break
+                    buf = carry + chunk
+                    if not injected:
+                        idx = buf.find(target)
+                        if idx >= 0:
+                            dst.write(buf[:idx])
+                            dst.write(fragment)
+                            dst.write(buf[idx:])
+                            injected = True
+                            carry = b""
+                        else:
+                            keep = len(target) - 1
+                            if len(buf) > keep:
+                                dst.write(buf[:-keep])
+                                carry = buf[-keep:]
+                            else:
+                                carry = buf
+                    else:
+                        dst.write(chunk)
+                if carry:
+                    dst.write(carry)
+                if not injected:
+                    raise ValueError(f'"features" key not found in {path}')
+            os.replace(tmp_path, path)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     def _embed_provenance(
         self,
@@ -1054,9 +1103,7 @@ class FilterManager:
 
     def _embed_provenance_geojson(self, path: Path, provenance: dict) -> None:
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            data["provenance"] = provenance
-            path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            self._stream_inject_geojson_keys(path, {"provenance": provenance})
         except Exception as exc:
             _log.warning("Failed to embed provenance in GeoJSON: %s", exc)
 
