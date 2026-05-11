@@ -176,6 +176,7 @@ class FilterManager:
         job.phases = self._build_phases(job)
         job.current_phase_index = 0
         job.job_started_at = time.time()
+        job.phase_started_at = job.job_started_at  # ticker starts immediately
         job.eta_seconds = self._compute_eta(job)
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
