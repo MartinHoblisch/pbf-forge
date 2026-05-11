@@ -63,7 +63,7 @@ class Phase:
     source: str
     step: str  # filter | reduce | export_convert
     weight: float
-    fmt: str = "pbf"  # output format associated with this phase (for ETA grouping)
+    fmt: str = "pbf"  # output format associated with this phase
     duration_seconds: float | None = None
 
     def to_dict(self) -> dict:

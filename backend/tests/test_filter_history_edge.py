@@ -4,8 +4,6 @@ test_filter_history.py.
 Bug class to prevent:
   - Unbounded growth of the entries list (no _MAX_ENTRIES cap actually applied)
     → JSON file grows without limit, parse-time degrades, RSS bloats.
-  - DivisionByZero in predict() when historic source_size happened to be 0
-    (very small file) → ETA crashes the WS broadcast pipeline.
   - Disk-write failure during record() bubbles up and aborts the FilterManager
     phase loop — instead it must log+swallow.
   - _rename_corrupt() failing (read-only mount, antivirus lock) propagates and
@@ -46,13 +44,6 @@ def test_record_persists_trim_to_disk(tmp_path):
 
     on_disk = json.loads(path.read_text(encoding="utf-8"))
     assert len(on_disk["entries"]) == cap
-
-
-# `predict` with ref_size==0 (line 64) is a defensive DivByZero guard that
-# cannot be triggered through any normal API path — record() filters by ±30 %
-# tolerance so a size=0 entry could only match when the caller asks for size=0
-# too, which the FilterManager never does. Testing it would mean injecting
-# `_entries` directly, which is coverage theater. Defensive guard left as-is.
 
 
 # ── save failure ──────────────────────────────────────────────────────────────
@@ -105,5 +96,3 @@ def test_rename_corrupt_oserror_swallowed(tmp_path):
         h = FilterHistory(path)  # _load → _rename_corrupt → OSError caught
 
     assert h._entries == []
-    # Predict still returns None gracefully
-    assert h.predict(1000, "filter", "pbf") is None

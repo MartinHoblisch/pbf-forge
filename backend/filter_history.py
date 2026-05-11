@@ -5,19 +5,16 @@ import logging
 import os
 import time
 from pathlib import Path
-from statistics import median
 from typing import Any
 
 _log = logging.getLogger(__name__)
 
 _SCHEMA_VERSION = 1
 _MAX_ENTRIES = 200
-_PREDICT_N = 20
-_SIZE_TOLERANCE = 0.30  # ±30%
 
 
 class FilterHistory:
-    """Persistent store of per-phase durations used for ETA prediction."""
+    """Persistent store of per-phase durations for history-based analysis."""
 
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -45,24 +42,6 @@ class FilterHistory:
         if len(self._entries) > _MAX_ENTRIES:
             self._entries = self._entries[-_MAX_ENTRIES:]
         self._save()
-
-    def predict(self, source_size: int, step: str, fmt: str) -> float | None:
-        """Return predicted duration in seconds, or None if insufficient data."""
-        lo = source_size * (1 - _SIZE_TOLERANCE)
-        hi = source_size * (1 + _SIZE_TOLERANCE)
-        candidates = [
-            e
-            for e in self._entries
-            if e["step"] == step and e["format"] == fmt and lo <= e["source_size"] <= hi
-        ]
-        recent = candidates[-_PREDICT_N:]
-        if not recent:
-            return None
-        ref_size = median(e["source_size"] for e in recent)
-        ref_duration = median(e["duration_seconds"] for e in recent)
-        if ref_size == 0:
-            return ref_duration
-        return ref_duration * (source_size / ref_size)
 
     def _load(self) -> None:
         if not self._path.exists():
