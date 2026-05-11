@@ -169,6 +169,17 @@ class FilterJob:
         return d
 
 
+def _mem_available_bytes() -> int | None:
+    """Return MemAvailable in bytes from /proc/meminfo. None on non-Linux."""
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) * 1024
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
 def _compute_max_parallel() -> int:
     """Return max parallel jobs: max(1, min(cpu//4, ram_gb//8))."""
     try:
@@ -395,6 +406,8 @@ class FilterManager:
         lines.append(f"{_ts()}Resources: {threads} threads, nice {nice}")
         job.append_log("\n".join(lines) + "\n")
 
+        self._preflight_warnings(job, total_bytes)
+
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
         out_dir = Path(job.output_dir)
@@ -553,6 +566,9 @@ class FilterManager:
                             # Run export once; reuse shared_geojson for subsequent formats.
                             if shared_geojson is None:
                                 shared_geojson = tmp / f"{stem}_export.geojson"
+                                # Disk-backed node index keeps RAM bounded on
+                                # large sources (Europe-scale fits in ~1 GB RSS
+                                # instead of 5–10 GB with flex_mem default).
                                 rc = await self._run_cmd(
                                     [
                                         "osmium",
@@ -560,6 +576,7 @@ class FilterManager:
                                         "--format=geojson",
                                         "--attributes",
                                         "id",
+                                        "--index-type=sparse_file_array,sparse_file_array",
                                         "-o",
                                         str(shared_geojson),
                                         str(intermediate),
@@ -660,6 +677,40 @@ class FilterManager:
             return (DATA_DIR / source).stat().st_size
         except OSError:
             return 1
+
+    def _preflight_warnings(self, job: FilterJob, total_source_bytes: int) -> None:
+        """Append RAM + disk-space warnings to job log. Never blocks the job."""
+        warnings: list[str] = []
+
+        # Memory check — only meaningful when GeoJSON is requested (osmium export
+        # is the memory-heavy step). Heuristic: peak RSS ≈ source_size × 0.4
+        # with sparse_file_array index (~1/10th of flex_mem peak).
+        if "geojson" in job.output_formats:
+            mem_avail = _mem_available_bytes()
+            if mem_avail:
+                estimated_peak = int(total_source_bytes * 0.4)
+                if mem_avail < estimated_peak:
+                    warnings.append(
+                        f"{_ts()}WARNING: Available RAM ({_fmt_size(mem_avail)}) is below "
+                        f"estimated peak for GeoJSON export ({_fmt_size(estimated_peak)}). "
+                        f"Job may be killed by OOM. Consider GPKG-only output."
+                    )
+
+        # Disk space check at TEMP_DIR — intermediate PBF + GeoJSON live there.
+        try:
+            free = shutil.disk_usage(TEMP_DIR).free
+            required = int(total_source_bytes * 1.5)
+            if free < required:
+                warnings.append(
+                    f"{_ts()}WARNING: Free disk at {TEMP_DIR} ({_fmt_size(free)}) "
+                    f"is below estimated need ({_fmt_size(required)}). "
+                    f"Pipeline may fail mid-run on disk-full."
+                )
+        except OSError:
+            pass
+
+        if warnings:
+            job.append_log("\n".join(warnings) + "\n")
 
     def _resource_limits(self) -> tuple[int, int]:
         """Return (thread_count, nice_level) from user config + presets."""

@@ -79,6 +79,9 @@ async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
     # Two ogr2ogr calls — one per format
     ogr_cmds = [c for c in captured_cmds if c[0] == "ogr2ogr"]
     assert len(ogr_cmds) == 2
+    # osmium export must carry the disk-backed node index flag (RAM cap)
+    export_cmd = next(c for c in captured_cmds if c[0] == "osmium" and "export" in c)
+    assert "--index-type=sparse_file_array,sparse_file_array" in export_cmd
 
 
 # ── other_tags+GPKG never triggers osmium export ─────────────────────────────
