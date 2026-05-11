@@ -508,7 +508,6 @@ footer .credits-sep { color: var(--border); }
     <span>📁</span>
     <span class="dir-badge-path" id="dir-badge-text"></span>
     <button class="dir-badge-edit" onclick="openChangeDirModal()" id="btn-dir-badge-edit" title="Verzeichnis ändern">✎</button>
-    <button class="dir-badge-edit" onclick="openResourceModal()" id="btn-resource-limits" title="Ressourcen-Limits">⚙</button>
   </div>
   <button id="lang-btn" onclick="toggleLang()">EN</button>
   <div id="ws-indicator">
@@ -663,6 +662,10 @@ footer .credits-sep { color: var(--border); }
           <input type="text" id="manual-keys" placeholder="name,highway,railway,maxspeed">
         </div>
 
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
+          <span style="font-size:.8rem;color:var(--gray)" id="resource-status-label"></span>
+          <button class="btn btn-secondary" style="font-size:.8rem;padding:.2rem .6rem" onclick="openResourceModal()" data-i18n-title="btn_resource_limits">⚙</button>
+        </div>
         <button class="btn btn-primary" style="width:100%" onclick="runFilter()" data-i18n="btn_run_filter">Filter ausführen</button>
         <div id="filter-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
       </div>
@@ -828,28 +831,28 @@ footer .credits-sep { color: var(--border); }
 <!-- ── Resource limits modal ── -->
 <div id="modal-resource-limits" class="overlay" style="display:none">
   <div class="overlay-box" style="max-width:420px">
-    <h2>Ressourcen-Limits</h2>
-    <p style="font-size:.85rem;color:var(--gray);margin-bottom:.75rem">Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.</p>
+    <h2 data-i18n="resource_title">Ressourcen-Limits</h2>
+    <p style="font-size:.85rem;color:var(--gray);margin-bottom:.75rem" data-i18n="resource_desc">Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.</p>
     <div class="resource-presets">
-      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')">⚡ Vollgas</button>
-      <button class="resource-preset-btn" id="btn-preset-background" onclick="setResourcePreset('background')">🌙 Schonend</button>
+      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')" data-i18n="resource_preset_full">⚡ Vollgas</button>
+      <button class="resource-preset-btn" id="btn-preset-background" onclick="setResourcePreset('background')" data-i18n="resource_preset_background">🌙 Schonend</button>
     </div>
     <div class="resource-hint" id="resource-hint"></div>
     <details class="resource-advanced" style="margin-top:.75rem">
-      <summary>Erweitert (Override)</summary>
+      <summary data-i18n="resource_advanced">Erweitert (Override)</summary>
       <div class="form-group">
-        <label class="field-label">Threads <span style="font-weight:400;color:var(--gray)" id="resource-threads-range"></span></label>
+        <label class="field-label"><span data-i18n="resource_label_threads">Threads</span> <span style="font-weight:400;color:var(--gray)" id="resource-threads-range"></span></label>
         <input type="number" id="resource-threads-input" class="form-control" min="1" placeholder="Auto">
       </div>
       <div class="form-group">
-        <label class="field-label">Priorität (nice) <span style="font-weight:400;color:var(--gray)">(0 = normal, 19 = minimal)</span></label>
+        <label class="field-label"><span data-i18n="resource_label_nice">Priorität (nice)</span> <span style="font-weight:400;color:var(--gray)">(0 = normal, 19 = minimal)</span></label>
         <input type="number" id="resource-nice-input" class="form-control" min="0" max="19" placeholder="Auto">
       </div>
     </details>
     <div id="resource-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
     <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
-      <button class="btn btn-secondary" onclick="closeResourceModal()">Abbrechen</button>
-      <button class="btn btn-primary" onclick="saveResourceLimits()">Speichern</button>
+      <button class="btn btn-secondary" onclick="closeResourceModal()" data-i18n="btn_cancel">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveResourceLimits()" data-i18n="cd_save">Speichern</button>
     </div>
   </div>
 </div>
@@ -1029,6 +1032,16 @@ const TRANSLATIONS = {
     ow_desc: 'Folgende Dateien existieren bereits und würden überschrieben:',
     ow_cancel: 'Abbrechen',
     ow_confirm: 'Überschreiben',
+    resource_title: 'Ressourcen-Limits',
+    resource_desc: 'Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.',
+    resource_preset_full: '⚡ Vollgas',
+    resource_preset_background: '🌙 Schonend',
+    resource_advanced: 'Erweitert (Override)',
+    resource_label_threads: 'Threads',
+    resource_label_nice: 'Priorität (nice)',
+    resource_threads_range: n => `(1–${n}, leer = Auto)`,
+    resource_hint_effective: (n, nice) => `Effektiv: ${n} Thread${n !== 1 ? 's' : ''}, Nice ${nice}`,
+    btn_resource_limits: 'Ressourcen-Limits',
   },
   en: {
     tab_downloads: 'Download Manager',
@@ -1173,6 +1186,16 @@ const TRANSLATIONS = {
     ow_cancel: 'Cancel',
     ow_confirm: 'Overwrite',
     label_suffix: 'Suffix',
+    resource_title: 'Resource Limits',
+    resource_desc: 'Takes effect on the next job start. No restart needed.',
+    resource_preset_full: '⚡ Full Power',
+    resource_preset_background: '🌙 Background',
+    resource_advanced: 'Advanced (Override)',
+    resource_label_threads: 'Threads',
+    resource_label_nice: 'Priority (nice)',
+    resource_threads_range: n => `(1–${n}, empty = Auto)`,
+    resource_hint_effective: (n, nice) => `Effective: ${n} thread${n !== 1 ? 's' : ''}, nice ${nice}`,
+    btn_resource_limits: 'Resource Limits',
   }
 };
 
@@ -1306,13 +1329,30 @@ async function saveChangedDir() {
 // ─── Resource limits ──────────────────────────────────────────────────────────
 let _resourceState = { mode: 'full', cpu_count: 1, osmium_threads_override: null, nice_override: null, effective_threads: 1, effective_nice: 0 };
 
+function _applyResourceStatusLabel() {
+  const el = document.getElementById('resource-status-label');
+  if (!el) return;
+  const { mode, effective_threads, effective_nice } = _resourceState;
+  const modeLabel = mode === 'full' ? t('resource_preset_full') : t('resource_preset_background');
+  let txt = `${modeLabel} · ${effective_threads}T`;
+  if (effective_nice > 0) txt += `, Nice ${effective_nice}`;
+  el.textContent = txt;
+}
+
+async function loadResourceStatus() {
+  try {
+    _resourceState = await fetch('/api/resource-limits').then(r => r.json());
+  } catch (e) { /* keep defaults */ }
+  _applyResourceStatusLabel();
+}
+
 async function openResourceModal() {
   document.getElementById('resource-error').style.display = 'none';
   try {
-    const res = await fetch('/api/resource-limits');
-    _resourceState = await res.json();
+    _resourceState = await fetch('/api/resource-limits').then(r => r.json());
   } catch (e) { /* keep defaults */ }
   _applyResourceState();
+  _applyResourceStatusLabel();
   document.getElementById('modal-resource-limits').style.display = 'flex';
 }
 
@@ -1329,12 +1369,11 @@ function _applyResourceState() {
   const { mode, cpu_count, osmium_threads_override, nice_override, effective_threads, effective_nice } = _resourceState;
   document.getElementById('btn-preset-full').classList.toggle('active', mode === 'full');
   document.getElementById('btn-preset-background').classList.toggle('active', mode === 'background');
-  document.getElementById('resource-threads-range').textContent = `(1–${cpu_count}, leer = Auto)`;
+  document.getElementById('resource-threads-range').textContent = t('resource_threads_range', cpu_count);
   document.getElementById('resource-threads-input').max = cpu_count;
   document.getElementById('resource-threads-input').value = osmium_threads_override ?? '';
   document.getElementById('resource-nice-input').value = nice_override ?? '';
-  document.getElementById('resource-hint').textContent =
-    `Effektiv: ${effective_threads} Thread${effective_threads !== 1 ? 's' : ''}, Nice ${effective_nice}`;
+  document.getElementById('resource-hint').textContent = t('resource_hint_effective', effective_threads, effective_nice);
 }
 
 async function saveResourceLimits() {
@@ -1353,17 +1392,17 @@ async function saveResourceLimits() {
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      errEl.textContent = d.detail || 'Fehler beim Speichern.';
+      errEl.textContent = d.detail || t('err_server');
       errEl.style.display = 'block';
       return;
     }
-    // Refresh effective values display
     const updated = await fetch('/api/resource-limits').then(r => r.json());
     _resourceState = updated;
     _applyResourceState();
+    _applyResourceStatusLabel();
     closeResourceModal();
   } catch (e) {
-    errEl.textContent = 'Verbindungsfehler: ' + e.message;
+    errEl.textContent = t('err_conn', e.message);
     errEl.style.display = 'block';
   }
 }
@@ -2105,7 +2144,7 @@ function showTab(name) {
   const idx = { downloads:0, filter:1, presets:2 }[name];
   document.querySelectorAll('.tab-btn')[idx]?.classList.add('active');
 
-  if (name === 'filter')  { loadFilterSources(); loadFilterJobs(); }
+  if (name === 'filter')  { loadFilterSources(); loadFilterJobs(); loadResourceStatus(); }
   if (name === 'presets') loadPresets();
 }
 
