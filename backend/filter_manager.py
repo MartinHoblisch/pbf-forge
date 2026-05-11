@@ -406,10 +406,28 @@ class FilterManager:
                         out_file.unlink(missing_ok=True)
                         await self._start_phase(job)
 
-                        if fmt == "gpkg" and job.columns_mode == "other_tags":
-                            # GPKG Standard: GDAL OSM driver with other_tags HSTORE column.
+                        gpkg_direct = fmt == "gpkg" and not (
+                            job.columns_mode == "manual" and not job.manual_keys
+                        )
+                        if gpkg_direct:
+                            # GDAL OSM driver reads PBF directly; no GeoJSON intermediate.
+                            #   other_tags → default schema (known cols + other_tags HSTORE)
+                            #   all        → default schema
+                            #   manual     → osmconf.ini projects only manual_keys
+                            osmconf_path: Path | None = None
+                            if job.columns_mode == "manual" and job.manual_keys:
+                                osmconf_path = tmp / f"{stem}_osmconf.ini"
+                                osmconf_path.write_text(
+                                    self._osmconf(job.manual_keys, other_tags=False),
+                                    encoding="utf-8",
+                                )
                             ogr_cmd = self._build_ogr_cmd(
-                                fmt, str(out_file), str(intermediate), job, tmp
+                                fmt,
+                                str(out_file),
+                                str(intermediate),
+                                job,
+                                tmp,
+                                osmconf_path=osmconf_path,
                             )
                             rc = await self._run_cmd(ogr_cmd, job)
                         else:
@@ -711,17 +729,26 @@ class FilterManager:
             return 1
 
     def _build_ogr_cmd(
-        self, fmt: str, out_file: str, src: str, job: FilterJob, tmp: Path
+        self,
+        fmt: str,
+        out_file: str,
+        src: str,
+        job: FilterJob,
+        tmp: Path,
+        osmconf_path: Path | None = None,
     ) -> list[str]:
-        """Build ogr2ogr command for other_tags+GPKG: GDAL OSM driver default schema.
+        """Build ogr2ogr command reading PBF directly via the GDAL OSM driver.
 
-        The GDAL OSM driver reads PBF and creates up to five layers by geometry
-        type: points, lines, multilinestrings, multipolygons, other_relations.
-        Each layer is stored as a separate table inside the GeoPackage.
-        CRS is declared as EPSG:4326 (WGS 84) via -a_srs.
+        Layers (points, lines, multilinestrings, multipolygons, other_relations)
+        become tables in the GeoPackage. CRS declared as EPSG:4326 via -a_srs.
+        When `osmconf_path` is provided, it overrides the default OSM schema
+        (used to enforce manual column projection without other_tags HSTORE).
         """
         ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
-        cmd = ["ogr2ogr", "-f", ogr_fmt, out_file, src]
+        cmd = ["ogr2ogr"]
+        if osmconf_path is not None:
+            cmd += ["--config", "OSM_CONFIG_FILE", str(osmconf_path)]
+        cmd += ["-f", ogr_fmt, out_file, src]
         if fmt == "gpkg":
             cmd += [
                 "-a_srs",
@@ -734,15 +761,16 @@ class FilterManager:
             ]
         return cmd
 
-    def _osmconf(self, keys: list[str]) -> str:
+    def _osmconf(self, keys: list[str], *, other_tags: bool = True) -> str:
         for key in keys:
             if not _VALID_KEY.match(key):
                 raise ValueError(f"Invalid column name: {key!r}")
         keys_str = ",".join(keys)
         layers = ["points", "lines", "multilinestrings", "multipolygons", "other_relations"]
+        other = "yes" if other_tags else "no"
         sections = ["[general]\nattribute_name_laundering=yes\n"]
         for layer in layers:
-            sections.append(f"[{layer}]\nosm_id=yes\nattributes={keys_str}\nother_tags=yes\n")
+            sections.append(f"[{layer}]\nosm_id=yes\nattributes={keys_str}\nother_tags={other}\n")
         return "\n".join(sections)
 
     def _embed_attribution(self, path: Path, fmt: str) -> None:

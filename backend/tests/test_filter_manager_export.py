@@ -164,3 +164,42 @@ async def test_gpkg_export_path_includes_perf_flags(tmp_data_dir):
     assert "-gt" in ogr_cmd
     assert ogr_cmd[ogr_cmd.index("-gt") + 1] == "65536"
     assert "OGR_SQLITE_SYNCHRONOUS" in ogr_cmd
+
+
+# ── gpkg + manual goes direct via osmconf, skipping osmium export ────────────
+
+
+async def test_gpkg_manual_uses_osmconf_and_skips_export(tmp_data_dir):
+    """gpkg+manual reads PBF directly with OSM_CONFIG_FILE; no osmium export."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(
+        tmp_data_dir,
+        output_formats=["gpkg"],
+        columns_mode="manual",
+        manual_keys=["name", "highway"],
+    )
+
+    captured_cmds = []
+
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        if cmd[0] == "ogr2ogr":
+            # ogr2ogr <flags...> -f GPKG out.gpkg in.osm.pbf
+            out = Path(cmd[cmd.index("-f") + 2])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(b"")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_embed_attribution"):
+            with patch.object(fm, "_embed_provenance"):
+                await fm.run_job(job)
+
+    assert job.status == "done"
+    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
+    ogr_cmd = next(c for c in captured_cmds if c[0] == "ogr2ogr")
+    assert "OSM_CONFIG_FILE" in ogr_cmd
+    cfg_idx = ogr_cmd.index("OSM_CONFIG_FILE")
+    cfg_path = Path(ogr_cmd[cfg_idx + 1])
+    assert cfg_path.name.endswith("_osmconf.ini")

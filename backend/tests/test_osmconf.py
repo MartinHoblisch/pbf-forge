@@ -47,6 +47,13 @@ def test_osmconf_each_layer_has_osm_id_and_other_tags(fm):
     assert out.count("other_tags=yes") == len(_LAYERS)
 
 
+def test_osmconf_other_tags_false_disables_hstore(fm):
+    """Manual mode passes other_tags=False to prevent HSTORE leak of unselected tags."""
+    out = fm._osmconf(["name"], other_tags=False)
+    assert out.count("other_tags=no") == len(_LAYERS)
+    assert "other_tags=yes" not in out
+
+
 def test_osmconf_empty_keys_yields_empty_attributes(fm):
     out = fm._osmconf([])
     # attributes= with empty value is acceptable for GDAL; make sure no crash
