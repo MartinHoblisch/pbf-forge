@@ -1674,6 +1674,11 @@ function renderFilterJobs() {
 
   const runningIds = new Set();
 
+  // Preserve user-opened log state across innerHTML re-renders.
+  const openLogs = new Set(
+    [...el.querySelectorAll('details.job-log-wrap[open]')].map(d => d.dataset.jobId)
+  );
+
   el.innerHTML = filterJobs.map(j => {
     const [cls] = getStatusLabels()[j.status === 'running' ? 'downloading' : j.status] || ['badge-gray'];
     const statusLabel = jobStatusMap[j.status] || j.status;
@@ -1728,7 +1733,7 @@ function renderFilterJobs() {
 
     const logOpen = !showProgress;
     const logHtml = j.log
-      ? `<details class="job-log-wrap"${logOpen ? ' open' : ''}>
+      ? `<details class="job-log-wrap" data-job-id="${escHtml(j.id)}"${logOpen ? ' open' : ''}>
            <summary>Log</summary>
            <div class="job-log">${escHtml(j.log)}</div>
          </details>`
@@ -1750,6 +1755,11 @@ function renderFilterJobs() {
       </div>
     </div>`;
   }).join('');
+
+  // Restore log open state for jobs the user had expanded.
+  el.querySelectorAll('details.job-log-wrap').forEach(d => {
+    if (openLogs.has(d.dataset.jobId)) d.open = true;
+  });
 
   // start timers for running jobs, stop for others
   Object.keys(_phaseTimers).forEach(id => { if (!runningIds.has(id)) _stopPhaseTimer(id); });

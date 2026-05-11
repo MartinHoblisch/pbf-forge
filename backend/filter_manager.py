@@ -22,7 +22,6 @@ from config import (
     ATTRIBUTION,
     CONFIG_DIR,
     DATA_DIR,
-    OSMIUM_INDEX_THRESHOLD,
     PYOSMIUM_BUFFER_SIZE,
     TEMP_DIR,
 )
@@ -280,7 +279,6 @@ class FilterManager:
                             "tags-filter",
                             str(source_path),
                             *exprs,
-                            *self._osmium_index_flags(source_path, tmp, stem),
                             "-o",
                             str(pbf_out),
                             "--overwrite",
@@ -326,7 +324,6 @@ class FilterManager:
                             "tags-filter",
                             str(source_path),
                             *exprs,
-                            *self._osmium_index_flags(source_path, tmp, stem),
                             "-o",
                             str(intermediate),
                             "--overwrite",
@@ -397,14 +394,10 @@ class FilterManager:
                                     job,
                                 )
                                 if rc != 0:
-                                    raise RuntimeError(
-                                        f"osmium export exited with code {rc}"
-                                    )
+                                    raise RuntimeError(f"osmium export exited with code {rc}")
                                 shared_fields = await self._get_fields(shared_geojson)
 
-                            sql = self._build_export_sql(
-                                shared_geojson.stem, job, shared_fields
-                            )
+                            sql = self._build_export_sql(shared_geojson.stem, job, shared_fields)
                             ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
                             cmd = [
                                 "ogr2ogr",
@@ -500,17 +493,6 @@ class FilterManager:
         job.phase_started_at = None
         job.speed_bps = None
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
-
-    def _osmium_index_flags(self, source_path: Path, tmp: Path, stem: str) -> list[str]:
-        """Return osmium -i flag list for large source files; empty list otherwise."""
-        try:
-            size = source_path.stat().st_size
-        except OSError:
-            return []
-        if size < OSMIUM_INDEX_THRESHOLD:
-            return []
-        idx_path = tmp / f"{stem}_idx"
-        return ["-i", f"sparse_file_array,{idx_path}"]
 
     def _build_phases(self, job: FilterJob) -> list[Phase]:
         phases: list[Phase] = []
@@ -668,9 +650,13 @@ class FilterManager:
         cmd = ["ogr2ogr", "-f", ogr_fmt, out_file, src]
         if fmt == "gpkg":
             cmd += [
-                "-a_srs", "EPSG:4326",
-                "-gt", "65536",
-                "--config", "OGR_SQLITE_SYNCHRONOUS", "OFF",
+                "-a_srs",
+                "EPSG:4326",
+                "-gt",
+                "65536",
+                "--config",
+                "OGR_SQLITE_SYNCHRONOUS",
+                "OFF",
             ]
         return cmd
 

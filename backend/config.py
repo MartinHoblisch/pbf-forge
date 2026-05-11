@@ -32,10 +32,6 @@ MAX_DOWNLOAD_SIZE = int(os.getenv("MAX_DOWNLOAD_SIZE", str(100 * 1024 * 1024 * 1
 # 512 MB default is a reasonable balance for large PBF files.
 PYOSMIUM_BUFFER_SIZE = int(os.getenv("PYOSMIUM_BUFFER_SIZE", str(512 * 1024 * 1024)))
 
-# Source files larger than this use a disk-backed osmium index (sparse_file_array)
-# to reduce RAM usage during osmium tags-filter.  4 GB covers germany and below.
-OSMIUM_INDEX_THRESHOLD = int(os.getenv("OSMIUM_INDEX_THRESHOLD", str(4 * 1024**3)))
-
 # Buffer required free on disk after a download.
 MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB
 
