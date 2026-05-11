@@ -540,8 +540,17 @@ class FilterManager:
                         out_file.unlink(missing_ok=True)
                         await self._start_phase(job)
 
-                        gpkg_direct = fmt == "gpkg" and not (
-                            job.columns_mode == "manual" and not job.manual_keys
+                        # GPKG goes direct-from-PBF only when GeoJSON is NOT
+                        # also requested. Reason: GDAL OSM driver has no
+                        # disk-backed node index (unlike osmium's
+                        # sparse_file_array) and OOMs on Europe-scale sources
+                        # with tight RAM. If GeoJSON is in the same job, the
+                        # shared osmium export already produced a GeoJSON we
+                        # can cheaply project into GPKG via ogr2ogr SQL.
+                        gpkg_direct = (
+                            fmt == "gpkg"
+                            and "geojson" not in non_pbf
+                            and not (job.columns_mode == "manual" and not job.manual_keys)
                         )
                         if gpkg_direct:
                             # GDAL OSM driver reads PBF directly; no GeoJSON intermediate.

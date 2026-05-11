@@ -206,3 +206,49 @@ async def test_gpkg_manual_uses_osmconf_and_skips_export(tmp_data_dir):
     cfg_idx = ogr_cmd.index("OSM_CONFIG_FILE")
     cfg_path = Path(ogr_cmd[cfg_idx + 1])
     assert cfg_path.name.endswith("_osmconf.ini")
+
+
+# ── gpkg + geojson must reuse shared geojson (no GDAL OSM driver OOM) ────────
+
+
+async def test_gpkg_plus_geojson_reuses_shared_geojson_for_gpkg(tmp_data_dir):
+    """When GeoJSON is also requested, GPKG must read from shared geojson, not
+    direct from PBF. GDAL OSM driver has no disk-backed index and OOMs on
+    Europe-scale sources with limited RAM."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(
+        tmp_data_dir,
+        output_formats=["geojson", "gpkg"],
+        columns_mode="manual",
+        manual_keys=["name"],
+    )
+
+    captured_cmds = []
+
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        if cmd[0] == "osmium" and "export" in cmd:
+            out_path = Path(cmd[cmd.index("-o") + 1])
+            out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            out = Path(cmd[3])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(b"")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    assert job.status == "done"
+    # osmium export must run (creates shared geojson)
+    export_cmds = [c for c in captured_cmds if c[0] == "osmium" and "export" in c]
+    assert len(export_cmds) == 1
+    # GPKG ogr2ogr must NOT carry OSM_CONFIG_FILE (would mean direct-PBF path)
+    ogr_cmds = [c for c in captured_cmds if c[0] == "ogr2ogr"]
+    assert all("OSM_CONFIG_FILE" not in c for c in ogr_cmds)
+    # Both ogr2ogr calls read from shared geojson (-sql path)
+    assert all("-sql" in c for c in ogr_cmds)
