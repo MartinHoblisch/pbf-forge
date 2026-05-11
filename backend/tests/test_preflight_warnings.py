@@ -1,10 +1,15 @@
-"""Tests for memory/disk preflight warnings emitted at job start."""
+"""Tests for disk preflight warning emitted at job start.
+
+Previously also tested RAM-based heuristics; those were removed once
+sparse_file_array + streaming JSON embed brought the pipeline's peak
+RSS down to ~1-2 GB on Europe-scale sources, making the old estimate
+(source × 0.4) a false-alarm generator.
+"""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-import filter_manager as fm_module
 from filter_manager import FilterJob, FilterManager
 
 
@@ -29,64 +34,48 @@ def _job(**overrides) -> FilterJob:
     return FilterJob(**defaults)
 
 
-def test_low_memory_emits_warning_when_geojson_requested():
+def test_no_ram_warning_emitted_even_when_geojson_requested():
+    """RAM warning is gone — large source + GeoJSON must not produce a RAM line."""
     fm = _fm()
     job = _job(output_formats=["geojson"])
 
-    # 1 GB available, claim 100 GB source → estimated peak 40 GB > 1 GB → warning
-    with patch.object(fm_module, "_mem_available_bytes", return_value=1 * 1024**3):
+    with patch("filter_manager.shutil.disk_usage") as du:
+        du.return_value.free = 1000 * 1024**3  # plenty of disk
         fm._preflight_warnings(job, total_source_bytes=100 * 1024**3)
 
-    assert "WARNING" in job.log
-    assert "RAM" in job.log
-
-
-def test_no_warning_when_geojson_not_requested():
-    fm = _fm()
-    job = _job(output_formats=["gpkg"])
-
-    with patch.object(fm_module, "_mem_available_bytes", return_value=1 * 1024**3):
-        fm._preflight_warnings(job, total_source_bytes=100 * 1024**3)
-
-    # Disk check may still trigger; the RAM warning specifically must not.
     assert "RAM" not in job.log
-
-
-def test_no_warning_when_memory_sufficient():
-    fm = _fm()
-    job = _job(output_formats=["geojson"])
-
-    # 16 GB available, 1 GB source → estimated peak 400 MB → no warning
-    with patch.object(fm_module, "_mem_available_bytes", return_value=16 * 1024**3):
-        with patch("filter_manager.shutil.disk_usage") as du:
-            du.return_value.free = 100 * 1024**3
-            fm._preflight_warnings(job, total_source_bytes=1 * 1024**3)
-
-    assert job.log == ""
+    assert "OOM" not in job.log
 
 
 def test_low_disk_emits_warning():
     fm = _fm()
     job = _job(output_formats=["pbf"])
 
-    with patch.object(fm_module, "_mem_available_bytes", return_value=None):
-        with patch("filter_manager.shutil.disk_usage") as du:
-            du.return_value.free = 100 * 1024 * 1024  # 100 MB free
-            fm._preflight_warnings(job, total_source_bytes=10 * 1024**3)  # 10 GB
+    with patch("filter_manager.shutil.disk_usage") as du:
+        du.return_value.free = 100 * 1024 * 1024  # 100 MB free
+        fm._preflight_warnings(job, total_source_bytes=10 * 1024**3)  # 10 GB
 
     assert "WARNING" in job.log
     assert "disk" in job.log.lower()
 
 
-def test_non_linux_mem_check_does_not_crash():
-    """_mem_available_bytes returns None on non-Linux; preflight still runs."""
+def test_sufficient_disk_no_warning():
     fm = _fm()
     job = _job(output_formats=["geojson"])
 
-    with patch.object(fm_module, "_mem_available_bytes", return_value=None):
-        with patch("filter_manager.shutil.disk_usage") as du:
-            du.return_value.free = 100 * 1024**3
-            fm._preflight_warnings(job, total_source_bytes=1 * 1024**3)
+    with patch("filter_manager.shutil.disk_usage") as du:
+        du.return_value.free = 100 * 1024**3
+        fm._preflight_warnings(job, total_source_bytes=1 * 1024**3)
 
-    # Should complete cleanly — no RAM warning when MemAvailable unknown
-    assert "RAM" not in job.log
+    assert job.log == ""
+
+
+def test_disk_check_oserror_is_silent():
+    """If shutil.disk_usage fails (e.g. permission, missing dir), preflight stays quiet."""
+    fm = _fm()
+    job = _job(output_formats=["pbf"])
+
+    with patch("filter_manager.shutil.disk_usage", side_effect=OSError("boom")):
+        fm._preflight_warnings(job, total_source_bytes=1 * 1024**3)
+
+    assert job.log == ""
