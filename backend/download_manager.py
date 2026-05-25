@@ -254,7 +254,9 @@ class DownloadManager:
                 state.server_mtime = mtime.isoformat() if mtime else None
                 if state.local_size is None:
                     state.status = "not_downloaded"
-                elif mtime and state.local_mtime and mtime > datetime.fromisoformat(state.local_mtime):
+                elif mtime and state.local_mtime and mtime > datetime.fromisoformat(
+                    state.local_mtime
+                ):
                     state.status = "update_available"
                 elif state.local_size >= size:
                     state.status = "up_to_date"
@@ -379,9 +381,13 @@ class DownloadManager:
         s.headers.update({"User-Agent": USER_AGENT})
         return s
 
-    def _head(self, url: str, session: Optional[requests.Session] = None) -> tuple[int, Optional[datetime]]:
+    def _head(
+        self, url: str, session: Optional[requests.Session] = None
+    ) -> tuple[int, Optional[datetime]]:
         def _do(s: requests.Session) -> tuple[int, Optional[datetime]]:
-            resp = s.head(url, allow_redirects=True, timeout=30, headers={"Cache-Control": "no-cache"})
+            resp = s.head(
+                url, allow_redirects=True, timeout=30, headers={"Cache-Control": "no-cache"}
+            )
             resp.raise_for_status()
             size = int(resp.headers.get("Content-Length", 0))
             raw_mtime = resp.headers.get("Last-Modified")
