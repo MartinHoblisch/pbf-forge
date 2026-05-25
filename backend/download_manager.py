@@ -254,8 +254,10 @@ class DownloadManager:
                 state.server_mtime = mtime.isoformat() if mtime else None
                 if state.local_size is None:
                     state.status = "not_downloaded"
-                elif mtime and state.local_mtime and mtime > datetime.fromisoformat(
-                    state.local_mtime
+                elif (
+                    mtime
+                    and state.local_mtime
+                    and mtime > datetime.fromisoformat(state.local_mtime)
                 ):
                     state.status = "update_available"
                 elif state.local_size >= size:
