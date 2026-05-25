@@ -251,10 +251,10 @@ class DownloadManager:
             size, mtime = self._head(url)
             with self._lock:
                 state.server_size = size
-                state.server_mtime = mtime.isoformat()
+                state.server_mtime = mtime.isoformat() if mtime else None
                 if state.local_size is None:
                     state.status = "not_downloaded"
-                elif state.local_mtime and mtime > datetime.fromisoformat(state.local_mtime):
+                elif mtime and state.local_mtime and mtime > datetime.fromisoformat(state.local_mtime):
                     state.status = "update_available"
                 elif state.local_size >= size:
                     state.status = "up_to_date"
@@ -311,7 +311,7 @@ class DownloadManager:
             "url": url,
             "filename": filename,
             "server_size": size,
-            "server_mtime": mtime.isoformat(),
+            "server_mtime": mtime.isoformat() if mtime else None,
             "already_exists": (DATA_DIR / filename).exists(),
         }
 
@@ -379,13 +379,13 @@ class DownloadManager:
         s.headers.update({"User-Agent": USER_AGENT})
         return s
 
-    def _head(self, url: str, session: Optional[requests.Session] = None) -> tuple[int, datetime]:
-        def _do(s: requests.Session) -> tuple[int, datetime]:
-            resp = s.head(url, allow_redirects=True, timeout=30)
+    def _head(self, url: str, session: Optional[requests.Session] = None) -> tuple[int, Optional[datetime]]:
+        def _do(s: requests.Session) -> tuple[int, Optional[datetime]]:
+            resp = s.head(url, allow_redirects=True, timeout=30, headers={"Cache-Control": "no-cache"})
             resp.raise_for_status()
             size = int(resp.headers.get("Content-Length", 0))
             raw_mtime = resp.headers.get("Last-Modified")
-            mtime = parsedate_to_datetime(raw_mtime) if raw_mtime else datetime.now(timezone.utc)
+            mtime = parsedate_to_datetime(raw_mtime) if raw_mtime else None
             return size, mtime
 
         if session is not None:
@@ -516,13 +516,14 @@ class DownloadManager:
                     state.speed_bps = 0.0
                     state.eta_seconds = 0.0
             else:
-                ts = mtime.timestamp()
-                os.utime(dest, (ts, ts))
+                if mtime:
+                    ts = mtime.timestamp()
+                    os.utime(dest, (ts, ts))
                 self._verify_checksum(url, dest, session)
                 with self._lock:
                     state.status = "up_to_date"
                     state.local_size = dest.stat().st_size
-                    state.local_mtime = mtime.isoformat()
+                    state.local_mtime = mtime.isoformat() if mtime else None
                     state.speed_bps = 0.0
                     state.eta_seconds = 0.0
                     state.downloaded_bytes = 0

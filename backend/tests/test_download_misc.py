@@ -209,12 +209,11 @@ def test_head_uses_default_session_when_none_passed(tmp_data_dir):
         size, mtime = dm._head("https://example.com/x.osm.pbf")
 
     assert size == 100
-    assert isinstance(mtime, datetime)
+    assert mtime is None  # no Last-Modified header → None, not a fallback datetime
 
 
-def test_head_falls_back_to_now_when_no_last_modified(tmp_data_dir):
-    """Server omits Last-Modified → use current UTC time so update detection
-    still triggers a re-download next time the user clicks check."""
+def test_head_returns_none_when_no_last_modified(tmp_data_dir):
+    """Server omits Last-Modified → mtime is None, not a fallback datetime."""
     dm = _make_dm()
     resp = MagicMock()
     resp.headers = {"Content-Length": "1"}
@@ -222,11 +221,8 @@ def test_head_falls_back_to_now_when_no_last_modified(tmp_data_dir):
     session = MagicMock()
     session.head = MagicMock(return_value=resp)
 
-    before = datetime.now(timezone.utc)
     _, mtime = dm._head("https://example.com/x.osm.pbf", session=session)
-    after = datetime.now(timezone.utc)
-    assert before <= mtime <= after
-    assert mtime.tzinfo is not None  # timezone-aware
+    assert mtime is None
 
 
 # ── /api/check with explicit filenames ───────────────────────────────────────
