@@ -407,6 +407,7 @@ class DownloadManager:
             url = state.url
 
         dest = DATA_DIR / filename
+        part = dest.with_name(dest.name + ".part")
         tracker = _SpeedTracker()
 
         try:
@@ -423,14 +424,16 @@ class DownloadManager:
                         f"(cap is {MAX_DOWNLOAD_SIZE / 1e9:.0f} GB)"
                     )
 
-                # Decide whether to resume or start fresh
+                # Resume from .part — but discard partials older than the
+                # server file: resuming across a Geofabrik daily update would
+                # mix old and new bytes (guaranteed MD5 failure later).
                 start_byte = 0
-                if dest.exists():
-                    local_mtime = (
-                        datetime.fromisoformat(state.local_mtime) if state.local_mtime else None
-                    )
-                    if local_mtime and mtime <= local_mtime:
-                        start_byte = dest.stat().st_size
+                if part.exists():
+                    part_mtime = datetime.fromtimestamp(part.stat().st_mtime, tz=timezone.utc)
+                    if mtime is not None and mtime > part_mtime:
+                        part.unlink(missing_ok=True)
+                    else:
+                        start_byte = part.stat().st_size
 
                 # Disk-space pre-check (avoid filling /data and crashing the host)
                 needed = max(0, size - start_byte) + MIN_FREE_DISK_BUFFER
@@ -449,7 +452,7 @@ class DownloadManager:
                         break
                     try:
                         self._do_download(
-                            url, dest, start_byte, size, tracker, state, cancel, session
+                            url, part, start_byte, size, tracker, state, cancel, session
                         )
                         break
                     except requests.HTTPError as exc:
@@ -467,7 +470,7 @@ class DownloadManager:
                                 f"HTTP {code} {reason} — failed after {MAX_RETRIES} retries"
                             ) from exc
                         time.sleep(_retry_delay(exc.response, attempt))
-                        start_byte = dest.stat().st_size if dest.exists() else start_byte
+                        start_byte = part.stat().st_size if part.exists() else start_byte
                     except requests.exceptions.SSLError as exc:
                         raise RuntimeError(f"SSL error — not retrying: {exc}") from exc
                     except (
@@ -491,7 +494,7 @@ class DownloadManager:
                             cancel.wait(timeout=SLOW_RETRY_INTERVAL_SECONDS)
                             if cancel.is_set():
                                 break
-                            start_byte = dest.stat().st_size if dest.exists() else start_byte
+                            start_byte = part.stat().st_size if part.exists() else start_byte
                             with self._lock:
                                 state.status = "downloading"
                                 state.retry_at = None
@@ -499,7 +502,7 @@ class DownloadManager:
                             try:
                                 self._do_download(
                                     url,
-                                    dest,
+                                    part,
                                     start_byte,
                                     size,
                                     tracker,
@@ -526,7 +529,9 @@ class DownloadManager:
             else:
                 # D1: verify BEFORE stamping server mtime — a corrupt file must
                 # never look up_to_date after a backend restart.
-                self._verify_checksum(url, dest, session)
+                # D2: verify the .part file, then atomically rename to dest.
+                self._verify_checksum(url, part, session)
+                os.replace(part, dest)
                 if mtime:
                     ts = mtime.timestamp()
                     os.utime(dest, (ts, ts))

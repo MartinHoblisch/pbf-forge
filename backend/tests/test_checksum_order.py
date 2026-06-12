@@ -43,17 +43,17 @@ def dm(tmp_path, monkeypatch):
 
 def test_verify_runs_before_utime(dm, tmp_path, monkeypatch):
     filename = "berlin.osm.pbf"
-    dest = tmp_path / filename
-    dest.write_bytes(b"data")
     mtime = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
     order: list[str] = []
     monkeypatch.setattr(dm, "_head", lambda url, session=None: (4, mtime))
-    monkeypatch.setattr(
-        dm,
-        "_do_download",
-        lambda *a, **k: order.append("download"),
-    )
+
+    def fake_download(*a, **k):
+        # a[1] is the dest path passed by the worker (now the .part file)
+        a[1].write_bytes(b"data")
+        order.append("download")
+
+    monkeypatch.setattr(dm, "_do_download", fake_download)
     monkeypatch.setattr(
         dm,
         "_verify_checksum",

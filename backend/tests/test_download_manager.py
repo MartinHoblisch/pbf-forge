@@ -142,19 +142,18 @@ def test_no_local_file_start_byte_zero(tmp_data_dir):
 
 def test_partial_download_start_byte_equals_local_size(tmp_data_dir):
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
-    dest.write_bytes(b"x" * 500)
+    # D2: resume is now from the .part file, not the final dest
+    part = tmp_data_dir / (filename + ".part")
+    part.write_bytes(b"x" * 500)
 
     dm = _make_dm(tmp_data_dir)
     _setup_downloading(dm, filename)
-    # local_mtime must be >= server mtime to trigger resume
-    with dm._lock:
-        dm._files[filename].local_mtime = _SERVER_MTIME_NEW.isoformat()
 
     captured = {}
 
     def fake_do(url, dest, start_byte, size, tracker, state, c, session):
         captured["start_byte"] = start_byte
+        dest.write_bytes(b"x" * 1000)  # create part so os.replace succeeds
 
     with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME_OLD)):
         with patch.object(dm, "_do_download", side_effect=fake_do):
@@ -165,15 +164,16 @@ def test_partial_download_start_byte_equals_local_size(tmp_data_dir):
 
 def test_same_version_becomes_up_to_date(tmp_data_dir):
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
-    dest.write_bytes(b"x" * 1000)
+    # D2: _do_download writes to .part; os.replace then moves it to dest.
+    # Simulate a complete-file scenario by pre-creating the .part file so
+    # the success path (os.replace + stat) works.
+    part = tmp_data_dir / (filename + ".part")
+    part.write_bytes(b"x" * 1000)
 
     dm = _make_dm(tmp_data_dir)
     _setup_downloading(dm, filename)
-    with dm._lock:
-        dm._files[filename].local_mtime = _SERVER_MTIME_NEW.isoformat()
 
-    # _do_download does nothing (simulates 416 scenario: complete file → skip)
+    # _do_download does nothing (simulates 416 scenario: complete .part → skip)
     with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME_OLD)):
         with patch.object(dm, "_do_download"):
             with patch.object(dm, "_verify_checksum"):
