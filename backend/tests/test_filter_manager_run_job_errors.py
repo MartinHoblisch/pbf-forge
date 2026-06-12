@@ -175,8 +175,15 @@ async def test_run_job_invokes_reduce_for_manual_with_keys(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, columns_mode="manual", manual_keys=["name"])
 
+    # F4: tags-filter now writes to pbf_work (tmp), not the final path.
+    # The mock must write the -o target so shutil.move(pbf_work → pbf_out) succeeds.
+    async def fake_run_cmd(cmd, _j):
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x")
+        return 0
+
     reduce_mock = AsyncMock(return_value=0)
-    with patch.object(fm, "_run_cmd", AsyncMock(return_value=0)):
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_reduce_pbf_tags", reduce_mock):
             await fm.run_job(job)
 
@@ -311,6 +318,10 @@ async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
 
     async def fake_run_cmd(cmd, _job):
         captured_cmds.append(list(cmd))
+        # F4: tags-filter now writes to pbf_work (tmp); write the -o target so
+        # shutil.move(pbf_work → pbf_out) succeeds without a real osmium binary.
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x")
         return 0
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):

@@ -431,6 +431,7 @@ class FilterManager:
 
                     if needs_pbf:
                         pbf_out = out_dir / "pbf" / f"{stem}.osm.pbf"
+                        pbf_work = tmp / f"{stem}_work.osm.pbf"
                         await self._start_phase(job)
                         cmd = [
                             "osmium",
@@ -438,7 +439,7 @@ class FilterManager:
                             str(source_path),
                             *exprs,
                             "-o",
-                            str(pbf_out),
+                            str(pbf_work),
                             "--overwrite",
                         ]
                         rc = await self._run_cmd(cmd, job)
@@ -453,7 +454,7 @@ class FilterManager:
                             excl_cmd = [
                                 "osmium",
                                 "tags-filter",
-                                str(pbf_out),
+                                str(pbf_work),
                                 *excl_exprs,
                                 "--invert-match",
                                 "-o",
@@ -463,15 +464,18 @@ class FilterManager:
                             rc = await self._run_cmd(excl_cmd, job)
                             if rc != 0:
                                 raise RuntimeError(f"osmium exclude pass exited with code {rc}")
-                            shutil.move(str(excl_tmp), str(pbf_out))
+                            shutil.move(str(excl_tmp), str(pbf_work))
                             await self._finish_phase(job)
 
                         if job.columns_mode == "manual" and job.manual_keys:
                             await self._start_phase(job)
-                            rc = await self._reduce_pbf_tags(pbf_out, job)
+                            rc = await self._reduce_pbf_tags(pbf_work, job)
                             if rc != 0:
                                 raise RuntimeError("PBF tag reduction failed")
                             await self._finish_phase(job)
+
+                        # All PBF phases done — publish atomically (audit F4).
+                        shutil.move(str(pbf_work), str(pbf_out))
                         job.output_files.append(str(pbf_out))
                         intermediate = pbf_out
                     elif non_pbf:
@@ -523,7 +527,8 @@ class FilterManager:
                         else:
                             out_file = out_dir / "gpkg" / f"{stem}.gpkg"
 
-                        out_file.unlink(missing_ok=True)
+                        work_file = tmp / out_file.name
+                        work_file.unlink(missing_ok=True)
                         await self._start_phase(job)
 
                         # Single export route for every non-PBF format: osmium
@@ -560,7 +565,7 @@ class FilterManager:
                             "ogr2ogr",
                             "-f",
                             ogr_fmt,
-                            str(out_file),
+                            str(work_file),
                             str(shared_geojson),
                             "-sql",
                             sql,
@@ -583,17 +588,20 @@ class FilterManager:
                             raise RuntimeError(f"Conversion exited with code {rc}")
                         await self._finish_phase(job)
                         loop = asyncio.get_running_loop()
-                        await loop.run_in_executor(None, self._embed_attribution, out_file, fmt)
+                        await loop.run_in_executor(None, self._embed_attribution, work_file, fmt)
                         await loop.run_in_executor(
                             None,
                             self._embed_provenance,
-                            out_file,
+                            work_file,
                             fmt,
                             source,
                             job.tags,
                             job.exclude_tags,
                             job.geometry_types,
                         )
+                        # All export phases done — publish atomically (audit F4).
+                        out_file.unlink(missing_ok=True)
+                        shutil.move(str(work_file), str(out_file))
                         job.output_files.append(str(out_file))
                         gc.collect()
 
