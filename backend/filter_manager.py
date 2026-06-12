@@ -42,9 +42,6 @@ _VALID_TAG = re.compile(r"^[^-\s\n\r\x00][^\n\r\x00]*$")
 # Matches osmium/ogr2ogr progress lines such as "[======>   ] 45%" or "45%"
 _PROGRESS_RE = re.compile(r"\]\s*(\d{1,3})%|^(\d{1,3})%\s*$")
 
-# Column names written into osmconf INI files must be safe identifiers.
-_VALID_KEY = re.compile(r"^[a-zA-Z0-9_:.\-]+$")
-
 
 def _ts() -> str:
     return datetime.now().strftime("[%H:%M:%S] ")
@@ -529,90 +526,58 @@ class FilterManager:
                         out_file.unlink(missing_ok=True)
                         await self._start_phase(job)
 
-                        # GPKG goes direct-from-PBF only when GeoJSON is NOT
-                        # also requested. Reason: GDAL OSM driver has no
-                        # disk-backed node index (unlike osmium's
-                        # sparse_file_array) and OOMs on Europe-scale sources
-                        # with tight RAM. If GeoJSON is in the same job, the
-                        # shared osmium export already produced a GeoJSON we
-                        # can cheaply project into GPKG via ogr2ogr SQL.
-                        gpkg_direct = (
-                            fmt == "gpkg"
-                            and "geojson" not in non_pbf
-                            and not (job.columns_mode == "manual" and not job.manual_keys)
-                        )
-                        if gpkg_direct:
-                            # GDAL OSM driver reads PBF directly; no GeoJSON intermediate.
-                            #   other_tags → default schema (known cols + other_tags HSTORE)
-                            #   all        → default schema
-                            #   manual     → osmconf.ini projects only manual_keys
-                            osmconf_path: Path | None = None
-                            if job.columns_mode == "manual" and job.manual_keys:
-                                osmconf_path = tmp / f"{stem}_osmconf.ini"
-                                osmconf_path.write_text(
-                                    self._osmconf(job.manual_keys, other_tags=False),
-                                    encoding="utf-8",
-                                )
-                            ogr_cmd = self._build_ogr_cmd(
-                                fmt,
-                                str(out_file),
-                                str(intermediate),
+                        # Single export route for every non-PBF format: osmium
+                        # export with a disk-backed node index, then ogr2ogr.
+                        # One route = one schema, regardless of which formats
+                        # were co-selected (audit finding F1).
+                        if shared_geojson is None:
+                            shared_geojson = tmp / f"{stem}_export.geojson"
+                            # Disk-backed node index keeps RAM bounded on
+                            # large sources (Europe-scale fits in ~1 GB RSS
+                            # instead of 5–10 GB with flex_mem default).
+                            rc = await self._run_cmd(
+                                [
+                                    "osmium",
+                                    "export",
+                                    "--format=geojson",
+                                    "--attributes",
+                                    "id",
+                                    "--index-type=sparse_file_array,sparse_file_array",
+                                    "-o",
+                                    str(shared_geojson),
+                                    str(intermediate),
+                                    "--overwrite",
+                                ],
                                 job,
-                                tmp,
-                                osmconf_path=osmconf_path,
                             )
-                            rc = await self._run_cmd(ogr_cmd, job)
-                        else:
-                            # osmium export path (all non-PBF formats except other_tags+GPKG).
-                            # Run export once; reuse shared_geojson for subsequent formats.
-                            if shared_geojson is None:
-                                shared_geojson = tmp / f"{stem}_export.geojson"
-                                # Disk-backed node index keeps RAM bounded on
-                                # large sources (Europe-scale fits in ~1 GB RSS
-                                # instead of 5–10 GB with flex_mem default).
-                                rc = await self._run_cmd(
-                                    [
-                                        "osmium",
-                                        "export",
-                                        "--format=geojson",
-                                        "--attributes",
-                                        "id",
-                                        "--index-type=sparse_file_array,sparse_file_array",
-                                        "-o",
-                                        str(shared_geojson),
-                                        str(intermediate),
-                                        "--overwrite",
-                                    ],
-                                    job,
-                                )
-                                if rc != 0:
-                                    raise RuntimeError(f"osmium export exited with code {rc}")
-                                shared_fields = await self._get_fields(shared_geojson)
+                            if rc != 0:
+                                raise RuntimeError(f"osmium export exited with code {rc}")
+                            shared_fields = await self._get_fields(shared_geojson)
 
-                            sql = self._build_export_sql(shared_geojson.stem, job, shared_fields)
-                            ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
-                            cmd = [
-                                "ogr2ogr",
-                                "-f",
-                                ogr_fmt,
-                                str(out_file),
-                                str(shared_geojson),
-                                "-sql",
-                                sql,
+                        sql = self._build_export_sql(shared_geojson.stem, job, shared_fields)
+                        ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
+                        cmd = [
+                            "ogr2ogr",
+                            "-f",
+                            ogr_fmt,
+                            str(out_file),
+                            str(shared_geojson),
+                            "-sql",
+                            sql,
+                        ]
+                        if fmt == "gpkg":
+                            cmd += [
+                                "-nln",
+                                out_file.stem,
+                                "-a_srs",
+                                "EPSG:4326",
+                                "-gt",
+                                "65536",
+                                "--config",
+                                "OGR_SQLITE_SYNCHRONOUS",
+                                "OFF",
                             ]
-                            if fmt == "gpkg":
-                                cmd += [
-                                    "-nln",
-                                    out_file.stem,
-                                    "-a_srs",
-                                    "EPSG:4326",
-                                    "-gt",
-                                    "65536",
-                                    "--config",
-                                    "OGR_SQLITE_SYNCHRONOUS",
-                                    "OFF",
-                                ]
-                            rc = await self._run_cmd(cmd, job)
+                        rc = await self._run_cmd(cmd, job)
 
                         if rc != 0:
                             raise RuntimeError(f"Conversion exited with code {rc}")
@@ -892,51 +857,6 @@ class FilterManager:
             job.append_log(f"ERROR in tag reduction: {exc}\n")
             tmp_out.unlink(missing_ok=True)
             return 1
-
-    def _build_ogr_cmd(
-        self,
-        fmt: str,
-        out_file: str,
-        src: str,
-        job: FilterJob,
-        tmp: Path,
-        osmconf_path: Path | None = None,
-    ) -> list[str]:
-        """Build ogr2ogr command reading PBF directly via the GDAL OSM driver.
-
-        Layers (points, lines, multilinestrings, multipolygons, other_relations)
-        become tables in the GeoPackage. CRS declared as EPSG:4326 via -a_srs.
-        When `osmconf_path` is provided, it overrides the default OSM schema
-        (used to enforce manual column projection without other_tags HSTORE).
-        """
-        ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
-        cmd = ["ogr2ogr"]
-        if osmconf_path is not None:
-            cmd += ["--config", "OSM_CONFIG_FILE", str(osmconf_path)]
-        cmd += ["-f", ogr_fmt, out_file, src]
-        if fmt == "gpkg":
-            cmd += [
-                "-a_srs",
-                "EPSG:4326",
-                "-gt",
-                "65536",
-                "--config",
-                "OGR_SQLITE_SYNCHRONOUS",
-                "OFF",
-            ]
-        return cmd
-
-    def _osmconf(self, keys: list[str], *, other_tags: bool = True) -> str:
-        for key in keys:
-            if not _VALID_KEY.match(key):
-                raise ValueError(f"Invalid column name: {key!r}")
-        keys_str = ",".join(keys)
-        layers = ["points", "lines", "multilinestrings", "multipolygons", "other_relations"]
-        other = "yes" if other_tags else "no"
-        sections = ["[general]\nattribute_name_laundering=yes\n"]
-        for layer in layers:
-            sections.append(f"[{layer}]\nosm_id=yes\nattributes={keys_str}\nother_tags={other}\n")
-        return "\n".join(sections)
 
     def _embed_attribution(self, path: Path, fmt: str) -> None:
         if fmt == "gpkg":

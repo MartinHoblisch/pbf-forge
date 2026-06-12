@@ -1,8 +1,8 @@
 """Tests for the G2 osmium-export sharing behaviour in run_job.
 
-osmium export runs at most ONCE per source across all non-PBF formats that
-need the export path (all/manual modes).  The other_tags+GPKG format uses the
-GDAL OSM driver directly and never triggers osmium export.
+osmium export runs at most ONCE per source across all non-PBF formats.
+All non-PBF formats (geojson, gpkg) always go through the osmium-export path
+regardless of columns_mode (audit F1: one route = one schema).
 """
 
 from __future__ import annotations
@@ -84,35 +84,6 @@ async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
     assert "--index-type=sparse_file_array,sparse_file_array" in export_cmd
 
 
-# ── other_tags+GPKG never triggers osmium export ─────────────────────────────
-
-
-async def test_other_tags_gpkg_skips_osmium_export(tmp_data_dir):
-    """other_tags+gpkg uses GDAL OSM driver — no osmium export command."""
-    _ensure_source(tmp_data_dir)
-    fm = _fm()
-    job = _job(tmp_data_dir, output_formats=["gpkg"], columns_mode="other_tags")
-
-    captured_cmds = []
-
-    async def fake_run_cmd(cmd, _job):
-        captured_cmds.append(list(cmd))
-        if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(b"")
-        return 0
-
-    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
-        with patch.object(fm, "_embed_attribution"):
-            with patch.object(fm, "_embed_provenance"):
-                await fm.run_job(job)
-
-    assert job.status == "done"
-    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
-    assert any(c[0] == "ogr2ogr" for c in captured_cmds)
-
-
 # ── osmium export failure sets status=error ──────────────────────────────────
 
 
@@ -169,45 +140,6 @@ async def test_gpkg_export_path_includes_perf_flags(tmp_data_dir):
     assert "OGR_SQLITE_SYNCHRONOUS" in ogr_cmd
 
 
-# ── gpkg + manual goes direct via osmconf, skipping osmium export ────────────
-
-
-async def test_gpkg_manual_uses_osmconf_and_skips_export(tmp_data_dir):
-    """gpkg+manual reads PBF directly with OSM_CONFIG_FILE; no osmium export."""
-    _ensure_source(tmp_data_dir)
-    fm = _fm()
-    job = _job(
-        tmp_data_dir,
-        output_formats=["gpkg"],
-        columns_mode="manual",
-        manual_keys=["name", "highway"],
-    )
-
-    captured_cmds = []
-
-    async def fake_run_cmd(cmd, _job):
-        captured_cmds.append(list(cmd))
-        if cmd[0] == "ogr2ogr":
-            # ogr2ogr <flags...> -f GPKG out.gpkg in.osm.pbf
-            out = Path(cmd[cmd.index("-f") + 2])
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(b"")
-        return 0
-
-    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
-        with patch.object(fm, "_embed_attribution"):
-            with patch.object(fm, "_embed_provenance"):
-                await fm.run_job(job)
-
-    assert job.status == "done"
-    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
-    ogr_cmd = next(c for c in captured_cmds if c[0] == "ogr2ogr")
-    assert "OSM_CONFIG_FILE" in ogr_cmd
-    cfg_idx = ogr_cmd.index("OSM_CONFIG_FILE")
-    cfg_path = Path(ogr_cmd[cfg_idx + 1])
-    assert cfg_path.name.endswith("_osmconf.ini")
-
-
 # ── gpkg + geojson must reuse shared geojson (no GDAL OSM driver OOM) ────────
 
 
@@ -252,3 +184,55 @@ async def test_gpkg_plus_geojson_reuses_shared_geojson_for_gpkg(tmp_data_dir):
     assert all("OSM_CONFIG_FILE" not in c for c in ogr_cmds)
     # Both ogr2ogr calls read from shared geojson (-sql path)
     assert all("-sql" in c for c in ogr_cmds)
+
+
+# ── F1: gpkg-only always uses osmium export path ──────────────────────────────
+
+
+async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
+    """F1: gpkg-only jobs must use the same osmium-export route as gpkg+geojson.
+
+    Before F1 fix: gpkg-only with other_tags or manual took the GDAL-OSM-driver
+    path (gpkg_direct), skipping osmium export entirely.  After fix: every
+    non-PBF format — including gpkg-only — always runs osmium export first and
+    then ogr2ogr on the shared geojson.  One route = one schema.
+    """
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(
+        tmp_data_dir,
+        output_formats=["gpkg"],
+        columns_mode="other_tags",
+    )
+
+    captured_cmds = []
+
+    async def fake_run_cmd(cmd, _job):
+        captured_cmds.append(list(cmd))
+        if cmd[0] == "osmium" and "export" in cmd:
+            out_path = Path(cmd[cmd.index("-o") + 1])
+            out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            out = Path(cmd[3])
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(b"")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    assert job.status == "done"
+    # Must have called osmium export (new unified route)
+    export_cmds = [c for c in captured_cmds if c[0] == "osmium" and "export" in c]
+    assert len(export_cmds) == 1, "gpkg-only must use osmium export (F1)"
+    # osmium export carries disk-backed node index
+    assert "--index-type=sparse_file_array,sparse_file_array" in export_cmds[0]
+    # ogr2ogr reads from shared geojson, NOT from PBF
+    ogr_cmds = [c for c in captured_cmds if c[0] == "ogr2ogr"]
+    assert len(ogr_cmds) == 1
+    assert "-sql" in ogr_cmds[0], "ogr2ogr must read from shared geojson via -sql"
+    # No OSM_CONFIG_FILE (GDAL driver path must be gone)
+    assert "OSM_CONFIG_FILE" not in ogr_cmds[0], "OSM_CONFIG_FILE must not appear (F1)"

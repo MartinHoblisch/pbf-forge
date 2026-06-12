@@ -12,7 +12,6 @@ orchestration error paths:
   - non-pbf-only path (intermediate filter into tmp)
   - exclude on non-pbf path
   - manual column-mode dispatch
-  - GPKG-other_tags routing through _build_ogr_cmd
   - attribution + provenance embedded after success
   - phase_started_at cleared on error so the FE elapsed-ticker stops
 """
@@ -265,38 +264,6 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
     filter_cmds = [c for c in captured_cmds if c[0] == "osmium" and c[1] == "tags-filter"]
     assert len(filter_cmds) == 2
     assert job.status == "done"
-
-
-# ── GPKG other_tags routing through _build_ogr_cmd ───────────────────────────
-
-
-async def test_run_job_gpkg_other_tags_uses_build_ogr_cmd_path(tmp_data_dir):
-    """columns_mode='other_tags' + format='gpkg' → uses _build_ogr_cmd
-    (GDAL OSM driver), skips osmium export step."""
-    _ensure_source(tmp_data_dir)
-    fm = _fm()
-    job = _job(tmp_data_dir, output_formats=["gpkg"], columns_mode="other_tags")
-
-    captured_cmds = []
-
-    async def fake_run_cmd(cmd, _job):
-        captured_cmds.append(list(cmd))
-        if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(b"")
-        return 0
-
-    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
-        with patch.object(fm, "_embed_attribution"):
-            with patch.object(fm, "_embed_provenance"):
-                await fm.run_job(job)
-
-    assert job.status == "done"
-    # No osmium export for other_tags+gpkg — GDAL OSM driver goes direct
-    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
-    # ogr2ogr was invoked via _run_cmd
-    assert any(c[0] == "ogr2ogr" for c in captured_cmds)
 
 
 # ── attribution + provenance embedded after success ──────────────────────────
