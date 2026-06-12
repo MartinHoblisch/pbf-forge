@@ -524,10 +524,12 @@ class DownloadManager:
                     state.speed_bps = 0.0
                     state.eta_seconds = 0.0
             else:
+                # D1: verify BEFORE stamping server mtime — a corrupt file must
+                # never look up_to_date after a backend restart.
+                self._verify_checksum(url, dest, session)
                 if mtime:
                     ts = mtime.timestamp()
                     os.utime(dest, (ts, ts))
-                self._verify_checksum(url, dest, session)
                 with self._lock:
                     state.status = "up_to_date"
                     state.local_size = dest.stat().st_size
@@ -572,8 +574,15 @@ class DownloadManager:
         actual_hex = h.hexdigest()
 
         if actual_hex != expected_hex:
+            quarantine = dest.with_name(dest.name + ".corrupt")
+            try:
+                dest.replace(quarantine)
+                hint = f"File quarantined as {quarantine.name}."
+            except OSError:
+                hint = "File left in place — delete it manually."
             raise RuntimeError(
-                f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}"
+                f"MD5 mismatch for {dest.name}: expected {expected_hex}, "
+                f"got {actual_hex}. {hint}"
             )
 
     def _do_download(
