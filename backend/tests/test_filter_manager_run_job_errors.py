@@ -177,7 +177,7 @@ async def test_run_job_invokes_reduce_for_manual_with_keys(tmp_data_dir):
 
     # F4: tags-filter now writes to pbf_work (tmp), not the final path.
     # The mock must write the -o target so shutil.move(pbf_work → pbf_out) succeeds.
-    async def fake_run_cmd(cmd, _j):
+    async def fake_run_cmd(cmd, _j, **_):
         if "-o" in cmd:
             Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x")
         return 0
@@ -214,7 +214,7 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             # Create the shared geojson so _get_fields can be called
@@ -250,7 +250,7 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
@@ -281,7 +281,7 @@ async def test_run_job_embeds_attribution_and_provenance(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["geojson"])
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
@@ -316,7 +316,7 @@ async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         # F4: tags-filter now writes to pbf_work (tmp); write the -o target so
         # shutil.move(pbf_work → pbf_out) succeeds without a real osmium binary.

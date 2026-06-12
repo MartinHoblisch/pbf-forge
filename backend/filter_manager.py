@@ -39,6 +39,13 @@ _FMT_EXT = {
 # (which would be interpreted as a CLI flag) or contain shell-special chars.
 _VALID_TAG = re.compile(r"^[^-\s\n\r\x00][^\n\r\x00]*$")
 
+# Stall watchdog: kill only when neither stdout activity nor output-file
+# growth happened for this long. Wall-clock rate limits killed healthy
+# processes on slow disks/bind mounts (audit F3).
+STALL_CHECK_INTERVAL = 2.0
+STALL_KILL_SECONDS = 300.0
+ABSOLUTE_TIMEOUT_SECONDS = 24 * 3600.0
+
 # Matches osmium/ogr2ogr progress lines such as "[======>   ] 45%" or "45%"
 _PROGRESS_RE = re.compile(r"\]\s*(\d{1,3})%|^(\d{1,3})%\s*$")
 
@@ -99,6 +106,8 @@ class FilterJob:
     speed_bps: float | None = None
     timeout_seconds: float | None = None
     queue_position: int | None = None
+    output_bytes: int | None = None
+    last_activity_at: float | None = None
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
     _proc_env: dict = field(default_factory=dict, init=False, repr=False)
     _nice_level: int = field(default=0, init=False, repr=False)
@@ -157,6 +166,8 @@ class FilterJob:
             "phase_percent": self.phase_percent,
             "speed_bps": self.speed_bps,
             "queue_position": self.queue_position,
+            "output_bytes": self.output_bytes,
+            "last_activity_at": self.last_activity_at,
         }
 
     def to_manifest_dict(self) -> dict:
@@ -370,7 +381,7 @@ class FilterManager:
         job.phase_started_at = job.job_started_at  # ticker starts immediately
         self._persist_jobs()
         total_bytes = sum(self._source_size(s) for s in job.source_files)
-        job.timeout_seconds = max(300.0, total_bytes / (10 * 1024 * 1024))
+        job.timeout_seconds = ABSOLUTE_TIMEOUT_SECONDS
 
         # Resource limits — computed once, carried on job for subprocess use
         threads, nice = self._resource_limits()
@@ -391,7 +402,9 @@ class FilterManager:
             lines.append(f"{_ts()}Exclude  : {', '.join(job.exclude_tags)}")
         if job.geometry_types:
             lines.append(f"{_ts()}Geometry : {', '.join(job.geometry_types)}")
-        lines.append(f"{_ts()}Timeout  : {int(job.timeout_seconds)}s")
+        lines.append(
+            f"{_ts()}Watchdog : stall-kill after {int(STALL_KILL_SECONDS)}s without progress"
+        )
         lines.append(f"{_ts()}Resources: {threads} threads, nice {nice}")
         job.append_log("\n".join(lines) + "\n")
 
@@ -442,7 +455,7 @@ class FilterManager:
                             str(pbf_work),
                             "--overwrite",
                         ]
-                        rc = await self._run_cmd(cmd, job)
+                        rc = await self._run_cmd(cmd, job, watch_path=pbf_work)
                         if rc != 0:
                             raise RuntimeError(f"osmium exited with code {rc}")
                         await self._finish_phase(job)
@@ -461,7 +474,7 @@ class FilterManager:
                                 str(excl_tmp),
                                 "--overwrite",
                             ]
-                            rc = await self._run_cmd(excl_cmd, job)
+                            rc = await self._run_cmd(excl_cmd, job, watch_path=excl_tmp)
                             if rc != 0:
                                 raise RuntimeError(f"osmium exclude pass exited with code {rc}")
                             shutil.move(str(excl_tmp), str(pbf_work))
@@ -490,7 +503,7 @@ class FilterManager:
                             str(intermediate),
                             "--overwrite",
                         ]
-                        rc = await self._run_cmd(cmd, job)
+                        rc = await self._run_cmd(cmd, job, watch_path=intermediate)
                         if rc != 0:
                             raise RuntimeError(f"osmium exited with code {rc}")
                         await self._finish_phase(job)
@@ -509,7 +522,7 @@ class FilterManager:
                                 str(excl_tmp),
                                 "--overwrite",
                             ]
-                            rc = await self._run_cmd(excl_cmd, job)
+                            rc = await self._run_cmd(excl_cmd, job, watch_path=excl_tmp)
                             if rc != 0:
                                 raise RuntimeError(f"osmium exclude pass exited with code {rc}")
                             intermediate = excl_tmp
@@ -554,6 +567,7 @@ class FilterManager:
                                     "--overwrite",
                                 ],
                                 job,
+                                watch_path=shared_geojson,
                             )
                             if rc != 0:
                                 raise RuntimeError(f"osmium export exited with code {rc}")
@@ -582,7 +596,7 @@ class FilterManager:
                                 "OGR_SQLITE_SYNCHRONOUS",
                                 "OFF",
                             ]
-                        rc = await self._run_cmd(cmd, job)
+                        rc = await self._run_cmd(cmd, job, watch_path=work_file)
 
                         if rc != 0:
                             raise RuntimeError(f"Conversion exited with code {rc}")
@@ -701,6 +715,7 @@ class FilterManager:
         job.phase_started_at = time.time()
         job.phase_percent = None
         job.speed_bps = None
+        job.output_bytes = None
         n, m = job.current_phase_index + 1, len(job.phases)
         label = job.phases[job.current_phase_index].label
         job.append_log(f"{_ts()}--- Phase {n}/{m}: {label} ---\n")
@@ -1056,7 +1071,7 @@ class FilterManager:
             job.append_log(f"\n--- kernel log tail ({cmd[0]}) ---\n{tail}\n--- end ---\n")
             return
 
-    async def _run_cmd(self, cmd: list[str], job: FilterJob) -> int:
+    async def _run_cmd(self, cmd: list[str], job: FilterJob, watch_path: Path | None = None) -> int:
         if job._nice_level > 0:
             cmd = ["nice", "-n", str(job._nice_level), *cmd]
         job.append_log(f"\n$ {' '.join(cmd)}\n")
@@ -1072,11 +1087,31 @@ class FilterManager:
             raise RuntimeError("subprocess stdout is None despite PIPE")
 
         self._procs[job.id] = proc
+        job.last_activity_at = time.time()
+        stalled = False
 
         async def _heartbeat() -> None:
+            nonlocal stalled
+            last_size = -1
             try:
                 while True:
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(STALL_CHECK_INTERVAL)
+                    if watch_path is not None:
+                        try:
+                            size = watch_path.stat().st_size
+                        except OSError:
+                            size = -1
+                        if size > last_size:
+                            last_size = size
+                            job.output_bytes = size
+                            job.last_activity_at = time.time()
+                    if time.time() - (job.last_activity_at or 0) > STALL_KILL_SECONDS:
+                        stalled = True
+                        try:
+                            proc.kill()
+                        except OSError:
+                            pass
+                        return
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
             except asyncio.CancelledError:
                 pass
@@ -1093,6 +1128,7 @@ class FilterManager:
                 if not chunk:
                     break
                 buf += chunk
+                job.last_activity_at = time.time()
                 segments = re.split(rb"[\r\n]", buf)
                 buf = segments[-1]
                 for seg in segments[:-1]:
@@ -1133,13 +1169,23 @@ class FilterManager:
                 proc.kill()
             except OSError:
                 pass
-            raise RuntimeError(f"Subprocess timed out after {job.timeout_seconds:.0f}s")
+            raise RuntimeError(
+                f"Subprocess exceeded absolute limit of {job.timeout_seconds / 3600:.0f}h"
+            )
         finally:
             heartbeat_task.cancel()
             await asyncio.gather(heartbeat_task, return_exceptions=True)
             self._procs.pop(job.id, None)
 
         await proc.wait()
+
+        if stalled:
+            raise RuntimeError(
+                f"No progress for {STALL_KILL_SECONDS:.0f}s (output file not "
+                f"growing, no log output) — process killed. A very slow disk "
+                f"only triggers this on total silence; retry if unsure."
+            )
+
         rc = proc.returncode
         if rc is not None and rc < 0:
             sig = -rc

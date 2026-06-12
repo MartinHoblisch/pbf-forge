@@ -56,7 +56,7 @@ async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
     export_call_count = {"n": 0}
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             export_call_count["n"] += 1
@@ -93,7 +93,7 @@ async def test_osmium_export_failure_sets_error(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["geojson"], columns_mode="all")
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         if cmd[0] == "osmium" and "export" in cmd:
             return 1  # export fails
         return 0
@@ -117,7 +117,7 @@ async def test_gpkg_export_path_includes_perf_flags(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
@@ -158,7 +158,7 @@ async def test_gpkg_plus_geojson_reuses_shared_geojson_for_gpkg(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
@@ -207,7 +207,7 @@ async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])

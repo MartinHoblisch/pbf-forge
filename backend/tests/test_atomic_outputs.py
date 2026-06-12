@@ -60,7 +60,7 @@ async def test_failed_export_leaves_no_final_file(tmp_data_dir):
         output_dir=str(out_dir),
     )
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         # tags-filter: write the -o file and succeed
         if cmd[0] == "osmium" and "tags-filter" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
@@ -112,7 +112,7 @@ async def test_failed_exclude_leaves_no_final_pbf(tmp_data_dir):
         output_dir=str(out_dir),
     )
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         # tags-filter: write the -o file and succeed (whether pbf_work or pbf_out)
         if cmd[0] == "osmium" and "tags-filter" in cmd and "--invert-match" not in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
@@ -152,7 +152,7 @@ async def test_successful_job_publishes_outputs(tmp_data_dir):
         output_dir=str(out_dir),
     )
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         if cmd[0] == "osmium" and "tags-filter" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.parent.mkdir(parents=True, exist_ok=True)

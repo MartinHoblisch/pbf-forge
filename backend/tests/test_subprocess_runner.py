@@ -139,7 +139,9 @@ async def test_timeout_kills_process_and_raises():
     proc.returncode = -9
 
     with patch("asyncio.create_subprocess_exec", return_value=proc):
-        with pytest.raises(RuntimeError, match="timed out"):
+        with pytest.raises(RuntimeError, match="absolute limit"):
+            # Now raises "exceeded absolute limit of Xh" (F3: stall watchdog replaces
+            # the old wall-clock rate; TimeoutError path still kills + raises)
             await fm._run_cmd(["sleep", "10"], job)
 
     proc.kill.assert_called_once()
