@@ -72,8 +72,22 @@ def test_verify_runs_before_utime(dm, tmp_path, monkeypatch):
 
     dm._download_worker(filename, threading.Event())
 
-    assert "verify" in order and "utime" in order
-    assert order.index("verify") < order.index("utime")
+    assert order == ["download", "verify", "utime"]
+
+
+def test_mismatch_overwrites_existing_quarantine(dm, tmp_path):
+    """Policy: a newer corrupt download overwrites an older .corrupt file."""
+    dest = tmp_path / "berlin.osm.pbf"
+    dest.write_bytes(b"new corrupt content")
+    old = tmp_path / "berlin.osm.pbf.corrupt"
+    old.write_bytes(b"old corrupt content")
+    session = _Session("0" * 32 + "  berlin.osm.pbf\n")
+
+    with pytest.raises(RuntimeError, match="MD5 mismatch"):
+        dm._verify_checksum("http://example.com/berlin.osm.pbf", dest, session)
+
+    assert not dest.exists()
+    assert old.read_bytes() == b"new corrupt content"
 
 
 def test_mismatch_quarantines_file(dm, tmp_path):

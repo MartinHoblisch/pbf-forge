@@ -553,6 +553,7 @@ class DownloadManager:
 
         Fails closed: any error (network, parse, mismatch) raises RuntimeError
         so the download is marked error and osmium is never invoked on the file.
+        Caller must ensure *dest* exists.
         """
         md5_url = url + ".md5"
         try:
