@@ -429,11 +429,12 @@ class DownloadManager:
                 # mix old and new bytes (guaranteed MD5 failure later).
                 start_byte = 0
                 if part.exists():
-                    part_mtime = datetime.fromtimestamp(part.stat().st_mtime, tz=timezone.utc)
+                    st = part.stat()
+                    part_mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
                     if mtime is not None and mtime > part_mtime:
                         part.unlink(missing_ok=True)
                     else:
-                        start_byte = part.stat().st_size
+                        start_byte = st.st_size
 
                 # Disk-space pre-check (avoid filling /data and crashing the host)
                 needed = max(0, size - start_byte) + MIN_FREE_DISK_BUFFER
@@ -522,11 +523,17 @@ class DownloadManager:
                         break  # exit fast retry loop (slow loop handled everything)
 
             if cancel.is_set():
+                # .part intentionally kept on disk — resume base for the next attempt.
                 with self._lock:
                     state.status = "unknown"
                     state.speed_bps = 0.0
                     state.eta_seconds = 0.0
             else:
+                if not part.exists():
+                    raise RuntimeError(
+                        f"Download of {filename!r} produced no output "
+                        f"(server returned 416 with no partial file present)"
+                    )
                 # D1: verify BEFORE stamping server mtime — a corrupt file must
                 # never look up_to_date after a backend restart.
                 # D2: verify the .part file, then atomically rename to dest.

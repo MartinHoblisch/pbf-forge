@@ -406,7 +406,7 @@ def test_verify_checksum_bad_md5_content_raises(tmp_data_dir):
 def test_download_worker_checksum_failure_marks_error(tmp_data_dir):
     """Checksum mismatch after download → status error, not up_to_date."""
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
+    dest = tmp_data_dir / (filename + ".part")
     dest.write_bytes(b"x" * 100)
 
     dm = _make_dm(tmp_data_dir)

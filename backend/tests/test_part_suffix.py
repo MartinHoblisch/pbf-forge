@@ -74,6 +74,21 @@ def test_stale_part_discarded_when_server_newer(dm, tmp_path, monkeypatch):
     assert captured["start_byte"] == 0
 
 
+def test_416_without_part_raises_clean_error(dm, tmp_path, monkeypatch):
+    """A 416 on a fresh download (no .part) must yield a clear error, not FileNotFoundError."""
+    captured = {}
+    mtime = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    filename = _prep(dm, tmp_path, monkeypatch, mtime, captured)
+    # simulate server 416 with nothing written: _do_download returns without writing
+    monkeypatch.setattr(dm, "_do_download", lambda *a, **k: None)
+
+    dm._download_worker(filename, threading.Event())
+
+    state = dm._files[filename]
+    assert state.status == "error"
+    assert "produced no output" in (state.error or "")
+
+
 def test_part_files_invisible_to_filter_and_downloads(dm, tmp_path, monkeypatch):
     (tmp_path / "berlin.osm.pbf.part").write_bytes(b"y" * 10)
 

@@ -385,7 +385,7 @@ def test_slow_retry_bubbles_other_exception(tmp_data_dir):
     (e.g. unexpected ValueError). Must bubble up to the outer handler and
     mark status=error — NOT continue spinning the slow loop forever."""
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
+    dest = tmp_data_dir / (filename + ".part")
     dest.write_bytes(b"")
 
     dm = _make_dm(tmp_data_dir)
