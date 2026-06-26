@@ -252,19 +252,15 @@ textarea { resize: vertical; min-height: 90px; font-family: inherit; }
 
 /* ── Job progress ── */
 .job-progress { margin-bottom: .5rem; }
-.job-progress-bar-bg {
-  height: 6px;
-  background: var(--border);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 4px;
+.job-progress-bar-pulse {
+  height: 6px; border-radius: 3px; overflow: hidden;
+  background: repeating-linear-gradient(45deg, var(--blue) 0 8px, #cfe3fb 8px 16px);
+  background-size: 200% 100%;
+  animation: pulse-slide 1.1s linear infinite;
 }
-.job-progress-bar-fill {
-  height: 100%;
-  background: var(--blue);
-  border-radius: 3px;
-  transition: width .4s ease;
-}
+.job-progress-bar-pulse.idle { animation: none; opacity: .4; }
+@keyframes pulse-slide { from { background-position: 0 0; } to { background-position: 32px 0; } }
+.job-stall-warn { color: var(--orange); font-size: .8rem; margin-top: .25rem; }
 .job-progress-meta {
   display: flex;
   justify-content: space-between;
@@ -1005,6 +1001,8 @@ const TRANSLATIONS = {
     eta_large_file_hint: 'Hinweis: Sehr große Quelldatei. Filterung kann je nach Hardware mehrere Stunden dauern.',
     err_url_not_pbf: 'URL muss auf .osm.pbf enden.',
     job_step: (i, n) => `Schritt ${i} von ${n}:`,
+    job_written: w => `${w} geschrieben`,
+    job_stall_warn: d => `Kein Fortschritt seit ${d} — Job hängt möglicherweise.`,
     err_server: 'Serverfehler',
     err_conn: msg => 'Verbindungsfehler: ' + msg,
     err_preset_name: 'Bitte einen Namen eingeben.',
@@ -1166,6 +1164,8 @@ const TRANSLATIONS = {
     eta_large_file_hint: 'Note: Very large source file. Filtering may take several hours depending on hardware.',
     err_url_not_pbf: 'URL must end with .osm.pbf.',
     job_step: (i, n) => `Step ${i} of ${n}:`,
+    job_written: w => `${w} written`,
+    job_stall_warn: d => `No progress for ${d} — the job may be stuck.`,
     err_server: 'Server error',
     err_conn: msg => 'Connection error: ' + msg,
     err_preset_name: 'Please enter a name.',
@@ -1821,13 +1821,6 @@ function _updateFilterHints() {
   }
 }
 
-function _jobProgressPct(j) {
-  if (!j.phases || !j.phases.length) return 0;
-  const total = j.phases.reduce((s, p) => s + p.weight, 0);
-  if (total <= 0) return 0;
-  const done = j.phases.slice(0, j.current_phase_index || 0).reduce((s, p) => s + p.weight, 0);
-  return Math.min(100, Math.round(done / total * 100));
-}
 
 function renderFilterJobs() {
   const el = document.getElementById('filter-jobs-list');
@@ -1868,13 +1861,15 @@ function renderFilterJobs() {
       progressHtml = `<div style="font-size:.82rem;color:var(--gray);padding:.25rem 0">${t('job_queued')}${escHtml(pos)}</div>`;
     } else if (showProgress) {
       runningIds.add(j.id);
-      const pct = _jobProgressPct(j);
-      const speedStr = fmtSpeed(j.speed_bps);
       const phaseIdx = j.current_phase_index || 0;
       const totalPhases = j.phases.length;
       const curPhase = j.phases[phaseIdx];
       const phaseLabel = curPhase ? curPhase.label : '';
       const elapsedPhase = j.phase_started_at ? nowSec - j.phase_started_at : 0;
+      const lastAct = j.last_activity_at ? nowSec - j.last_activity_at : null;
+      const alive = lastAct != null && lastAct < 10;
+      const stalled = lastAct != null && lastAct > 120;
+      const written = j.output_bytes != null ? fmtSize(j.output_bytes) : null;
       const lastActivity = (() => {
         if (!j.log) return '';
         const lines = j.log.trimEnd().split('\n');
@@ -1887,18 +1882,14 @@ function renderFilterJobs() {
 
       progressHtml = `
         <div class="job-progress">
-          <div class="job-progress-bar-bg">
-            <div class="job-progress-bar-fill" style="width:${pct}%"></div>
-          </div>
-          <div class="job-progress-meta">
-            <span>${pct}%</span>
-            ${speedStr ? `<span>${escHtml(speedStr)}</span>` : ''}
-          </div>
+          <div class="job-progress-bar-pulse${alive ? '' : ' idle'}"></div>
           <div class="job-phase-text">
             ${t('job_step', phaseIdx + 1, totalPhases)} ${escHtml(phaseLabel)}
             — <span id="phase-elapsed-${escHtml(j.id)}"
                     data-started="${j.phase_started_at || ''}">${formatDuration(elapsedPhase)}</span>
+            ${written ? ` · ${t('job_written', written)}` : ''}
           </div>
+          ${stalled ? `<div class="job-stall-warn">${t('job_stall_warn', formatDuration(lastAct))}</div>` : ''}
           ${lastActivity ? `<div class="job-activity">${escHtml(lastActivity)}</div>` : ''}
         </div>`;
     }

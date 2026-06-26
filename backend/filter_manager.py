@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import collections
 import gc
 import json
 import logging
@@ -49,9 +48,6 @@ RISK_RAM_FACTOR = 0.5
 STALL_CHECK_INTERVAL = 2.0
 STALL_KILL_SECONDS = 300.0
 ABSOLUTE_TIMEOUT_SECONDS = 24 * 3600.0
-
-# Matches osmium/ogr2ogr progress lines such as "[======>   ] 45%" or "45%"
-_PROGRESS_RE = re.compile(r"\]\s*(\d{1,3})%|^(\d{1,3})%\s*$")
 
 
 def _ts() -> str:
@@ -106,8 +102,6 @@ class FilterJob:
     current_phase_index: int = 0
     phase_started_at: float | None = None
     job_started_at: float | None = None
-    phase_percent: int | None = None
-    speed_bps: float | None = None
     timeout_seconds: float | None = None
     queue_position: int | None = None
     output_bytes: int | None = None
@@ -167,8 +161,6 @@ class FilterJob:
             "current_phase_index": self.current_phase_index,
             "phase_started_at": self.phase_started_at,
             "job_started_at": self.job_started_at,
-            "phase_percent": self.phase_percent,
-            "speed_bps": self.speed_bps,
             "queue_position": self.queue_position,
             "output_bytes": self.output_bytes,
             "last_activity_at": self.last_activity_at,
@@ -260,7 +252,6 @@ class FilterManager:
                 job.output_files = entry.get("output_files", [])
                 job.error = entry.get("error")
                 job.current_phase_index = entry.get("current_phase_index", 0)
-                job.phase_percent = entry.get("phase_percent")
                 lf = entry.get("log_file")
                 if lf:
                     job._log_path = Path(lf)
@@ -760,8 +751,6 @@ class FilterManager:
         if job.current_phase_index >= len(job.phases):
             return
         job.phase_started_at = time.time()
-        job.phase_percent = None
-        job.speed_bps = None
         job.output_bytes = None
         n, m = job.current_phase_index + 1, len(job.phases)
         label = job.phases[job.current_phase_index].label
@@ -784,7 +773,6 @@ class FilterManager:
         job.append_log(f"{_ts()}Phase {n}/{m} done in {duration:.1f}s\n")
         job.current_phase_index += 1
         job.phase_started_at = None
-        job.speed_bps = None
         await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
 
     def _build_phases(self, job: FilterJob) -> list[Phase]:
@@ -1167,9 +1155,6 @@ class FilterManager:
             loop = asyncio.get_running_loop()
             last_broadcast = loop.time()
             buf = b""
-            total_bytes = sum(self._source_size(s) for s in job.source_files)
-            # 10-second sliding window: (monotonic_time, bytes_processed)
-            speed_window: collections.deque[tuple[float, float]] = collections.deque()
             while True:
                 chunk = await proc.stdout.read(4096)
                 if not chunk:
@@ -1183,21 +1168,6 @@ class FilterManager:
                     if not text:
                         continue
                     job.append_log(text + "\n")
-                    m = _PROGRESS_RE.search(text)
-                    if m:
-                        job.phase_percent = int(m.group(1) or m.group(2))
-                        if total_bytes > 0:
-                            now_mono = loop.time()
-                            processed = (job.phase_percent / 100) * total_bytes
-                            speed_window.append((now_mono, processed))
-                            cutoff = now_mono - 10.0
-                            while speed_window and speed_window[0][0] < cutoff:
-                                speed_window.popleft()
-                            if len(speed_window) >= 2:
-                                t0, b0 = speed_window[0]
-                                t1, b1 = speed_window[-1]
-                                dt = t1 - t0
-                                job.speed_bps = (b1 - b0) / dt if dt > 0 else None
                 now = loop.time()
                 if now - last_broadcast >= 0.5:
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
