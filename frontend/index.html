@@ -1965,7 +1965,7 @@ let _riskResolve = null;
 function _showRiskModal(risk) {
   const gb = b => (b / 1024 ** 3).toFixed(1);
   document.getElementById('risk-desc').textContent =
-    t('risk_desc', gb(risk.source_bytes), gb(risk.available_ram_bytes),
+    t('risk_desc', gb(risk.source_bytes), gb(risk.total_ram_bytes),
       risk.formats.map(f => f.toUpperCase()).join(', '));
   document.getElementById('modal-risk').style.display = 'flex';
   document.getElementById('btn-risk-cancel').focus();

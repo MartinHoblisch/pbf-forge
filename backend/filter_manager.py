@@ -368,6 +368,13 @@ class FilterManager:
         job, so the source size serves as an upper-bound proxy: big source +
         non-PBF format on a small-RAM machine is the combination that OOMs in
         practice. PBF-only jobs stream end-to-end and are always safe.
+
+        RAM is measured as MemTotal (not MemAvailable) — a deliberate choice.
+        Using MemTotal gives a deterministic, load-independent structural bound
+        that makes the pre-flight warning reproducible regardless of current
+        system load. This is consistent with how _compute_max_parallel() sizes
+        the job queue. The key is therefore named total_ram_bytes, not
+        available_ram_bytes.
         """
         non_pbf = [f for f in output_formats if f != "pbf"]
         if not non_pbf:
@@ -380,7 +387,7 @@ class FilterManager:
             return {
                 "level": "high",
                 "source_bytes": total,
-                "available_ram_bytes": ram,
+                "total_ram_bytes": ram,
                 "formats": non_pbf,
             }
         return None
@@ -708,11 +715,12 @@ class FilterManager:
     def _preflight_warnings(self, job: FilterJob, total_source_bytes: int) -> None:
         """Append disk-space warning to job log. Never blocks the job.
 
-        RAM-based heuristic was removed once sparse_file_array (osmium export),
-        shared-geojson reuse (GPKG), and streaming GeoJSON metadata embed
-        brought pipeline peak RSS down to ~1–2 GB even on Europe-scale jobs.
-        The old `source_size × 0.4` estimate produced false alarms scaring
-        users away from valid jobs.
+        Per-job RAM risk is now assessed by assess_job_risk() (Gate 0), which
+        shows a pre-start confirmation dialog when source size exceeds 50% of
+        MemTotal. That replaces the old in-log `source_size × 0.4 RSS` estimate
+        which produced false alarms on trimmed-down jobs. This method therefore
+        handles only the disk-space check after the filter pass — there is no
+        RAM heuristic here, but RAM risk is not ignored; it lives in Gate 0.
         """
         warnings: list[str] = []
 
