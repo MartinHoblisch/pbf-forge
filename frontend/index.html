@@ -777,7 +777,7 @@ footer .credits-sep { color: var(--border); }
 <div id="overlay-onboarding" class="overlay" style="display:none">
   <div class="overlay-box">
     <h2 data-i18n="onboard_title">Arbeitsverzeichnis einrichten</h2>
-    <p data-i18n="onboard_p">Bitte das Verzeichnis angeben, in dem OSM-PBF-Dateien gespeichert werden sollen. Das Verzeichnis muss auf dem Host-System existieren.</p>
+    <p data-i18n="onboard_p">PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf deinem Computer. Gib hier den vollständigen Pfad an — der Ordner wird angelegt, falls er noch nicht existiert. Dort findest du später deine Ergebnisse.</p>
     <div class="form-group">
       <label class="field-label" data-i18n="onboard_label">Verzeichnis (Windows-Pfad)</label>
       <div class="path-input-wrap">
@@ -794,7 +794,7 @@ footer .credits-sep { color: var(--border); }
 <div id="overlay-lock" class="overlay" style="display:none">
   <div class="overlay-box" style="text-align:center">
     <h2 data-i18n="lock_title">Neustart erforderlich</h2>
-    <p id="lock-p">Das Datenverzeichnis wurde gesetzt. Bitte <strong>start.bat</strong> erneut ausführen, damit die Änderung wirksam wird.</p>
+    <p id="lock-p">Das Datenverzeichnis wurde gesetzt. Bitte führe jetzt <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) erneut aus. Diese Seite erkennt den Neustart automatisch und lädt sich neu.</p>
     <div class="lock-path-badge" id="lock-path"></div>
     <div class="lock-spinner-wrap">
       <div class="spinner-lg"></div>
@@ -1022,7 +1022,7 @@ const TRANSLATIONS = {
     fb_confirm: 'Diesen Ordner wählen',
     fb_err_conn: 'Verbindungsfehler',
     onboard_title: 'Arbeitsverzeichnis einrichten',
-    onboard_p: 'Bitte das Verzeichnis angeben, in dem OSM-PBF-Dateien gespeichert werden sollen. Das Verzeichnis muss auf dem Host-System existieren.',
+    onboard_p: 'PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf deinem Computer. Gib hier den vollständigen Pfad an — der Ordner wird angelegt, falls er noch nicht existiert. Dort findest du später deine Ergebnisse.',
     onboard_label: 'Verzeichnis (Windows-Pfad)',
     onboard_browse: '📂 Durchsuchen',
     onboard_save: 'Speichern &amp; Neustart vorbereiten',
@@ -1030,8 +1030,8 @@ const TRANSLATIONS = {
     onboard_err_server: 'Serverfehler beim Speichern.',
     onboard_err_conn: msg => 'Verbindungsfehler: ' + msg,
     lock_title: 'Neustart erforderlich',
-    lock_p: 'Das Datenverzeichnis wurde gesetzt. Bitte <strong>start.bat</strong> erneut ausführen, damit die Änderung wirksam wird.',
-    lock_waiting: 'Warte auf Neustart …',
+    lock_p: 'Das Datenverzeichnis wurde gesetzt. Bitte führe jetzt <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) erneut aus. Diese Seite erkennt den Neustart automatisch und lädt sich neu.',
+    lock_waiting: 'Warte auf Neustart — Seite aktualisiert sich danach automatisch …',
     cd_title: 'Verzeichnis ändern',
     cd_p: 'Nach dem Speichern muss <strong>start.bat</strong> neu ausgeführt werden, damit die Änderung wirksam wird.',
     cd_label: 'Neues Verzeichnis (Windows-Pfad)',
@@ -1185,7 +1185,7 @@ const TRANSLATIONS = {
     fb_confirm: 'Select this folder',
     fb_err_conn: 'Connection error',
     onboard_title: 'Set up working directory',
-    onboard_p: 'Please specify the directory where OSM PBF files should be stored. The directory must exist on the host system.',
+    onboard_p: 'PBF Forge stores all map files (downloads and export results) in one folder on your computer. Enter its full path here — the folder is created if it does not exist yet. This is where you will find your results later.',
     onboard_label: 'Directory (Windows path)',
     onboard_browse: '📂 Browse',
     onboard_save: 'Save &amp; prepare restart',
@@ -1193,8 +1193,8 @@ const TRANSLATIONS = {
     onboard_err_server: 'Server error while saving.',
     onboard_err_conn: msg => 'Connection error: ' + msg,
     lock_title: 'Restart required',
-    lock_p: 'The data directory has been set. Please run <strong>start.bat</strong> again for the change to take effect.',
-    lock_waiting: 'Waiting for restart…',
+    lock_p: 'The data directory has been set. Now run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux) again. This page detects the restart automatically and reloads itself.',
+    lock_waiting: 'Waiting for restart — this page will refresh automatically …',
     cd_title: 'Change directory',
     cd_p: 'After saving, <strong>start.bat</strong> must be run again for the change to take effect.',
     cd_label: 'New directory (Windows path)',
@@ -1283,6 +1283,18 @@ async function loadSettings() {
   applySettingsState();
 }
 
+let _lockPoll = null;
+function _startLockPolling() {
+  if (_lockPoll) return;
+  _lockPoll = setInterval(async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const s = await res.json();
+      if (s.configured && !s.pending_restart) location.reload();
+    } catch { /* backend is restarting — keep polling */ }
+  }, 3000);
+}
+
 function applySettingsState() {
   const { configured, pending_restart, host_data_dir } = settingsState;
   if (!configured) {
@@ -1290,6 +1302,7 @@ function applySettingsState() {
   } else if (pending_restart) {
     document.getElementById('lock-path').textContent = host_data_dir;
     _showOverlay('lock');
+    _startLockPolling();
   } else {
     _showOverlay(null);
     const badge = document.getElementById('dir-badge');
@@ -1330,6 +1343,7 @@ async function saveDataDir() {
   settingsState = { configured: true, host_data_dir: path, pending_restart: true };
   document.getElementById('lock-path').textContent = path;
   _showOverlay('lock');
+  _startLockPolling();
 }
 
 function openChangeDirModal() {
@@ -1351,6 +1365,7 @@ async function saveChangedDir() {
   settingsState = { configured: true, host_data_dir: path, pending_restart: true };
   document.getElementById('lock-path').textContent = path;
   _showOverlay('lock');
+  _startLockPolling();
 }
 
 // ─── Resource limits ──────────────────────────────────────────────────────────
