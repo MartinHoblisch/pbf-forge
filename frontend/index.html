@@ -887,6 +887,18 @@ footer .credits-sep { color: var(--border); }
   </div>
 </div>
 
+<!-- ── Job risk confirmation modal (Gate 0) ── -->
+<div id="modal-risk" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h2 data-i18n="risk_title">Dieser Job wird wahrscheinlich scheitern</h2>
+    <p id="risk-desc"></p>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button class="btn btn-primary" id="btn-risk-cancel" data-i18n="risk_cancel">Abbrechen (empfohlen)</button>
+      <button class="btn btn-danger" id="btn-risk-confirm" data-i18n="risk_confirm">Trotzdem starten</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── i18n ────────────────────────────────────────────────────────────────────
 const TRANSLATIONS = {
@@ -1033,6 +1045,13 @@ const TRANSLATIONS = {
     ow_desc: 'Folgende Dateien existieren bereits und würden überschrieben:',
     ow_cancel: 'Abbrechen',
     ow_confirm: 'Überschreiben',
+    risk_title: 'Dieser Job wird wahrscheinlich scheitern',
+    risk_desc: (srcGb, ramGb, fmts) =>
+      `Quelldaten ${srcGb} GB, Format ${fmts}, System-RAM ${ramGb} GB: ` +
+      `Diese Kombination kann den Arbeitsspeicher sprengen und nach langer Laufzeit abbrechen. ` +
+      `Empfehlung: engerer Filter, kleinerer Extrakt, oder Format PBF (immer speichersicher).`,
+    risk_cancel: 'Abbrechen (empfohlen)',
+    risk_confirm: 'Trotzdem starten',
     resource_title: 'Ressourcen-Limits',
     resource_desc: 'Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.',
     resource_preset_full: '⚡ Vollgas',
@@ -1187,6 +1206,13 @@ const TRANSLATIONS = {
     ow_desc: 'The following files already exist and would be overwritten:',
     ow_cancel: 'Cancel',
     ow_confirm: 'Overwrite',
+    risk_title: 'This job is likely to fail',
+    risk_desc: (srcGb, ramGb, fmts) =>
+      `Source data ${srcGb} GB, format ${fmts}, system RAM ${ramGb} GB: ` +
+      `this combination can exhaust memory and die after a long run. ` +
+      `Recommendation: a narrower filter, a smaller extract, or PBF output (always memory-safe).`,
+    risk_cancel: 'Cancel (recommended)',
+    risk_confirm: 'Start anyway',
     label_suffix: 'Suffix',
     resource_title: 'Resource Limits',
     resource_desc: 'Takes effect on the next job start. No restart needed.',
@@ -1933,6 +1959,24 @@ function _closeOverwriteModal(result) {
   if (_owResolve) { _owResolve(result); _owResolve = null; }
 }
 
+// ─── Risk modal (Gate 0) ──────────────────────────────────────────────────────
+let _riskResolve = null;
+
+function _showRiskModal(risk) {
+  const gb = b => (b / 1024 ** 3).toFixed(1);
+  document.getElementById('risk-desc').textContent =
+    t('risk_desc', gb(risk.source_bytes), gb(risk.available_ram_bytes),
+      risk.formats.map(f => f.toUpperCase()).join(', '));
+  document.getElementById('modal-risk').style.display = 'flex';
+  document.getElementById('btn-risk-cancel').focus();
+  return new Promise(resolve => { _riskResolve = resolve; });
+}
+
+function _closeRiskModal(result) {
+  document.getElementById('modal-risk').style.display = 'none';
+  if (_riskResolve) { _riskResolve(result); _riskResolve = null; }
+}
+
 async function runFilter() {
   const errEl = document.getElementById('filter-error');
   errEl.style.display = 'none';
@@ -1983,11 +2027,16 @@ async function runFilter() {
       errEl.style.display = 'block';
       return;
     }
-    const { would_overwrite } = await checkRes.json();
+    const { would_overwrite, risk } = await checkRes.json();
 
     if (would_overwrite.length > 0) {
       const confirmed = await _showOverwriteModal(would_overwrite);
       if (!confirmed) return;
+    }
+
+    if (risk && risk.level === 'high') {
+      const goAhead = await _showRiskModal(risk);
+      if (!goAhead) return;
     }
 
     const res  = await fetch('/api/filter/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -2201,6 +2250,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Overwrite modal buttons
   document.getElementById('btn-ow-cancel').addEventListener('click', () => _closeOverwriteModal(false));
   document.getElementById('btn-ow-confirm').addEventListener('click', () => _closeOverwriteModal(true));
+
+  // Risk modal buttons (Gate 0)
+  document.getElementById('btn-risk-cancel').addEventListener('click', () => _closeRiskModal(false));
+  document.getElementById('btn-risk-confirm').addEventListener('click', () => _closeRiskModal(true));
 
   connectWs();
   loadFiles();

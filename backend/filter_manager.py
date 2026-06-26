@@ -39,6 +39,10 @@ _FMT_EXT = {
 # (which would be interpreted as a CLI flag) or contain shell-special chars.
 _VALID_TAG = re.compile(r"^[^-\s\n\r\x00][^\n\r\x00]*$")
 
+# Gate 0: flag non-PBF jobs where total source size exceeds this fraction of
+# system RAM. PBF-only jobs stream end-to-end and are never flagged.
+RISK_RAM_FACTOR = 0.5
+
 # Stall watchdog: kill only when neither stdout activity nor output-file
 # growth happened for this long. Wall-clock rate limits killed healthy
 # processes on slow disks/bind mounts (audit F3).
@@ -355,6 +359,41 @@ class FilterManager:
             for p in self.compute_output_paths(source_files, suffix, output_formats, output_dir)
             if p.exists()
         ]
+
+    def assess_job_risk(self, source_files: list[str], output_formats: list[str]) -> dict | None:
+        """Gate 0 (audit V6): cheap pre-job RAM-risk estimate.
+
+        The GeoJSON conversion step loads the whole filtered GeoJSON into RAM
+        (10-20x its size, verified). The filtered size is unknown before the
+        job, so the source size serves as an upper-bound proxy: big source +
+        non-PBF format on a small-RAM machine is the combination that OOMs in
+        practice. PBF-only jobs stream end-to-end and are always safe.
+        """
+        non_pbf = [f for f in output_formats if f != "pbf"]
+        if not non_pbf:
+            return None
+        ram = self._meminfo_total_bytes()
+        if ram is None:
+            return None
+        total = sum(self._source_size(s) for s in source_files)
+        if total > ram * RISK_RAM_FACTOR:
+            return {
+                "level": "high",
+                "source_bytes": total,
+                "available_ram_bytes": ram,
+                "formats": non_pbf,
+            }
+        return None
+
+    @staticmethod
+    def _meminfo_total_bytes() -> int | None:
+        try:
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) * 1024
+        except (OSError, ValueError, IndexError):
+            return None
+        return None
 
     async def run_job(self, job: FilterJob) -> None:
         if self._running_count >= self._max_parallel:
