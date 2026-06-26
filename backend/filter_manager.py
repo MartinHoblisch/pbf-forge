@@ -415,6 +415,7 @@ class FilterManager:
         job.phases = self._build_phases(job)
         job.current_phase_index = 0
         job.job_started_at = time.time()
+        job.last_activity_at = job.job_started_at
         job.phase_started_at = job.job_started_at  # ticker starts immediately
         self._persist_jobs()
         total_bytes = sum(self._source_size(s) for s in job.source_files)
