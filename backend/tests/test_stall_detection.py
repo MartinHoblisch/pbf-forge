@@ -7,6 +7,7 @@ signals (output-file growth, stdout/stderr activity, /proc-IO counters);
 prolonged silence produces a log warning, and only the absolute timeout
 kills the process.
 """
+
 from __future__ import annotations
 
 import sys

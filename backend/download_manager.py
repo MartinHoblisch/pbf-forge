@@ -594,8 +594,7 @@ class DownloadManager:
             except OSError:
                 hint = "File left in place — delete it manually."
             raise RuntimeError(
-                f"MD5 mismatch for {dest.name}: expected {expected_hex}, "
-                f"got {actual_hex}. {hint}"
+                f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}. {hint}"
             )
 
     def _do_download(

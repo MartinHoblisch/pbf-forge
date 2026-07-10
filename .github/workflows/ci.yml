@@ -21,7 +21,9 @@ jobs:
 
         with:
           python-version: "3.12"
-      - run: pip install ruff
+      # Pinned to the same version as .pre-commit-config.yaml — an unpinned
+      # ruff here let CI formatting drift away from the local hooks.
+      - run: pip install ruff==0.15.21
       - run: ruff check backend/
       - run: ruff format --check backend/
 

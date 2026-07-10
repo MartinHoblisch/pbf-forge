@@ -85,9 +85,9 @@ async def test_failed_export_leaves_no_final_file(tmp_data_dir):
 
     assert job.status == "error"
     # The failing export must not leave a file at the final gpkg path.
-    assert not (
-        out_dir / "gpkg" / "a_t.gpkg"
-    ).exists(), "ogr2ogr failure must not leave a truncated file at the final gpkg path"
+    assert not (out_dir / "gpkg" / "a_t.gpkg").exists(), (
+        "ogr2ogr failure must not leave a truncated file at the final gpkg path"
+    )
 
 
 # ── Test 2: failed exclude must not leave pre-exclude PBF at final path ───────
@@ -187,9 +187,9 @@ async def test_successful_job_publishes_outputs(tmp_data_dir):
     # job.output_files must reference the FINAL paths, not tmp paths.
     tmp_marker = str(tmp_data_dir / "tmp")
     for path_str in job.output_files:
-        assert not path_str.startswith(
-            tmp_marker
-        ), f"output_files must contain final paths, not tmp: {path_str}"
+        assert not path_str.startswith(tmp_marker), (
+            f"output_files must contain final paths, not tmp: {path_str}"
+        )
 
     # Both formats present in output_files.
     assert any(p.endswith(".osm.pbf") for p in job.output_files), "PBF must be in output_files"
