@@ -12,7 +12,6 @@ orchestration error paths:
   - non-pbf-only path (intermediate filter into tmp)
   - exclude on non-pbf path
   - manual column-mode dispatch
-  - GPKG-other_tags routing through _build_ogr_cmd
   - attribution + provenance embedded after success
   - phase_started_at cleared on error so the FE elapsed-ticker stops
 """
@@ -176,8 +175,15 @@ async def test_run_job_invokes_reduce_for_manual_with_keys(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, columns_mode="manual", manual_keys=["name"])
 
+    # F4: tags-filter now writes to pbf_work (tmp), not the final path.
+    # The mock must write the -o target so shutil.move(pbf_work → pbf_out) succeeds.
+    async def fake_run_cmd(cmd, _j, **_):
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x")
+        return 0
+
     reduce_mock = AsyncMock(return_value=0)
-    with patch.object(fm, "_run_cmd", AsyncMock(return_value=0)):
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_reduce_pbf_tags", reduce_mock):
             await fm.run_job(job)
 
@@ -208,14 +214,14 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             # Create the shared geojson so _get_fields can be called
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         return 0
@@ -230,11 +236,12 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
     # No PBF output file (only geojson was requested)
     assert all(not p.endswith(".osm.pbf") for p in job.output_files)
     assert any(p.endswith(".geojson") for p in job.output_files)
-    # filter (1) + osmium export (2) + ogr2ogr (3)
-    assert len(captured_cmds) == 3
+    # filter (1) + osmium export (2) + other_tags fold (3) + ogr2ogr (4)
+    assert len(captured_cmds) == 4
     assert captured_cmds[0][1] == "tags-filter"
     assert captured_cmds[1][1] == "export"
-    assert captured_cmds[2][0] == "ogr2ogr"
+    assert "geojsonseq_fold.py" in captured_cmds[2][1]
+    assert captured_cmds[3][0] == "ogr2ogr"
 
 
 async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir):
@@ -244,13 +251,13 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text("{}", encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text("{}", encoding="utf-8")
         return 0
@@ -267,38 +274,6 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
     assert job.status == "done"
 
 
-# ── GPKG other_tags routing through _build_ogr_cmd ───────────────────────────
-
-
-async def test_run_job_gpkg_other_tags_uses_build_ogr_cmd_path(tmp_data_dir):
-    """columns_mode='other_tags' + format='gpkg' → uses _build_ogr_cmd
-    (GDAL OSM driver), skips osmium export step."""
-    _ensure_source(tmp_data_dir)
-    fm = _fm()
-    job = _job(tmp_data_dir, output_formats=["gpkg"], columns_mode="other_tags")
-
-    captured_cmds = []
-
-    async def fake_run_cmd(cmd, _job):
-        captured_cmds.append(list(cmd))
-        if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(b"")
-        return 0
-
-    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
-        with patch.object(fm, "_embed_attribution"):
-            with patch.object(fm, "_embed_provenance"):
-                await fm.run_job(job)
-
-    assert job.status == "done"
-    # No osmium export for other_tags+gpkg — GDAL OSM driver goes direct
-    assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
-    # ogr2ogr was invoked via _run_cmd
-    assert any(c[0] == "ogr2ogr" for c in captured_cmds)
-
-
 # ── attribution + provenance embedded after success ──────────────────────────
 
 
@@ -307,12 +282,12 @@ async def test_run_job_embeds_attribution_and_provenance(tmp_data_dir):
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["geojson"])
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         if cmd[0] == "osmium" and "export" in cmd:
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         return 0
@@ -342,8 +317,12 @@ async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
 
     captured_cmds = []
 
-    async def fake_run_cmd(cmd, _job):
+    async def fake_run_cmd(cmd, _job, **_):
         captured_cmds.append(list(cmd))
+        # F4: tags-filter now writes to pbf_work (tmp); write the -o target so
+        # shutil.move(pbf_work → pbf_out) succeeds without a real osmium binary.
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x")
         return 0
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):

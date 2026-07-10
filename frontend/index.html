@@ -252,19 +252,14 @@ textarea { resize: vertical; min-height: 90px; font-family: inherit; }
 
 /* ── Job progress ── */
 .job-progress { margin-bottom: .5rem; }
-.job-progress-bar-bg {
-  height: 6px;
-  background: var(--border);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 4px;
+.job-progress-bar-pulse {
+  height: 6px; border-radius: 3px; overflow: hidden;
+  background: repeating-linear-gradient(45deg, var(--blue) 0 8px, var(--blue-lt) 8px 16px);
+  animation: pulse-slide 1.1s linear infinite;
 }
-.job-progress-bar-fill {
-  height: 100%;
-  background: var(--blue);
-  border-radius: 3px;
-  transition: width .4s ease;
-}
+.job-progress-bar-pulse.idle { animation: none; opacity: .4; }
+@keyframes pulse-slide { from { background-position: 0 0; } to { background-position: 32px 0; } }
+.job-stall-warn { color: var(--orange); font-size: .8rem; margin-top: .25rem; }
 .job-progress-meta {
   display: flex;
   justify-content: space-between;
@@ -782,7 +777,7 @@ footer .credits-sep { color: var(--border); }
 <div id="overlay-onboarding" class="overlay" style="display:none">
   <div class="overlay-box">
     <h2 data-i18n="onboard_title">Arbeitsverzeichnis einrichten</h2>
-    <p data-i18n="onboard_p">Bitte das Verzeichnis angeben, in dem OSM-PBF-Dateien gespeichert werden sollen. Das Verzeichnis muss auf dem Host-System existieren.</p>
+    <p data-i18n="onboard_p">PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf deinem Computer. Gib hier den vollständigen Pfad an — der Ordner wird angelegt, falls er noch nicht existiert. Dort findest du später deine Ergebnisse.</p>
     <div class="form-group">
       <label class="field-label" data-i18n="onboard_label">Verzeichnis (Windows-Pfad)</label>
       <div class="path-input-wrap">
@@ -799,7 +794,7 @@ footer .credits-sep { color: var(--border); }
 <div id="overlay-lock" class="overlay" style="display:none">
   <div class="overlay-box" style="text-align:center">
     <h2 data-i18n="lock_title">Neustart erforderlich</h2>
-    <p id="lock-p">Das Datenverzeichnis wurde gesetzt. Bitte <strong>start.bat</strong> erneut ausführen, damit die Änderung wirksam wird.</p>
+    <p id="lock-p">Das Datenverzeichnis wurde gesetzt. Bitte führe jetzt <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) erneut aus. Diese Seite erkennt den Neustart automatisch und lädt sich neu.</p>
     <div class="lock-path-badge" id="lock-path"></div>
     <div class="lock-spinner-wrap">
       <div class="spinner-lg"></div>
@@ -883,6 +878,18 @@ footer .credits-sep { color: var(--border); }
     <div style="display:flex;gap:.5rem;justify-content:flex-end">
       <button class="btn btn-secondary" id="btn-ow-cancel" data-i18n="ow_cancel">Abbrechen</button>
       <button class="btn btn-danger" id="btn-ow-confirm" data-i18n="ow_confirm">Überschreiben</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Job risk confirmation modal (Gate 0) ── -->
+<div id="modal-risk" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h2 data-i18n="risk_title">Dieser Job wird wahrscheinlich scheitern</h2>
+    <p id="risk-desc"></p>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button class="btn btn-primary" id="btn-risk-cancel" data-i18n="risk_cancel">Abbrechen (empfohlen)</button>
+      <button class="btn btn-danger" id="btn-risk-confirm" data-i18n="risk_confirm">Trotzdem starten</button>
     </div>
   </div>
 </div>
@@ -989,10 +996,13 @@ const TRANSLATIONS = {
     err_no_geo: 'Bitte mindestens einen Geometrietyp auswählen.',
     err_no_format: 'Bitte mindestens ein Ausgabeformat auswählen.',
     btn_cancel_job: 'Job abbrechen',
-    warn_geojson_large: 'Hinweis: GeoJSON kann bei großen Quelldateien sehr groß werden (>500 MB). GeoPackage oder GeoParquet sind effizienter.',
+    warn_geojson_large: 'Hinweis: GeoJSON kann bei großen Quelldateien sehr groß werden (>500 MB). GeoPackage ist effizienter.',
     eta_large_file_hint: 'Hinweis: Sehr große Quelldatei. Filterung kann je nach Hardware mehrere Stunden dauern.',
     err_url_not_pbf: 'URL muss auf .osm.pbf enden.',
     job_step: (i, n) => `Schritt ${i} von ${n}:`,
+    job_written: w => `${w} geschrieben`,
+    job_read: r => `${r} gelesen`,
+    job_stall_warn: d => `Kein beobachtbarer Fortschritt seit ${d} — Job läuft weiter (kein Auto-Abbruch); bei Verdacht manuell abbrechen.`,
     err_server: 'Serverfehler',
     err_conn: msg => 'Verbindungsfehler: ' + msg,
     err_preset_name: 'Bitte einen Namen eingeben.',
@@ -1013,7 +1023,7 @@ const TRANSLATIONS = {
     fb_confirm: 'Diesen Ordner wählen',
     fb_err_conn: 'Verbindungsfehler',
     onboard_title: 'Arbeitsverzeichnis einrichten',
-    onboard_p: 'Bitte das Verzeichnis angeben, in dem OSM-PBF-Dateien gespeichert werden sollen. Das Verzeichnis muss auf dem Host-System existieren.',
+    onboard_p: 'PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf deinem Computer. Gib hier den vollständigen Pfad an — der Ordner wird angelegt, falls er noch nicht existiert. Dort findest du später deine Ergebnisse.',
     onboard_label: 'Verzeichnis (Windows-Pfad)',
     onboard_browse: '📂 Durchsuchen',
     onboard_save: 'Speichern &amp; Neustart vorbereiten',
@@ -1021,8 +1031,8 @@ const TRANSLATIONS = {
     onboard_err_server: 'Serverfehler beim Speichern.',
     onboard_err_conn: msg => 'Verbindungsfehler: ' + msg,
     lock_title: 'Neustart erforderlich',
-    lock_p: 'Das Datenverzeichnis wurde gesetzt. Bitte <strong>start.bat</strong> erneut ausführen, damit die Änderung wirksam wird.',
-    lock_waiting: 'Warte auf Neustart …',
+    lock_p: 'Das Datenverzeichnis wurde gesetzt. Bitte führe jetzt <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) erneut aus. Diese Seite erkennt den Neustart automatisch und lädt sich neu.',
+    lock_waiting: 'Warte auf Neustart — Seite aktualisiert sich danach automatisch …',
     cd_title: 'Verzeichnis ändern',
     cd_p: 'Nach dem Speichern muss <strong>start.bat</strong> neu ausgeführt werden, damit die Änderung wirksam wird.',
     cd_label: 'Neues Verzeichnis (Windows-Pfad)',
@@ -1033,6 +1043,13 @@ const TRANSLATIONS = {
     ow_desc: 'Folgende Dateien existieren bereits und würden überschrieben:',
     ow_cancel: 'Abbrechen',
     ow_confirm: 'Überschreiben',
+    risk_title: 'Dieser Job wird wahrscheinlich scheitern',
+    risk_desc: (srcGb, ramGb, fmts) =>
+      `Quelldaten ${srcGb} GB, Format ${fmts}, System-RAM ${ramGb} GB: ` +
+      `Diese Kombination kann den Arbeitsspeicher sprengen und nach langer Laufzeit abbrechen. ` +
+      `Empfehlung: engerer Filter, kleinerer Extrakt, oder Format PBF (immer speichersicher).`,
+    risk_cancel: 'Abbrechen (empfohlen)',
+    risk_confirm: 'Trotzdem starten',
     resource_title: 'Ressourcen-Limits',
     resource_desc: 'Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.',
     resource_preset_full: '⚡ Vollgas',
@@ -1143,10 +1160,13 @@ const TRANSLATIONS = {
     err_no_geo: 'Please select at least one geometry type.',
     err_no_format: 'Please select at least one output format.',
     btn_cancel_job: 'Cancel job',
-    warn_geojson_large: 'Note: GeoJSON output from large source files can exceed 500 MB. GeoPackage or GeoParquet are more efficient.',
+    warn_geojson_large: 'Note: GeoJSON output from large source files can exceed 500 MB. GeoPackage is more efficient.',
     eta_large_file_hint: 'Note: Very large source file. Filtering may take several hours depending on hardware.',
     err_url_not_pbf: 'URL must end with .osm.pbf.',
     job_step: (i, n) => `Step ${i} of ${n}:`,
+    job_written: w => `${w} written`,
+    job_read: r => `${r} read`,
+    job_stall_warn: d => `No observable progress for ${d} — the job keeps running (no auto-kill); cancel manually if you think it is stuck.`,
     err_server: 'Server error',
     err_conn: msg => 'Connection error: ' + msg,
     err_preset_name: 'Please enter a name.',
@@ -1167,7 +1187,7 @@ const TRANSLATIONS = {
     fb_confirm: 'Select this folder',
     fb_err_conn: 'Connection error',
     onboard_title: 'Set up working directory',
-    onboard_p: 'Please specify the directory where OSM PBF files should be stored. The directory must exist on the host system.',
+    onboard_p: 'PBF Forge stores all map files (downloads and export results) in one folder on your computer. Enter its full path here — the folder is created if it does not exist yet. This is where you will find your results later.',
     onboard_label: 'Directory (Windows path)',
     onboard_browse: '📂 Browse',
     onboard_save: 'Save &amp; prepare restart',
@@ -1175,8 +1195,8 @@ const TRANSLATIONS = {
     onboard_err_server: 'Server error while saving.',
     onboard_err_conn: msg => 'Connection error: ' + msg,
     lock_title: 'Restart required',
-    lock_p: 'The data directory has been set. Please run <strong>start.bat</strong> again for the change to take effect.',
-    lock_waiting: 'Waiting for restart…',
+    lock_p: 'The data directory has been set. Now run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux) again. This page detects the restart automatically and reloads itself.',
+    lock_waiting: 'Waiting for restart — this page will refresh automatically …',
     cd_title: 'Change directory',
     cd_p: 'After saving, <strong>start.bat</strong> must be run again for the change to take effect.',
     cd_label: 'New directory (Windows path)',
@@ -1187,6 +1207,13 @@ const TRANSLATIONS = {
     ow_desc: 'The following files already exist and would be overwritten:',
     ow_cancel: 'Cancel',
     ow_confirm: 'Overwrite',
+    risk_title: 'This job is likely to fail',
+    risk_desc: (srcGb, ramGb, fmts) =>
+      `Source data ${srcGb} GB, format ${fmts}, system RAM ${ramGb} GB: ` +
+      `this combination can exhaust memory and die after a long run. ` +
+      `Recommendation: a narrower filter, a smaller extract, or PBF output (always memory-safe).`,
+    risk_cancel: 'Cancel (recommended)',
+    risk_confirm: 'Start anyway',
     label_suffix: 'Suffix',
     resource_title: 'Resource Limits',
     resource_desc: 'Takes effect on the next job start. No restart needed.',
@@ -1258,6 +1285,18 @@ async function loadSettings() {
   applySettingsState();
 }
 
+let _lockPoll = null;
+function _startLockPolling() {
+  if (_lockPoll) return;
+  _lockPoll = setInterval(async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const s = await res.json();
+      if (s.configured && !s.pending_restart) location.reload();
+    } catch { /* backend is restarting — keep polling */ }
+  }, 3000);
+}
+
 function applySettingsState() {
   const { configured, pending_restart, host_data_dir } = settingsState;
   if (!configured) {
@@ -1265,6 +1304,7 @@ function applySettingsState() {
   } else if (pending_restart) {
     document.getElementById('lock-path').textContent = host_data_dir;
     _showOverlay('lock');
+    _startLockPolling();
   } else {
     _showOverlay(null);
     const badge = document.getElementById('dir-badge');
@@ -1305,6 +1345,7 @@ async function saveDataDir() {
   settingsState = { configured: true, host_data_dir: path, pending_restart: true };
   document.getElementById('lock-path').textContent = path;
   _showOverlay('lock');
+  _startLockPolling();
 }
 
 function openChangeDirModal() {
@@ -1326,6 +1367,7 @@ async function saveChangedDir() {
   settingsState = { configured: true, host_data_dir: path, pending_restart: true };
   document.getElementById('lock-path').textContent = path;
   _showOverlay('lock');
+  _startLockPolling();
 }
 
 // ─── Resource limits ──────────────────────────────────────────────────────────
@@ -1795,13 +1837,6 @@ function _updateFilterHints() {
   }
 }
 
-function _jobProgressPct(j) {
-  if (!j.phases || !j.phases.length) return 0;
-  const total = j.phases.reduce((s, p) => s + p.weight, 0);
-  if (total <= 0) return 0;
-  const done = j.phases.slice(0, j.current_phase_index || 0).reduce((s, p) => s + p.weight, 0);
-  return Math.min(100, Math.round(done / total * 100));
-}
 
 function renderFilterJobs() {
   const el = document.getElementById('filter-jobs-list');
@@ -1824,6 +1859,17 @@ function renderFilterJobs() {
   const openLogs = new Set(
     [...el.querySelectorAll('details.job-log-wrap[open]')].map(d => d.dataset.jobId)
   );
+  // Preserve log scroll positions too — innerHTML replacement resets them to
+  // the top on every websocket update, yanking the log away mid-read.
+  const logScroll = {};
+  el.querySelectorAll('details.job-log-wrap').forEach(d => {
+    const body = d.querySelector('.job-log');
+    if (!body) return;
+    logScroll[d.dataset.jobId] = {
+      top: body.scrollTop,
+      atBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 4,
+    };
+  });
 
   el.innerHTML = filterJobs.map(j => {
     const [cls] = getStatusLabels()[j.status === 'running' ? 'downloading' : j.status] || ['badge-gray'];
@@ -1842,13 +1888,16 @@ function renderFilterJobs() {
       progressHtml = `<div style="font-size:.82rem;color:var(--gray);padding:.25rem 0">${t('job_queued')}${escHtml(pos)}</div>`;
     } else if (showProgress) {
       runningIds.add(j.id);
-      const pct = _jobProgressPct(j);
-      const speedStr = fmtSpeed(j.speed_bps);
       const phaseIdx = j.current_phase_index || 0;
       const totalPhases = j.phases.length;
       const curPhase = j.phases[phaseIdx];
       const phaseLabel = curPhase ? curPhase.label : '';
       const elapsedPhase = j.phase_started_at ? nowSec - j.phase_started_at : 0;
+      const lastAct = j.last_activity_at ? nowSec - j.last_activity_at : null;
+      const alive = lastAct != null && lastAct < 10;
+      const stalled = lastAct != null && lastAct > 120;
+      const written = j.output_bytes != null ? fmtSize(j.output_bytes) : null;
+      const readBytes = j.bytes_read != null ? fmtSize(j.bytes_read) : null;
       const lastActivity = (() => {
         if (!j.log) return '';
         const lines = j.log.trimEnd().split('\n');
@@ -1861,18 +1910,16 @@ function renderFilterJobs() {
 
       progressHtml = `
         <div class="job-progress">
-          <div class="job-progress-bar-bg">
-            <div class="job-progress-bar-fill" style="width:${pct}%"></div>
-          </div>
-          <div class="job-progress-meta">
-            <span>${pct}%</span>
-            ${speedStr ? `<span>${escHtml(speedStr)}</span>` : ''}
-          </div>
+          <div class="job-progress-bar-pulse${alive ? '' : ' idle'}"></div>
           <div class="job-phase-text">
             ${t('job_step', phaseIdx + 1, totalPhases)} ${escHtml(phaseLabel)}
             — <span id="phase-elapsed-${escHtml(j.id)}"
                     data-started="${j.phase_started_at || ''}">${formatDuration(elapsedPhase)}</span>
+            ${readBytes ? ` · ${t('job_read', readBytes)}` : ''}
+            ${written ? ` · ${t('job_written', written)}` : ''}
           </div>
+          ${j.progress_line ? `<div class="job-activity">${escHtml(j.progress_line)}</div>` : ''}
+          ${stalled ? `<div class="job-stall-warn">${t('job_stall_warn', formatDuration(lastAct))}</div>` : ''}
           ${lastActivity ? `<div class="job-activity">${escHtml(lastActivity)}</div>` : ''}
         </div>`;
     }
@@ -1908,9 +1955,15 @@ function renderFilterJobs() {
     </div>`;
   }).join('');
 
-  // Restore log open state for jobs the user had expanded.
+  // Restore log open state and scroll position for jobs the user had expanded.
   el.querySelectorAll('details.job-log-wrap').forEach(d => {
     if (openLogs.has(d.dataset.jobId)) d.open = true;
+    const s = logScroll[d.dataset.jobId];
+    if (!s) return;
+    const body = d.querySelector('.job-log');
+    if (!body) return;
+    // Followers stay pinned to the newest lines; readers keep their spot.
+    body.scrollTop = s.atBottom ? body.scrollHeight : s.top;
   });
 
   // start timers for running jobs, stop for others
@@ -1931,6 +1984,24 @@ function _showOverwriteModal(paths) {
 function _closeOverwriteModal(result) {
   document.getElementById('modal-overwrite').style.display = 'none';
   if (_owResolve) { _owResolve(result); _owResolve = null; }
+}
+
+// ─── Risk modal (Gate 0) ──────────────────────────────────────────────────────
+let _riskResolve = null;
+
+function _showRiskModal(risk) {
+  const gb = b => (b / 1024 ** 3).toFixed(1);
+  document.getElementById('risk-desc').textContent =
+    t('risk_desc', gb(risk.source_bytes), gb(risk.total_ram_bytes),
+      risk.formats.map(f => f.toUpperCase()).join(', '));
+  document.getElementById('modal-risk').style.display = 'flex';
+  document.getElementById('btn-risk-cancel').focus();
+  return new Promise(resolve => { _riskResolve = resolve; });
+}
+
+function _closeRiskModal(result) {
+  document.getElementById('modal-risk').style.display = 'none';
+  if (_riskResolve) { _riskResolve(result); _riskResolve = null; }
 }
 
 async function runFilter() {
@@ -1983,11 +2054,16 @@ async function runFilter() {
       errEl.style.display = 'block';
       return;
     }
-    const { would_overwrite } = await checkRes.json();
+    const { would_overwrite, risk } = await checkRes.json();
 
     if (would_overwrite.length > 0) {
       const confirmed = await _showOverwriteModal(would_overwrite);
       if (!confirmed) return;
+    }
+
+    if (risk && risk.level === 'high') {
+      const goAhead = await _showRiskModal(risk);
+      if (!goAhead) return;
     }
 
     const res  = await fetch('/api/filter/run', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -2201,6 +2277,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Overwrite modal buttons
   document.getElementById('btn-ow-cancel').addEventListener('click', () => _closeOverwriteModal(false));
   document.getElementById('btn-ow-confirm').addEventListener('click', () => _closeOverwriteModal(true));
+
+  // Risk modal buttons (Gate 0)
+  document.getElementById('btn-risk-cancel').addEventListener('click', () => _closeRiskModal(false));
+  document.getElementById('btn-risk-confirm').addEventListener('click', () => _closeRiskModal(true));
 
   connectWs();
   loadFiles();
