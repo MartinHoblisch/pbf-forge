@@ -1859,6 +1859,17 @@ function renderFilterJobs() {
   const openLogs = new Set(
     [...el.querySelectorAll('details.job-log-wrap[open]')].map(d => d.dataset.jobId)
   );
+  // Preserve log scroll positions too — innerHTML replacement resets them to
+  // the top on every websocket update, yanking the log away mid-read.
+  const logScroll = {};
+  el.querySelectorAll('details.job-log-wrap').forEach(d => {
+    const body = d.querySelector('.job-log');
+    if (!body) return;
+    logScroll[d.dataset.jobId] = {
+      top: body.scrollTop,
+      atBottom: body.scrollTop + body.clientHeight >= body.scrollHeight - 4,
+    };
+  });
 
   el.innerHTML = filterJobs.map(j => {
     const [cls] = getStatusLabels()[j.status === 'running' ? 'downloading' : j.status] || ['badge-gray'];
@@ -1944,9 +1955,15 @@ function renderFilterJobs() {
     </div>`;
   }).join('');
 
-  // Restore log open state for jobs the user had expanded.
+  // Restore log open state and scroll position for jobs the user had expanded.
   el.querySelectorAll('details.job-log-wrap').forEach(d => {
     if (openLogs.has(d.dataset.jobId)) d.open = true;
+    const s = logScroll[d.dataset.jobId];
+    if (!s) return;
+    const body = d.querySelector('.job-log');
+    if (!body) return;
+    // Followers stay pinned to the newest lines; readers keep their spot.
+    body.scrollTop = s.atBottom ? body.scrollHeight : s.top;
   });
 
   // start timers for running jobs, stop for others
