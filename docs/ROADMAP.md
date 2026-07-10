@@ -6,7 +6,8 @@ Features under consideration for future releases. Open an [Issue](https://github
 
 ## Planed
 
-- **GeoParquet polish** — geometry type per layer, Parquet metadata conformance with GeoParquet 1.1 spec.
+- **GeoParquet export** — columnar output for analytics workflows (DuckDB, pandas).
+- **Geofabrik region browser** — pick extracts from a continent → country → sub-region tree instead of pasting URLs.
 - **Region search** — type a place name to jump to the matching Geofabrik region, backed by a local Nominatim lookup or a static region index.
 
 ## Under consideration

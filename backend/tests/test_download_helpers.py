@@ -121,9 +121,10 @@ def test_download_worker_proceeds_when_disk_check_oserrors(tmp_data_dir):
     filesystems), the guard must log/skip rather than block legitimate
     downloads. `free` becomes None → check is skipped."""
     filename = "ok.osm.pbf"
-    dest = tmp_data_dir / filename
-    # _do_download is mocked; pre-create file so post-DL os.utime works
-    dest.write_bytes(b"x" * 1000)
+    # D2: _do_download is mocked; pre-create the .part file so os.replace
+    # (part → dest) succeeds in the success path.
+    part = tmp_data_dir / (filename + ".part")
+    part.write_bytes(b"x" * 1000)
 
     dm = _make_dm()
     dm._url_mapping[filename] = "https://example.com/ok.osm.pbf"

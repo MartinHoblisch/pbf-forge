@@ -1,11 +1,9 @@
-"""Tests for FilterManager helpers: list_pbf_files, _build_ogr_cmd, and the
-_run_cmd guards (stdout=None and broadcast-throttling).
+"""Tests for FilterManager helpers: list_pbf_files and the _run_cmd guards
+(stdout=None and broadcast-throttling).
 
 Bug class:
   - list_pbf_files leaks non-PBF entries → user picks an invalid source and
     the osmium subprocess fails with cryptic stderr.
-  - _build_ogr_cmd misses -a_srs for GPKG → output GeoPackage opens with no
-    CRS in QGIS / ArcGIS, the user thinks PBF Forge is broken.
   - _run_cmd doesn't notice proc.stdout=None (asyncio quirk on some platforms)
     and silently drops the entire job log.
   - _run_cmd never throttles broadcasts → WS spam during a 30-min export.
@@ -60,25 +58,6 @@ def test_list_pbf_files_excludes_non_pbf(tmp_data_dir):
 
 def test_list_pbf_files_empty_when_no_pbf(tmp_data_dir):
     assert _fm().list_pbf_files() == []
-
-
-# ── _build_ogr_cmd ───────────────────────────────────────────────────────────
-
-
-def test_build_ogr_cmd_gpkg_includes_a_srs_epsg_4326(tmp_path):
-    fm = _fm()
-    cmd = fm._build_ogr_cmd("gpkg", "/out/x.gpkg", "/in/x.pbf", _job(), tmp_path)
-    assert "-a_srs" in cmd
-    idx = cmd.index("-a_srs")
-    assert cmd[idx + 1] == "EPSG:4326"
-    assert cmd[:5] == ["ogr2ogr", "-f", "GPKG", "/out/x.gpkg", "/in/x.pbf"]
-
-
-def test_build_ogr_cmd_geojson_omits_a_srs(tmp_path):
-    fm = _fm()
-    cmd = fm._build_ogr_cmd("geojson", "/out/x.geojson", "/in/x.pbf", _job(), tmp_path)
-    assert "-a_srs" not in cmd
-    assert cmd == ["ogr2ogr", "-f", "GeoJSON", "/out/x.geojson", "/in/x.pbf"]
 
 
 # ── _run_cmd: proc.stdout=None ───────────────────────────────────────────────

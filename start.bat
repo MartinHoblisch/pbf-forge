@@ -67,8 +67,21 @@ echo PBF Forge running at: http://localhost:8000
 echo To stop: run stop.bat or "docker compose down"
 echo.
 
-REM Open browser (short delay to let the server start)
-timeout /t 2 /nobreak >nul
+REM Wait until the server actually responds, then open the browser.
+echo Waiting for PBF Forge to be ready...
+set /a _tries=0
+:ready_loop
+curl -s -o nul http://localhost:8000 2>nul
+if not errorlevel 1 goto ready
+set /a _tries+=1
+if !_tries! geq 60 (
+    echo WARNING: Server did not respond within 60 seconds. Opening browser anyway.
+    echo If the page fails to load, wait a moment and refresh.
+    goto ready
+)
+timeout /t 1 /nobreak >nul
+goto ready_loop
+:ready
 start http://localhost:8000
 
 endlocal

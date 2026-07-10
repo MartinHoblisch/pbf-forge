@@ -86,7 +86,10 @@ def check_overwrite(req: FilterRequest):
         output_formats=req.output_formats,
         output_dir=resolved_output_dir,
     )
-    return {"would_overwrite": would_overwrite}
+    return {
+        "would_overwrite": would_overwrite,
+        "risk": state.filter_manager.assess_job_risk(req.source_files, req.output_formats),
+    }
 
 
 @router.post("/run")

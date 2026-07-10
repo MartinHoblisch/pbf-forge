@@ -290,8 +290,10 @@ def test_slow_retry_recovers_after_network_returns(tmp_data_dir):
     """First _do_download raises ConnectionError → enters slow retry loop →
     waits → second attempt succeeds → status flips to up_to_date."""
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
-    dest.write_bytes(b"")  # _do_download is mocked; touch dest so os.utime works
+    # D2: worker writes to .part; pre-create it so os.replace succeeds after
+    # the successful second _do_download attempt.
+    part = tmp_data_dir / (filename + ".part")
+    part.write_bytes(b"")  # _do_download is mocked; touch .part so os.replace works
 
     dm = _make_dm(tmp_data_dir)
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
@@ -343,8 +345,9 @@ def test_slow_retry_continues_when_still_offline(tmp_data_dir):
     first slow attempt ALSO fails → must continue waiting; second slow
     attempt succeeds."""
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
-    dest.write_bytes(b"")
+    # D2: pre-create .part so os.replace succeeds after the final successful attempt.
+    part = tmp_data_dir / (filename + ".part")
+    part.write_bytes(b"")
 
     dm = _make_dm(tmp_data_dir)
     dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
@@ -382,7 +385,7 @@ def test_slow_retry_bubbles_other_exception(tmp_data_dir):
     (e.g. unexpected ValueError). Must bubble up to the outer handler and
     mark status=error — NOT continue spinning the slow loop forever."""
     filename = "test.osm.pbf"
-    dest = tmp_data_dir / filename
+    dest = tmp_data_dir / (filename + ".part")
     dest.write_bytes(b"")
 
     dm = _make_dm(tmp_data_dir)
