@@ -663,6 +663,23 @@ class FilterManager:
 
                         sql = self._build_export_sql(shared_geojson.stem, job, shared_fields)
                         ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
+                        if ogr_fmt == "GPKG":
+                            # SQLite caps a table at 2000 columns; fid + geom +
+                            # osm_id occupy 3. Europe-scale extracts can carry
+                            # >2000 distinct tag keys — fail before the
+                            # expensive conversion, not inside sqlite3_exec.
+                            if job.columns_mode == "manual" and job.manual_keys:
+                                available = set(shared_fields)
+                                n_cols = sum(1 for k in job.manual_keys if k in available)
+                            else:
+                                n_cols = len(shared_fields)
+                            if n_cols > 1997:
+                                raise RuntimeError(
+                                    f"GeoPackage supports at most 2000 columns, "
+                                    f"but this extract has {n_cols} distinct tag "
+                                    f"keys. Use 'Select manually' to pick the "
+                                    f"columns you need."
+                                )
                         cmd = [
                             "ogr2ogr",
                             # Tick output on stdout ("0...10...done") keeps the

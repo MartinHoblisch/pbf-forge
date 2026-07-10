@@ -236,3 +236,85 @@ async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
     assert "-sql" in ogr_cmds[0], "ogr2ogr must read from shared geojson via -sql"
     # No OSM_CONFIG_FILE (GDAL driver path must be gone)
     assert "OSM_CONFIG_FILE" not in ogr_cmds[0], "OSM_CONFIG_FILE must not appear (F1)"
+
+
+# ── GPKG column-count guard (SQLite max 2000 columns) ────────────────────────
+
+
+async def test_gpkg_column_guard_fails_fast_over_limit(tmp_data_dir):
+    """Europe-scale extracts can carry >2000 distinct tag keys; SQLite caps a
+    table at 2000 columns. The job must fail with a clear message BEFORE the
+    ogr2ogr conversion is attempted."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+    many_fields = [f"key_{i}" for i in range(2300)]
+    ogr_calls = []
+
+    async def fake_run_cmd(cmd, _job, **_):
+        if cmd[0] == "ogr2ogr":
+            ogr_calls.append(cmd)
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_text("{}", encoding="utf-8")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=many_fields)):
+            await fm.run_job(job)
+
+    assert job.status == "error"
+    assert "2000" in (job.error or "")
+    assert "2300" in (job.error or "")
+    assert not ogr_calls, "ogr2ogr must not be attempted over the column limit"
+
+
+async def test_gpkg_column_guard_ignores_geojson(tmp_data_dir):
+    """GeoJSON has no column limit — same oversized field list must pass."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["geojson"])
+    many_fields = [f"key_{i}" for i in range(2300)]
+
+    async def fake_run_cmd(cmd, _job, **_):
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_text("{}", encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            Path(cmd[cmd.index("-f") + 2]).write_text("{}", encoding="utf-8")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=many_fields)):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    assert job.status == "done"
+
+
+async def test_gpkg_column_guard_counts_manual_selection(tmp_data_dir):
+    """Manual mode counts only the selected keys — a small manual pick from an
+    oversized extract must pass."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(
+        tmp_data_dir,
+        output_formats=["gpkg"],
+        columns_mode="manual",
+        manual_keys=["key_1", "key_2"],
+    )
+    many_fields = [f"key_{i}" for i in range(2300)]
+
+    async def fake_run_cmd(cmd, _job, **_):
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_text("{}", encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            Path(cmd[cmd.index("-f") + 2]).write_text("{}", encoding="utf-8")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=many_fields)):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    assert job.status == "done"
