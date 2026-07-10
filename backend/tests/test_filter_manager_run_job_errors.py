@@ -221,7 +221,7 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         return 0
@@ -256,7 +256,7 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text("{}", encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text("{}", encoding="utf-8")
         return 0
@@ -286,7 +286,7 @@ async def test_run_job_embeds_attribution_and_provenance(tmp_data_dir):
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         return 0

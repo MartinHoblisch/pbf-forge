@@ -163,8 +163,8 @@ async def test_successful_job_publishes_outputs(tmp_data_dir):
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
             return 0
         if cmd[0] == "ogr2ogr":
-            # ogr2ogr writes to cmd[3] (the destination)
-            out_path = Path(cmd[3])
+            # ogr2ogr destination is the arg after "-f <format>"
+            out_path = Path(cmd[cmd.index("-f") + 2])
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(b"gpkg-data")
             return 0

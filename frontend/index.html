@@ -1001,7 +1001,8 @@ const TRANSLATIONS = {
     err_url_not_pbf: 'URL muss auf .osm.pbf enden.',
     job_step: (i, n) => `Schritt ${i} von ${n}:`,
     job_written: w => `${w} geschrieben`,
-    job_stall_warn: d => `Kein Fortschritt seit ${d} — Job hängt möglicherweise.`,
+    job_read: r => `${r} gelesen`,
+    job_stall_warn: d => `Kein beobachtbarer Fortschritt seit ${d} — Job läuft weiter (kein Auto-Abbruch); bei Verdacht manuell abbrechen.`,
     err_server: 'Serverfehler',
     err_conn: msg => 'Verbindungsfehler: ' + msg,
     err_preset_name: 'Bitte einen Namen eingeben.',
@@ -1164,7 +1165,8 @@ const TRANSLATIONS = {
     err_url_not_pbf: 'URL must end with .osm.pbf.',
     job_step: (i, n) => `Step ${i} of ${n}:`,
     job_written: w => `${w} written`,
-    job_stall_warn: d => `No progress for ${d} — the job may be stuck.`,
+    job_read: r => `${r} read`,
+    job_stall_warn: d => `No observable progress for ${d} — the job keeps running (no auto-kill); cancel manually if you think it is stuck.`,
     err_server: 'Server error',
     err_conn: msg => 'Connection error: ' + msg,
     err_preset_name: 'Please enter a name.',
@@ -1884,6 +1886,7 @@ function renderFilterJobs() {
       const alive = lastAct != null && lastAct < 10;
       const stalled = lastAct != null && lastAct > 120;
       const written = j.output_bytes != null ? fmtSize(j.output_bytes) : null;
+      const readBytes = j.bytes_read != null ? fmtSize(j.bytes_read) : null;
       const lastActivity = (() => {
         if (!j.log) return '';
         const lines = j.log.trimEnd().split('\n');
@@ -1901,8 +1904,10 @@ function renderFilterJobs() {
             ${t('job_step', phaseIdx + 1, totalPhases)} ${escHtml(phaseLabel)}
             — <span id="phase-elapsed-${escHtml(j.id)}"
                     data-started="${j.phase_started_at || ''}">${formatDuration(elapsedPhase)}</span>
+            ${readBytes ? ` · ${t('job_read', readBytes)}` : ''}
             ${written ? ` · ${t('job_written', written)}` : ''}
           </div>
+          ${j.progress_line ? `<div class="job-activity">${escHtml(j.progress_line)}</div>` : ''}
           ${stalled ? `<div class="job-stall-warn">${t('job_stall_warn', formatDuration(lastAct))}</div>` : ''}
           ${lastActivity ? `<div class="job-activity">${escHtml(lastActivity)}</div>` : ''}
         </div>`;

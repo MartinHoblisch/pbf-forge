@@ -63,7 +63,7 @@ async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(b"")
         return 0
@@ -123,7 +123,7 @@ async def test_gpkg_export_path_includes_perf_flags(tmp_data_dir):
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text("{}", encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(b"")
         return 0
@@ -164,7 +164,7 @@ async def test_gpkg_plus_geojson_reuses_shared_geojson_for_gpkg(tmp_data_dir):
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(b"")
         return 0
@@ -213,7 +213,7 @@ async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
             out_path = Path(cmd[cmd.index("-o") + 1])
             out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
         if cmd[0] == "ogr2ogr":
-            out = Path(cmd[3])
+            out = Path(cmd[cmd.index("-f") + 2])
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(b"")
         return 0

@@ -42,16 +42,42 @@ _VALID_TAG = re.compile(r"^[^-\s\n\r\x00][^\n\r\x00]*$")
 # system RAM. PBF-only jobs stream end-to-end and are never flagged.
 RISK_RAM_FACTOR = 0.5
 
-# Stall watchdog: kill only when neither stdout activity nor output-file
-# growth happened for this long. Wall-clock rate limits killed healthy
-# processes on slow disks/bind mounts (audit F3).
+# Stall handling: prolonged silence produces a WARNING, never a kill.
+# osmium tags-filter legitimately reads a 32-GB input up to 4 times before
+# writing any output, silently when piped — auto-killing on silence killed
+# healthy jobs twice (wall-clock rate, then the 300s stall-kill). Liveness
+# is judged from stdout/stderr activity, output-file growth, and /proc-IO
+# counters; only ABSOLUTE_TIMEOUT_SECONDS kills.
 STALL_CHECK_INTERVAL = 2.0
-STALL_KILL_SECONDS = 300.0
+STALL_WARN_SECONDS = 300.0
 ABSOLUTE_TIMEOUT_SECONDS = 24 * 3600.0
 
 
 def _ts() -> str:
     return datetime.now().strftime("[%H:%M:%S] ")
+
+
+def _parse_proc_io(text: str) -> int:
+    """Sum rchar+wchar from /proc/<pid>/io content."""
+    total = 0
+    for line in text.splitlines():
+        if line.startswith(("rchar:", "wchar:")):
+            total += int(line.split(":", 1)[1])
+    return total
+
+
+def _proc_io_bytes(pid: int) -> int | None:
+    """Total syscall-level IO bytes (rchar+wchar) of pid, or None if unavailable.
+
+    rchar/wchar, NOT read_bytes/write_bytes: the block-layer counters stay
+    flat on FUSE/virtiofs bind mounts (Docker Desktop) — exactly where the
+    signal is needed. Returns None off Linux, after process exit, or when
+    the kernel lacks IO accounting.
+    """
+    try:
+        return _parse_proc_io(Path(f"/proc/{pid}/io").read_text())
+    except (OSError, ValueError):
+        return None
 
 
 def _fmt_size(n: int) -> str:
@@ -105,6 +131,8 @@ class FilterJob:
     timeout_seconds: float | None = None
     queue_position: int | None = None
     output_bytes: int | None = None
+    bytes_read: int | None = None
+    progress_line: str | None = None
     last_activity_at: float | None = None
     _log_parts: list[str] = field(default_factory=list, init=False, repr=False)
     _proc_env: dict = field(default_factory=dict, init=False, repr=False)
@@ -163,6 +191,8 @@ class FilterJob:
             "job_started_at": self.job_started_at,
             "queue_position": self.queue_position,
             "output_bytes": self.output_bytes,
+            "bytes_read": self.bytes_read,
+            "progress_line": self.progress_line,
             "last_activity_at": self.last_activity_at,
         }
 
@@ -441,7 +471,9 @@ class FilterManager:
         if job.geometry_types:
             lines.append(f"{_ts()}Geometry : {', '.join(job.geometry_types)}")
         lines.append(
-            f"{_ts()}Watchdog : stall-kill after {int(STALL_KILL_SECONDS)}s without progress"
+            f"{_ts()}Watchdog : warn after {int(STALL_WARN_SECONDS)}s without observable "
+            f"progress (no auto-kill); absolute limit "
+            f"{int(ABSOLUTE_TIMEOUT_SECONDS / 3600)}h"
         )
         lines.append(f"{_ts()}Resources: {threads} threads, nice {nice}")
         job.append_log("\n".join(lines) + "\n")
@@ -487,6 +519,12 @@ class FilterManager:
                         cmd = [
                             "osmium",
                             "tags-filter",
+                            # --verbose: pass-boundary markers on stderr (the
+                            # only sign of life during the up-to-3 silent
+                            # reference-finding passes); --progress: percent
+                            # bar during the final copy pass even when piped.
+                            "--verbose",
+                            "--progress",
                             str(source_path),
                             *exprs,
                             "-o",
@@ -505,6 +543,8 @@ class FilterManager:
                             excl_cmd = [
                                 "osmium",
                                 "tags-filter",
+                                "--verbose",
+                                "--progress",
                                 str(pbf_work),
                                 *excl_exprs,
                                 "--invert-match",
@@ -535,6 +575,12 @@ class FilterManager:
                         cmd = [
                             "osmium",
                             "tags-filter",
+                            # --verbose: pass-boundary markers on stderr (the
+                            # only sign of life during the up-to-3 silent
+                            # reference-finding passes); --progress: percent
+                            # bar during the final copy pass even when piped.
+                            "--verbose",
+                            "--progress",
                             str(source_path),
                             *exprs,
                             "-o",
@@ -553,6 +599,8 @@ class FilterManager:
                             excl_cmd = [
                                 "osmium",
                                 "tags-filter",
+                                "--verbose",
+                                "--progress",
                                 str(intermediate),
                                 *excl_exprs,
                                 "--invert-match",
@@ -595,6 +643,8 @@ class FilterManager:
                                 [
                                     "osmium",
                                     "export",
+                                    "--verbose",
+                                    "--progress",
                                     "--format=geojson",
                                     "--attributes",
                                     "id",
@@ -615,6 +665,9 @@ class FilterManager:
                         ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
                         cmd = [
                             "ogr2ogr",
+                            # Tick output on stdout ("0...10...done") keeps the
+                            # liveness signal fed during long feature copies.
+                            "-progress",
                             "-f",
                             ogr_fmt,
                             str(work_file),
@@ -1124,30 +1177,57 @@ class FilterManager:
 
         self._procs[job.id] = proc
         job.last_activity_at = time.time()
-        stalled = False
+        job.progress_line = None
+
+        def _safe_size(path: Path) -> int:
+            try:
+                return path.stat().st_size
+            except OSError:
+                return -1
 
         async def _heartbeat() -> None:
-            nonlocal stalled
             last_size = -1
+            last_io = -1
+            warned = False
+            loop = asyncio.get_running_loop()
+            stat_fut = None
             try:
                 while True:
                     await asyncio.sleep(STALL_CHECK_INTERVAL)
+                    activity = False
                     if watch_path is not None:
-                        try:
-                            size = watch_path.stat().st_size
-                        except OSError:
-                            size = -1
-                        if size > last_size:
-                            last_size = size
-                            job.output_bytes = size
-                            job.last_activity_at = time.time()
-                    if time.time() - (job.last_activity_at or 0) > STALL_KILL_SECONDS:
-                        stalled = True
-                        try:
-                            proc.kill()
-                        except OSError:
-                            pass
-                        return
+                        # stat() can block indefinitely on a hung bind mount —
+                        # keep it off the event loop, at most one in flight.
+                        if stat_fut is None:
+                            stat_fut = loop.run_in_executor(None, _safe_size, watch_path)
+                        if stat_fut.done():
+                            size = stat_fut.result()
+                            stat_fut = None
+                            if size > last_size:
+                                last_size = size
+                                job.output_bytes = size
+                                activity = True
+                    if proc.returncode is None:
+                        io_bytes = _proc_io_bytes(proc.pid)
+                        if io_bytes is not None and io_bytes > last_io:
+                            last_io = io_bytes
+                            job.bytes_read = io_bytes
+                            activity = True
+                    if activity:
+                        job.last_activity_at = time.time()
+                    quiet = time.time() - (job.last_activity_at or 0)
+                    if quiet <= STALL_WARN_SECONDS:
+                        warned = False
+                    elif not warned:
+                        warned = True
+                        job.append_log(
+                            f"{_ts()}WARNING: no observable progress for "
+                            f"{int(quiet)}s (no log output, no output-file "
+                            f"growth, no process IO). The job keeps running — "
+                            f"it is only stopped at the absolute "
+                            f"{int(ABSOLUTE_TIMEOUT_SECONDS / 3600)}h limit. "
+                            f"Cancel manually if you believe it is stuck.\n"
+                        )
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
             except asyncio.CancelledError:
                 pass
@@ -1162,13 +1242,18 @@ class FilterManager:
                     break
                 buf += chunk
                 job.last_activity_at = time.time()
-                segments = re.split(rb"[\r\n]", buf)
-                buf = segments[-1]
-                for seg in segments[:-1]:
-                    text = seg.decode("utf-8", errors="replace").strip()
+                parts = re.split(rb"(\r\n|\r|\n)", buf)
+                buf = parts[-1]
+                for i in range(0, len(parts) - 1, 2):
+                    text = parts[i].decode("utf-8", errors="replace").strip()
                     if not text:
                         continue
-                    job.append_log(text + "\n")
+                    if parts[i + 1] == b"\r":
+                        # \r-terminated redraws (osmium --progress bar) are
+                        # ephemeral: keep only the latest, never in the log.
+                        job.progress_line = text
+                    else:
+                        job.append_log(text + "\n")
                 now = loop.time()
                 if now - last_broadcast >= 0.5:
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
@@ -1176,12 +1261,19 @@ class FilterManager:
             if buf:
                 job.append_log(buf.decode("utf-8", errors="replace") + "\n")
 
+        async def _consume_and_wait() -> None:
+            # proc.wait() must sit under the same absolute budget: a process
+            # that closes its pipes but never exits would otherwise hang the
+            # job slot forever.
+            await _read_output()
+            await proc.wait()
+
         heartbeat_task = asyncio.create_task(_heartbeat())
         try:
             if job.timeout_seconds is not None:
-                await asyncio.wait_for(_read_output(), timeout=job.timeout_seconds)
+                await asyncio.wait_for(_consume_and_wait(), timeout=job.timeout_seconds)
             else:
-                await _read_output()
+                await _consume_and_wait()
         except asyncio.TimeoutError:
             try:
                 proc.kill()
@@ -1194,15 +1286,6 @@ class FilterManager:
             heartbeat_task.cancel()
             await asyncio.gather(heartbeat_task, return_exceptions=True)
             self._procs.pop(job.id, None)
-
-        await proc.wait()
-
-        if stalled:
-            raise RuntimeError(
-                f"No progress for {STALL_KILL_SECONDS:.0f}s (output file not "
-                f"growing, no log output) — process killed. A very slow disk "
-                f"only triggers this on total silence; retry if unsure."
-            )
 
         rc = proc.returncode
         if rc is not None and rc < 0:
