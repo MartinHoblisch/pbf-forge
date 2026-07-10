@@ -247,7 +247,9 @@ async def test_gpkg_column_guard_fails_fast_over_limit(tmp_data_dir):
     ogr2ogr conversion is attempted."""
     _ensure_source(tmp_data_dir)
     fm = _fm()
-    job = _job(tmp_data_dir, output_formats=["gpkg"])
+    # columns_mode="all": Standard mode has a static curated schema and can
+    # never exceed the cap — only expand-all/manual still hit the guard.
+    job = _job(tmp_data_dir, output_formats=["gpkg"], columns_mode="all")
     many_fields = [f"key_{i}" for i in range(2300)]
     ogr_calls = []
 
@@ -318,3 +320,102 @@ async def test_gpkg_column_guard_counts_manual_selection(tmp_data_dir):
                     await fm.run_job(job)
 
     assert job.status == "done"
+
+
+# ── Standard mode: real other_tags via geojsonseq fold ───────────────────────
+
+
+async def test_standard_mode_folds_to_other_tags(tmp_data_dir):
+    """columns_mode=other_tags routes through the fold subprocess and builds
+    the SQL from the static curated schema — no ogrinfo field scan."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"], tags=["waterway=canal", "waterway=river"])
+    captured = []
+
+    async def fake_run_cmd(cmd, _job, **_):
+        captured.append(list(cmd))
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_text("{}", encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            Path(cmd[cmd.index("-f") + 2]).write_bytes(b"d")
+        return 0
+
+    get_fields = AsyncMock(return_value=["should_not_be_used"])
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", get_fields):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    assert job.status == "done", job.error
+    # osmium export must use the REAL flag: --format=X prefix-matches the
+    # no-op --format-option and is silently ignored by osmium.
+    export_cmd = next(c for c in captured if c[0] == "osmium" and "export" in c)
+    assert "--output-format=geojsonseq" in export_cmd
+    assert not any("--format=geojson" in a for a in export_cmd)
+    # fold subprocess with curated keys (name + include-tag keys, deduped)
+    fold_cmd = next(c for c in captured if "geojsonseq_fold.py" in c[1])
+    assert fold_cmd[2].endswith("_export.geojsonseq")
+    assert fold_cmd[3].endswith("_folded.geojsonseq")
+    assert fold_cmd[fold_cmd.index("--keep") + 1] == "name,waterway"
+    # ogr2ogr must consume the FOLDED file, not the raw export
+    ogr_src = next(c for c in captured if c[0] == "ogr2ogr")
+    assert any(str(a).endswith("_folded.geojsonseq") for a in ogr_src)
+    # SQL built from the static schema; ogrinfo never consulted
+    ogr_cmd = next(c for c in captured if c[0] == "ogr2ogr")
+    sql = ogr_cmd[ogr_cmd.index("-sql") + 1]
+    assert '"other_tags"' in sql and '"name"' in sql and '"waterway"' in sql
+    assert "should_not_be_used" not in sql
+    get_fields.assert_not_awaited()
+
+
+async def test_standard_mode_fold_failure_marks_error(tmp_data_dir):
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+
+    async def fake_run_cmd(cmd, _job, **_):
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_text("{}", encoding="utf-8")
+        if "geojsonseq_fold.py" in str(cmd[1]):
+            return 1
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        await fm.run_job(job)
+
+    assert job.status == "error"
+    assert "fold exited with code 1" in (job.error or "")
+
+
+async def test_manual_mode_still_scans_fields_from_seq(tmp_data_dir):
+    """Non-standard modes keep the ogrinfo scan and must NOT run the fold."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(
+        tmp_data_dir,
+        output_formats=["gpkg"],
+        columns_mode="manual",
+        manual_keys=["name"],
+    )
+    captured = []
+
+    async def fake_run_cmd(cmd, _job, **_):
+        captured.append(list(cmd))
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_text("{}", encoding="utf-8")
+        if cmd[0] == "ogr2ogr":
+            Path(cmd[cmd.index("-f") + 2]).write_bytes(b"d")
+        return 0
+
+    get_fields = AsyncMock(return_value=["name", "waterway"])
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", get_fields):
+            with patch.object(fm, "_embed_attribution"):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    assert job.status == "done", job.error
+    get_fields.assert_awaited()
+    assert not any("geojsonseq_fold.py" in str(c[1]) for c in captured)

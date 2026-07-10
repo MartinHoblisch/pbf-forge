@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import sqlite3
+import sys
 import tempfile
 import time
 import uuid
@@ -635,17 +636,23 @@ class FilterManager:
                         # One route = one schema, regardless of which formats
                         # were co-selected (audit finding F1).
                         if shared_geojson is None:
-                            shared_geojson = tmp / f"{stem}_export.geojson"
+                            shared_geojson = tmp / f"{stem}_export.geojsonseq"
                             # Disk-backed node index keeps RAM bounded on
                             # large sources (Europe-scale fits in ~1 GB RSS
                             # instead of 5–10 GB with flex_mem default).
+                            # GeoJSONSeq (not GeoJSON): the GDAL GeoJSONSeq
+                            # driver streams, while the classic GeoJSON driver
+                            # loads the whole file into RAM (10-20x its size).
+                            # NOTE: the option is --output-format; a bare
+                            # --format=X prefix-matches osmium's no-op
+                            # --format-option and is silently ignored.
                             rc = await self._run_cmd(
                                 [
                                     "osmium",
                                     "export",
                                     "--verbose",
                                     "--progress",
-                                    "--format=geojson",
+                                    "--output-format=geojsonseq",
                                     "--attributes",
                                     "id",
                                     "--index-type=sparse_file_array,sparse_file_array",
@@ -659,7 +666,37 @@ class FilterManager:
                             )
                             if rc != 0:
                                 raise RuntimeError(f"osmium export exited with code {rc}")
-                            shared_fields = await self._get_fields(shared_geojson)
+
+                            if job.columns_mode == "other_tags":
+                                # Standard mode: fold every non-curated tag
+                                # into a compact other_tags JSON column. This
+                                # is what the UI promises — and expanding all
+                                # keys is impossible anyway (SQLite caps a
+                                # table at 2000 columns; Europe-scale extracts
+                                # carry more distinct tag keys).
+                                curated = self._curated_keys(job)
+                                folded = tmp / f"{stem}_folded.geojsonseq"
+                                fold_cmd = [
+                                    sys.executable,
+                                    str(Path(__file__).parent / "geojsonseq_fold.py"),
+                                    str(shared_geojson),
+                                    str(folded),
+                                    "--keep",
+                                    ",".join(curated),
+                                ]
+                                rc = await self._run_cmd(fold_cmd, job, watch_path=folded)
+                                if rc != 0:
+                                    raise RuntimeError(f"other_tags fold exited with code {rc}")
+                                # Eager cleanup: raw export and folded copy
+                                # would otherwise coexist at full size.
+                                shared_geojson.unlink(missing_ok=True)
+                                shared_geojson = folded
+                                # Schema is static — fold emits every curated
+                                # key (null when absent) plus other_tags, so
+                                # no ogrinfo field scan is needed.
+                                shared_fields = [*curated, "other_tags"]
+                            else:
+                                shared_fields = await self._get_fields(shared_geojson)
 
                         sql = self._build_export_sql(shared_geojson.stem, job, shared_fields)
                         ogr_fmt = "GeoJSON" if fmt == "geojson" else "GPKG"
@@ -947,6 +984,18 @@ class FilterManager:
             if m and m.group(1) != "@id":
                 fields.append(m.group(1))
         return fields
+
+    def _curated_keys(self, job: FilterJob) -> list[str]:
+        """Standard-mode column set: name plus the keys of the include tags.
+
+        Everything else stays queryable inside the other_tags JSON column.
+        """
+        keys = ["name"]
+        for tag in job.tags:
+            key = tag.strip().split("=", 1)[0]
+            if key and key not in keys:
+                keys.append(key)
+        return keys
 
     def _build_export_sql(self, layer: str, job: FilterJob, fields: list[str]) -> str:
         """Build SELECT SQL prepending fid and osm_id before user-selected or all fields."""

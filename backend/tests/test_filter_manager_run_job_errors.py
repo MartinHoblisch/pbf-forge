@@ -236,11 +236,12 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
     # No PBF output file (only geojson was requested)
     assert all(not p.endswith(".osm.pbf") for p in job.output_files)
     assert any(p.endswith(".geojson") for p in job.output_files)
-    # filter (1) + osmium export (2) + ogr2ogr (3)
-    assert len(captured_cmds) == 3
+    # filter (1) + osmium export (2) + other_tags fold (3) + ogr2ogr (4)
+    assert len(captured_cmds) == 4
     assert captured_cmds[0][1] == "tags-filter"
     assert captured_cmds[1][1] == "export"
-    assert captured_cmds[2][0] == "ogr2ogr"
+    assert "geojsonseq_fold.py" in captured_cmds[2][1]
+    assert captured_cmds[3][0] == "ogr2ogr"
 
 
 async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir):
