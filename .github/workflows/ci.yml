@@ -21,7 +21,9 @@ jobs:
 
         with:
           python-version: "3.12"
-      - run: pip install ruff
+      # Pinned to the same version as .pre-commit-config.yaml — an unpinned
+      # ruff here let CI formatting drift away from the local hooks.
+      - run: pip install ruff==0.15.21
       - run: ruff check backend/
       - run: ruff format --check backend/
 
@@ -45,7 +47,7 @@ jobs:
         working-directory: backend
         run: pytest tests/ --cov=. --cov-report=term-missing --cov-report=xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v6
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v6
         with:
           files: backend/coverage.xml
           fail_ci_if_error: false
