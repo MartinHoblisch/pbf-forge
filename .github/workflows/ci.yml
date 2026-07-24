@@ -21,9 +21,14 @@ jobs:
 
         with:
           python-version: "3.12"
-      # Pinned to the same version as .pre-commit-config.yaml — an unpinned
-      # ruff here let CI formatting drift away from the local hooks.
-      - run: pip install ruff==0.15.21
+      # Read the version from .pre-commit-config.yaml so CI and the local hooks
+      # cannot drift apart. An unpinned ruff here, and later a second hardcoded
+      # pin, both let CI formatting diverge from the hooks.
+      - name: Install ruff pinned by .pre-commit-config.yaml
+        run: |
+          version=$(awk '/ruff-pre-commit/{f=1} f && /rev:/{sub(/.*rev: v/, ""); print; exit}' .pre-commit-config.yaml)
+          echo "ruff $version"
+          pip install "ruff==$version"
       - run: ruff check backend/
       - run: ruff format --check backend/
 
