@@ -9,3 +9,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # Single PR for all action bumps. Sub-actions pinned to the same SHA
+      # (e.g. github/codeql-action/{init,autobuild,analyze}) must move together,
+      # otherwise CodeQL fails with a version mismatch.
+      actions:
+        patterns:
+          - "*"
