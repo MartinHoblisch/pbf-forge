@@ -16,34 +16,52 @@ Automated dependency updates for:
 - GitHub Actions versions
 - pre-commit hook revisions
 
+GitHub Actions updates are grouped into one pull request, so sub-actions pinned to a shared SHA (`github/codeql-action/*`) always move together.
+
+Dependabot vulnerability alerts and security updates are enabled on the repository.
+
 Pull requests are created automatically; maintainers review and merge.
 
 ### Branch Protection
 
 **Status:** Configured for `main`  
-**Requirements:**
-- Pull request review before merge (1+ approval)
-- Status checks pass (CI workflow)
-- No force push or deletion
+**Enforced:**
+- Required status checks: `lint`, `test`, `test-windows`, `CodeQL`
+- Branch must be up to date with `main` before merging
+- Branch deletion blocked
 
-**Rationale:** Prevents accidental direct commits and requires peer review before release.
+**Not enforced:**
+- Pull request approval — merging without review is possible
+- Force push — `allow_force_pushes` is on, so history on `main` can be rewritten
+- Admin enforcement — `enforce_admins` is off
+
+**Rationale:** Required status checks keep broken code off `main`. Approval and force-push restrictions are currently not active; see Limitations & Gaps.
 
 ### Secret Scanning
 
-**Status:** Enabled (GitHub Free)  
-**Scope:** All pushes to `main`
+**Status:** Enabled  
+**Push protection:** Enabled  
+**Scope:** Entire repository (public)
 
 GitHub scans for secrets in:
 - API keys, tokens, credentials
 - Private SSH/PGP keys
 - Database credentials
 
-**Response:** Alerts maintainers; commits are not blocked (advisory only).
+**Response:** Pushes containing a recognized secret are blocked outright. Secrets already present in history raise alerts to maintainers.
 
 ### Code Scanning
 
-**Status:** Not configured  
-**Reason:** Defer to external tools (bandit, ruff, mypy) in CI for now.
+**Status:** Enabled  
+**Engine:** CodeQL (`python`), configured in `.github/workflows/security.yml`  
+**Triggers:** Push to `main`, all pull requests, weekly cron (Sunday 06:00 UTC)
+
+CodeQL is a required status check, so a failing analysis blocks the merge.
+
+### Image & Supply Chain Scanning
+
+**Trivy:** Builds the image and scans it, failing on CRITICAL/HIGH findings that have a fix available. Results are uploaded as SARIF.  
+**OpenSSF Scorecard:** Runs on push and weekly cron, publishing results.
 
 ## Pre-Commit Security
 
@@ -52,24 +70,33 @@ Local enforcement via `.pre-commit-config.yaml`:
 - **ruff-format** ensures consistent code style (reduces hidden bugs)
 - **trailing-whitespace, end-of-file-fixer** prevent whitespace-related issues
 
+The ruff revision in that file is the single source of truth: the CI lint job reads it from there instead of carrying its own pin, so the two cannot drift apart.
+
 Run locally: `pre-commit run --all-files`
 
 ## CI Security (GitHub Actions)
 
 **.github/workflows/ci.yml** enforces:
 - **ruff lint & format** pass on all Python code
-- **pytest** with coverage (116 tests, 0 failures)
+- **pytest** with coverage on Linux (475 tests) plus a platform-safe subset on Windows
+- **shellcheck** on `start.sh` and `stop.sh`
+- **start.bat** structure smoke test
 - **docker build** smoke test (verifies Dockerfile integrity)
 
-Workflow runs on:
+**.github/workflows/security.yml** adds CodeQL, Trivy and Scorecard, as described above.
+
+Workflows run on:
 - Push to `main`
 - All pull requests
+- Weekly cron (`security.yml` only)
 
 ## Limitations & Gaps
 
-- **No SAST CodeQL:** Consider enabling for deeper static analysis
+- **No required review:** Branch protection does not require approvals, so a single maintainer can merge unreviewed
+- **Force push permitted:** History on `main` can be rewritten
+- **System packages unmanaged:** `osmium-tool` and `gdal-bin` are installed via apt, and no Dependabot ecosystem covers apt. Their versions are capped by the Ubuntu 24.04 archive and refreshed by `apt-get upgrade` on each image build
 - **No DAST:** Runtime security testing not automated
-- **No SBOM:** Software Bill of Materials not generated
+- **No SBOM:** GitHub's dependency graph is populated, but no SBOM artifact is published with releases
 - **Manual security review:** All releases require manual audit
 
 ## Incident Response
@@ -78,7 +105,7 @@ If a secret is exposed:
 1. GitHub alerts maintainers via email + dashboard
 2. Secret is immediately revoked in the service
 3. Commit is flagged but remains in history (transparency)
-4. Future commits are scanned to prevent re-exposure
+4. Further pushes carrying the secret are blocked by push protection
 
 ## Maintenance Cadence
 
@@ -87,9 +114,9 @@ If a secret is exposed:
 | Review Dependabot PRs | Weekly |
 | Review GitHub secret alerts | Ongoing (as they arrive) |
 | Audit branch protection rules | Quarterly |
-| Update `.pre-commit-config.yaml` | As dependencies update |
+| Update `.pre-commit-config.yaml` | Automated via Dependabot |
 
 ---
 
-**Last updated:** 2026-04-29  
-**Status:** Initial baseline, Phase 5.6
+**Last updated:** 2026-07-25  
+**Status:** Verified against repository settings and workflow definitions
