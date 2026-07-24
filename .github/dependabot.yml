@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: weekly
 
+  # Bumping the ruff rev here also moves the CI lint job, which reads the
+  # version out of .pre-commit-config.yaml.
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
