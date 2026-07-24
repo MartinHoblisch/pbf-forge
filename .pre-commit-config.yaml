@@ -13,3 +13,6 @@ repos:
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
+        # Two trailing spaces are a hard line break in Markdown. Without this
+        # the hook silently reflows docs that rely on them.
+        args: [--markdown-linebreak-ext=md]

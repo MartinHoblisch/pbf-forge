@@ -7,13 +7,14 @@ PBF Forge relies on GitHub's built-in security features. This document outlines 
 ### Dependabot
 
 **Status:** Enabled  
-**Scope:** `backend/` (pip), root (GitHub Actions)  
+**Scope:** `backend/` (pip), root (GitHub Actions, pre-commit)  
 **Cadence:** Weekly updates  
 **Config:** `.github/dependabot.yml`
 
 Automated dependency updates for:
 - Python packages via pip
 - GitHub Actions versions
+- pre-commit hook revisions
 
 Pull requests are created automatically; maintainers review and merge.
 
