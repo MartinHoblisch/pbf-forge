@@ -1,3 +1,5 @@
+"""API contract tests for the /api/filter endpoints."""
+
 from __future__ import annotations
 
 _VALID_RUN = {

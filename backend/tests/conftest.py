@@ -1,3 +1,5 @@
+"""Shared fixtures: isolated data/config directories, API clients, process mocks."""
+
 from __future__ import annotations
 
 from typing import Generator

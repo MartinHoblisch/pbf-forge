@@ -1,3 +1,5 @@
+"""Tests for DownloadManager: freshness checks, resume offsets, worker outcomes."""
+
 from __future__ import annotations
 
 import hashlib
@@ -125,9 +127,7 @@ def _call_worker(dm, filename, cancel, head_return, do_download_side_effect=None
 
 def test_no_local_file_start_byte_zero(tmp_data_dir):
     dm = _make_dm(tmp_data_dir)
-    cancel = _setup_downloading(dm, "test.osm.pbf")
-    captured = _call_worker(dm, "test.osm.pbf", cancel, (_SERVER_MTIME_NEW, _SERVER_MTIME_NEW))
-    # Can't verify start_byte=0 directly without head_return being (size, mtime) — fix:
+    _setup_downloading(dm, "test.osm.pbf")
     captured = {}
 
     def fake_do(url, dest, start_byte, size, tracker, state, c, session):
@@ -142,7 +142,7 @@ def test_no_local_file_start_byte_zero(tmp_data_dir):
 
 def test_partial_download_start_byte_equals_local_size(tmp_data_dir):
     filename = "test.osm.pbf"
-    # D2: resume is now from the .part file, not the final dest
+    # Resume reads from the .part file, not from the final destination.
     part = tmp_data_dir / (filename + ".part")
     part.write_bytes(b"x" * 500)
 
@@ -164,7 +164,7 @@ def test_partial_download_start_byte_equals_local_size(tmp_data_dir):
 
 def test_same_version_becomes_up_to_date(tmp_data_dir):
     filename = "test.osm.pbf"
-    # D2: _do_download writes to .part; os.replace then moves it to dest.
+    # _do_download writes to .part; os.replace then moves it to dest.
     # Simulate a complete-file scenario by pre-creating the .part file so
     # the success path (os.replace + stat) works.
     part = tmp_data_dir / (filename + ".part")
@@ -324,7 +324,7 @@ def test_fourth_download_accepted_not_simultaneous(tmp_data_dir):
 
 def test_register_and_start_skips_if_already_downloading(tmp_data_dir):
     """register_and_start must return False and not submit a second worker
-    when the filename is already being downloaded (B5 double-download guard)."""
+    when the filename is already being downloaded."""
     dm = _make_dm(tmp_data_dir)
     (tmp_data_dir / "test.osm.pbf").touch()
     dm._refresh_local_files()

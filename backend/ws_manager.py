@@ -1,3 +1,5 @@
+"""Fan-out of state snapshots to every connected WebSocket client."""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +11,13 @@ _log = logging.getLogger(__name__)
 
 
 class ConnectionManager:
+    """Track open WebSocket connections and broadcast to all of them.
+
+    Clients that fail on send are dropped rather than retried: the browser
+    reconnects on its own and receives a fresh snapshot, so there is nothing
+    worth queueing for a socket that is already gone.
+    """
+
     def __init__(self) -> None:
         self._active: list[WebSocket] = []
 

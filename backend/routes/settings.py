@@ -1,3 +1,5 @@
+"""HTTP endpoints for user settings: the host data directory and resource limits."""
+
 from __future__ import annotations
 
 import json

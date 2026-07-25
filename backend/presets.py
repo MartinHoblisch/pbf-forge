@@ -1,3 +1,10 @@
+"""Storage for filter presets: the saved tag/geometry/format combinations.
+
+Presets live in a single JSON file, read and rewritten on every operation. The
+file is small (dozens of entries) and edited only by hand through the UI, so a
+process-wide lock around whole-file reads and writes is enough; no database.
+"""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +22,10 @@ _log = logging.getLogger(__name__)
 
 _DEFAULT_FILE = Path(__file__).parent / "presets_default.json"
 
+# The bundled presets were once named in German. Installs that created them
+# under those names are rewritten to the English identifiers, names and filename
+# suffixes on first read, so an upgrade does not leave a mix of both languages.
+# Maps legacy id → (id, name, suffix).
 _ID_MIGRATION = {
     "preset-schienennetz": ("preset-railway-network", "Railway Network", "railway_network"),
     "preset-wasserstrassen": ("preset-waterways", "Waterways", "waterways"),
@@ -25,6 +36,7 @@ _ID_MIGRATION = {
 
 
 def _migrate(presets: list[dict]) -> tuple[list[dict], bool]:
+    """Rewrite legacy preset identifiers in place. Returns (presets, changed)."""
     changed = False
     for p in presets:
         if p.get("id") in _ID_MIGRATION:
@@ -37,6 +49,8 @@ def _migrate(presets: list[dict]) -> tuple[list[dict], bool]:
 
 
 def _load() -> list[dict]:
+    # Presets used to live in the data volume. Copy them into the config volume
+    # once, so installs created before the split keep their saved presets.
     _old = DATA_DIR / ".osm_tool_presets.json"
     if not PRESETS_FILE.exists() and _old.exists():
         shutil.copy(_old, PRESETS_FILE)

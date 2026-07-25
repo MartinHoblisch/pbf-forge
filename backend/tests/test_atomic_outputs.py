@@ -1,4 +1,4 @@
-"""F4: a failing phase must not leave anything at the final output paths.
+"""A failing phase must not leave anything at the final output paths.
 
 Tests:
 1. test_failed_export_leaves_no_final_file   — export (gpkg) fails → no gpkg at final path

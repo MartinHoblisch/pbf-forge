@@ -1,3 +1,5 @@
+"""HTTP endpoints for the download manager: listing, freshness checks, transfers."""
+
 from __future__ import annotations
 
 import ipaddress
@@ -17,6 +19,12 @@ _BLOCKED_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1", "0.
 
 
 def _validate_url(url: str) -> None:
+    """Reject URLs that point back into the host or a private network.
+
+    The backend fetches whatever URL it is handed, so without this a caller
+    could use it to reach services that are not exposed to them directly.
+    Raises ValueError on rejection.
+    """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError("Only http/https URLs allowed")

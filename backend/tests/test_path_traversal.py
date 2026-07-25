@@ -1,3 +1,9 @@
+"""Tests that user-supplied paths cannot escape the allowed directories.
+
+Covers output_dir on filter requests and the host-drive browser, including
+symlinks pointing outside the browsable root.
+"""
+
 from __future__ import annotations
 
 from unittest.mock import patch

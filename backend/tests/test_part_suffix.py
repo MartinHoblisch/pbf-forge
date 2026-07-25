@@ -1,4 +1,4 @@
-"""D2: in-flight downloads use a .part suffix and are invisible to listings."""
+"""In-flight downloads use a .part suffix and are invisible to listings."""
 
 from __future__ import annotations
 

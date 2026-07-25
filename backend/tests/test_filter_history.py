@@ -1,3 +1,5 @@
+"""Tests for FilterHistory persistence, schema versioning, and corrupt-store recovery."""
+
 from __future__ import annotations
 
 import json

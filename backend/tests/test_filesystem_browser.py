@@ -167,9 +167,9 @@ def test_browse_fs_parent_for_top_level_is_empty_string(client, host_drives):
 
 
 def test_browse_fs_parent_for_nested_path(client, host_drives):
-    nested = host_drives / "h" / "Users" / "Estac"
+    nested = host_drives / "h" / "Users" / "someone"
     nested.mkdir(parents=True)
-    resp = client.get("/api/fs/browse", params={"path": "h/Users/Estac"})
+    resp = client.get("/api/fs/browse", params={"path": "h/Users/someone"})
     body = resp.json()
     assert body["parent"] == str(Path("h/Users"))
 

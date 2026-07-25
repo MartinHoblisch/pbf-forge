@@ -1,3 +1,10 @@
+"""Host-directory browser backing the data-directory picker.
+
+Only works on Docker Desktop for Windows, which exposes the host's drives to the
+container. Elsewhere the endpoints report that browsing is unavailable and the
+user types the path instead.
+"""
+
 from __future__ import annotations
 
 import re

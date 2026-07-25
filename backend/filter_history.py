@@ -1,3 +1,5 @@
+"""Rolling record of how long past filter phases took, kept for duration estimates."""
+
 from __future__ import annotations
 
 import json

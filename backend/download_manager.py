@@ -1,3 +1,10 @@
+"""Downloading and freshness tracking for Geofabrik PBF extracts.
+
+Transfers run in worker threads, resume from a .part file, and are checksummed
+against Geofabrik's .md5 before they count as complete. Per-file state is pushed
+to connected clients as it changes.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -161,6 +168,9 @@ class DownloadManager:
         self._loop = loop
 
     def _load_url_mapping(self) -> None:
+        # The URL mapping used to live in the data volume. Copy it into the
+        # config volume once, so installs created before the split keep their
+        # custom URLs instead of silently starting over.
         _old = DATA_DIR / ".osm_tool_urls.json"
         if not URLS_FILE.exists() and _old.exists():
             shutil.copy(_old, URLS_FILE)
@@ -424,9 +434,10 @@ class DownloadManager:
                         f"(cap is {MAX_DOWNLOAD_SIZE / 1e9:.0f} GB)"
                     )
 
-                # Resume from .part — but discard partials older than the
-                # server file: resuming across a Geofabrik daily update would
-                # mix old and new bytes (guaranteed MD5 failure later).
+                # Resume from .part — but discard partials older than the server
+                # file. Geofabrik rebuilds its extracts daily, so appending to a
+                # partial from yesterday would splice together bytes from two
+                # different files and fail the MD5 check at the end.
                 start_byte = 0
                 if part.exists():
                     st = part.stat()
@@ -534,9 +545,10 @@ class DownloadManager:
                         f"Download of {filename!r} produced no output "
                         f"(server returned 416 with no partial file present)"
                     )
-                # D1: verify BEFORE stamping server mtime — a corrupt file must
-                # never look up_to_date after a backend restart.
-                # D2: verify the .part file, then atomically rename to dest.
+                # Order matters. Verify the .part file first, then rename it
+                # into place, and only stamp the server mtime last: a corrupt
+                # download that already carried the server timestamp would look
+                # up_to_date after a restart and never be fetched again.
                 self._verify_checksum(url, part, session)
                 os.replace(part, dest)
                 if mtime:

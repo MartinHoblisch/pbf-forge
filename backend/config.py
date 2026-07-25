@@ -1,3 +1,9 @@
+"""Paths, tuning constants and download limits shared across the backend.
+
+Directory locations come from the environment so the same code runs inside the
+container and against a local checkout.
+"""
+
 from __future__ import annotations
 
 import os
@@ -34,7 +40,9 @@ MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB
 # Sent on all outbound HTTP requests so Geofabrik can identify traffic source.
 USER_AGENT = "pbf-forge/1.0.0 (+https://github.com/martinhoblisch/pbf-forge)"
 
-# Known continental PBF files — both old (-latest) and new naming conventions
+# Continental extracts offered out of the box. Each continent is keyed twice:
+# under Geofabrik's own "-latest" filename and under the shortened name this
+# tool writes to disk, so a lookup succeeds whichever spelling it starts from.
 CONTINENTAL_URLS: dict[str, str] = {
     "africa.osm.pbf": "https://download.geofabrik.de/africa-latest.osm.pbf",
     "africa-latest.osm.pbf": "https://download.geofabrik.de/africa-latest.osm.pbf",

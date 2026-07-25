@@ -1,8 +1,7 @@
-"""Tests for the G2 osmium-export sharing behaviour in run_job.
+"""Tests that run_job shares one osmium export across all non-PBF formats.
 
-osmium export runs at most ONCE per source across all non-PBF formats.
-All non-PBF formats (geojson, gpkg) always go through the osmium-export path
-regardless of columns_mode (audit F1: one route = one schema).
+osmium export runs at most ONCE per source, and every non-PBF format (geojson,
+gpkg) goes through it regardless of columns_mode — one route, one schema.
 """
 
 from __future__ import annotations
@@ -39,10 +38,10 @@ def _ensure_source(tmp_data_dir, name="berlin.osm.pbf", size=1000):
     (tmp_data_dir / name).write_bytes(b"x" * size)
 
 
-# ── G2: osmium export shared across geojson + gpkg (manual mode) ─────────────
+# ── osmium export shared across geojson + gpkg (manual mode) ─────────────────
 
 
-async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
+async def test_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
     """geojson + gpkg with manual columns_mode → osmium export called exactly once."""
     _ensure_source(tmp_data_dir)
     fm = _fm()
@@ -75,7 +74,7 @@ async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
                     await fm.run_job(job)
 
     assert job.status == "done"
-    assert export_call_count["n"] == 1, "osmium export must run exactly once (G2)"
+    assert export_call_count["n"] == 1, "osmium export must run exactly once per source"
     # Two ogr2ogr calls — one per format
     ogr_cmds = [c for c in captured_cmds if c[0] == "ogr2ogr"]
     assert len(ogr_cmds) == 2
@@ -186,16 +185,17 @@ async def test_gpkg_plus_geojson_reuses_shared_geojson_for_gpkg(tmp_data_dir):
     assert all("-sql" in c for c in ogr_cmds)
 
 
-# ── F1: gpkg-only always uses osmium export path ──────────────────────────────
+# ── gpkg-only always uses the osmium export path ──────────────────────────────
 
 
 async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
-    """F1: gpkg-only jobs must use the same osmium-export route as gpkg+geojson.
+    """gpkg-only jobs use the same osmium-export route as gpkg+geojson.
 
-    Before F1 fix: gpkg-only with other_tags or manual took the GDAL-OSM-driver
-    path (gpkg_direct), skipping osmium export entirely.  After fix: every
-    non-PBF format — including gpkg-only — always runs osmium export first and
-    then ogr2ogr on the shared geojson.  One route = one schema.
+    GDAL's OSM driver could write a GPKG straight from the PBF, which is faster
+    but produces a different column set. Taking that shortcut when gpkg is the
+    only selected format would mean the same filter yields two different schemas
+    depending on what else the user ticked. So every non-PBF format runs osmium
+    export first, then ogr2ogr over the shared GeoJSON.
     """
     _ensure_source(tmp_data_dir)
     fm = _fm()
@@ -225,17 +225,17 @@ async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
                     await fm.run_job(job)
 
     assert job.status == "done"
-    # Must have called osmium export (new unified route)
     export_cmds = [c for c in captured_cmds if c[0] == "osmium" and "export" in c]
-    assert len(export_cmds) == 1, "gpkg-only must use osmium export (F1)"
+    assert len(export_cmds) == 1, "gpkg-only must still run osmium export"
     # osmium export carries disk-backed node index
     assert "--index-type=sparse_file_array,sparse_file_array" in export_cmds[0]
     # ogr2ogr reads from shared geojson, NOT from PBF
     ogr_cmds = [c for c in captured_cmds if c[0] == "ogr2ogr"]
     assert len(ogr_cmds) == 1
     assert "-sql" in ogr_cmds[0], "ogr2ogr must read from shared geojson via -sql"
-    # No OSM_CONFIG_FILE (GDAL driver path must be gone)
-    assert "OSM_CONFIG_FILE" not in ogr_cmds[0], "OSM_CONFIG_FILE must not appear (F1)"
+    assert "OSM_CONFIG_FILE" not in ogr_cmds[0], (
+        "OSM_CONFIG_FILE means ogr2ogr took GDAL's OSM driver instead of the export"
+    )
 
 
 # ── GPKG column-count guard (SQLite max 2000 columns) ────────────────────────

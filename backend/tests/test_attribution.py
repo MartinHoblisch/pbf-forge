@@ -1,3 +1,8 @@
+"""Tests that outputs carry ODbL attribution and provenance metadata.
+
+Covers GPKG and GeoJSON embedding, the PBF no-op, and UTF-8 preservation.
+"""
+
 from __future__ import annotations
 
 import json
