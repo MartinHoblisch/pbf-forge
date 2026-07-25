@@ -783,7 +783,7 @@ footer .credits-sep { color: var(--border); }
     <div class="form-group">
       <label class="field-label" data-i18n="onboard_label">Verzeichnis (Windows-Pfad)</label>
       <div class="path-input-wrap">
-        <input type="text" id="onboarding-path" data-i18n-placeholder="ph_data_dir" placeholder="z. B. C:\Users\Martin\osm-data">
+        <input type="text" id="onboarding-path" data-i18n-placeholder="ph_data_dir" placeholder="z. B. C:\Users\yourname\osm-data">
         <button class="btn btn-secondary" id="btn-browse-onboarding" type="button" title="Ordner durchsuchen" data-i18n="onboard_browse">📂 Durchsuchen</button>
       </div>
     </div>
@@ -813,7 +813,7 @@ footer .credits-sep { color: var(--border); }
     <div class="form-group">
       <label class="field-label" data-i18n="cd_label">Neues Verzeichnis (Windows-Pfad)</label>
       <div class="path-input-wrap">
-        <input type="text" id="change-dir-input" data-i18n-placeholder="ph_data_dir" placeholder="z. B. C:\Users\Martin\osm-data">
+        <input type="text" id="change-dir-input" data-i18n-placeholder="ph_data_dir" placeholder="z. B. C:\Users\yourname\osm-data">
         <button class="btn btn-secondary" id="btn-browse-changedir" type="button" title="Ordner durchsuchen" data-i18n="onboard_browse">📂 Durchsuchen</button>
       </div>
     </div>
@@ -931,7 +931,7 @@ const TRANSLATIONS = {
     ph_preset_name: 'z. B. Schienennetz',
     ph_preset_suffix: 'z. B. railway',
     ph_filter_suffix: 'z. B. railway',
-    ph_data_dir: 'z. B. C:\\Users\\Martin\\osm-data',
+    ph_data_dir: 'z. B. C:\\Users\\yourname\\osm-data',
     label_output_format: 'Ausgabeformat',
     label_osm_attrs: 'OSM-Attribute',
     radio_standard: 'Standard',
@@ -1097,7 +1097,7 @@ const TRANSLATIONS = {
     ph_preset_name: 'e.g. Railway Network',
     ph_preset_suffix: 'e.g. railway',
     ph_filter_suffix: 'e.g. railway',
-    ph_data_dir: 'e.g. C:\\Users\\Martin\\osm-data',
+    ph_data_dir: 'e.g. C:\\Users\\yourname\\osm-data',
     label_output_format: 'Output format',
     label_osm_attrs: 'OSM Attributes',
     radio_standard: 'Standard',
@@ -2338,11 +2338,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!windows_host) {
         TRANSLATIONS.en.onboard_label = 'Directory';
         TRANSLATIONS.en.cd_label = 'New directory';
-        TRANSLATIONS.en.ph_data_dir = 'e.g. /home/martin/osm-data';
+        TRANSLATIONS.en.ph_data_dir = 'e.g. /home/user/osm-data';
         TRANSLATIONS.en.cd_p = 'After saving, <strong>start.sh</strong> must be run again for the change to take effect.';
         TRANSLATIONS.de.onboard_label = 'Verzeichnis';
         TRANSLATIONS.de.cd_label = 'Neues Verzeichnis';
-        TRANSLATIONS.de.ph_data_dir = 'z. B. /home/martin/osm-daten';
+        TRANSLATIONS.de.ph_data_dir = 'z. B. /home/user/osm-daten';
         TRANSLATIONS.de.cd_p = TRANSLATIONS.de.cd_p.replace('start.bat', 'start.sh');
       }
     } catch { /* keep Windows defaults on error */ }

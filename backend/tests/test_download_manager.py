@@ -127,10 +127,7 @@ def _call_worker(dm, filename, cancel, head_return, do_download_side_effect=None
 
 def test_no_local_file_start_byte_zero(tmp_data_dir):
     dm = _make_dm(tmp_data_dir)
-    cancel = _setup_downloading(dm, "test.osm.pbf")
-    captured = _call_worker(dm, "test.osm.pbf", cancel, (_SERVER_MTIME_NEW, _SERVER_MTIME_NEW))
-    # _head must yield (size, mtime), so patch it explicitly below rather than
-    # going through _call_worker — otherwise start_byte cannot be observed.
+    _setup_downloading(dm, "test.osm.pbf")
     captured = {}
 
     def fake_do(url, dest, start_byte, size, tracker, state, c, session):

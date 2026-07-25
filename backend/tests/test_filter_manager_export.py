@@ -41,7 +41,7 @@ def _ensure_source(tmp_data_dir, name="berlin.osm.pbf", size=1000):
 # ── osmium export shared across geojson + gpkg (manual mode) ─────────────────
 
 
-async def test_g2_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
+async def test_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
     """geojson + gpkg with manual columns_mode → osmium export called exactly once."""
     _ensure_source(tmp_data_dir)
     fm = _fm()
