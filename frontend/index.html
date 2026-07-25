@@ -1693,6 +1693,11 @@ function connectWs() {
       const idx = files.findIndex(f => f.filename === msg.file.filename);
       if (idx >= 0) files[idx] = msg.file; else files.push(msg.file);
       renderFiles();
+    } else if (msg.type === 'file_removed') {
+      // The file vanished from the data directory — drop the row without waiting
+      // for a reload, otherwise a check keeps reporting a file that is gone.
+      files = files.filter(f => f.filename !== msg.filename);
+      renderFiles();
     } else if (msg.type === 'filter_jobs') {
       filterJobs = msg.jobs;
       renderFilterJobs();
