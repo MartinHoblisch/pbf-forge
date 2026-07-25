@@ -117,8 +117,7 @@ config/jobs/
 *.parquet
 
 # === Local-only / personal ===
-Notizen.txt
-tasks/
+local/
 .scan-patterns.local
 .claude/
 docs/superpowers/
