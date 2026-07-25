@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from download_manager import DownloadManager, FileState
+from download_manager import PART_SUFFIX, DownloadManager, FileState
 
 _SERVER_MTIME = datetime(2024, 6, 1, tzinfo=timezone.utc)
 _URL = "https://example.com/test.osm.pbf"
@@ -250,3 +250,144 @@ def test_download_worker_survives_a_missing_last_modified(tmp_data_dir):
         state = dm._files[filename]
         assert state.status == "up_to_date"
         assert state.server_mtime is None
+
+
+# ── A cancelled transfer keeps its row so it can be resumed ──────────────────
+
+
+def _paused_by_cancel(tmp_data_dir, written: int = 400) -> tuple[DownloadManager, FileState]:
+    """Run a worker that writes some bytes and is then cancelled."""
+    filename = "test.osm.pbf"
+    part = tmp_data_dir / (filename + PART_SUFFIX)
+    dm = _make_dm()
+    dm._url_mapping[filename] = _URL
+    with dm._lock:
+        dm._files[filename] = FileState(filename=filename, url=_URL, status="downloading")
+        state = dm._files[filename]
+
+    def _write_then_cancel(url, dest, start_byte, size, tracker, st, c, session):
+        part.write_bytes(b"x" * written)
+        c.set()
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        with patch.object(dm, "_do_download", side_effect=_write_then_cancel):
+            dm._download_worker(filename, threading.Event())
+    return dm, state
+
+
+def test_cancel_leaves_a_paused_row_carrying_its_partial(tmp_data_dir):
+    dm, state = _paused_by_cancel(tmp_data_dir)
+
+    assert "test.osm.pbf" in dm._files
+    with dm._lock:
+        assert state.status == "paused"
+        assert state.partial_bytes == 400
+        # The partial must never masquerade as a usable local file.
+        assert state.local_size is None
+
+
+def test_refresh_keeps_a_row_whose_only_artifact_is_a_part_file(tmp_data_dir):
+    dm, _ = _paused_by_cancel(tmp_data_dir)
+
+    dm._refresh_local_files()
+
+    assert "test.osm.pbf" in dm._files
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "paused"
+        assert dm._files["test.osm.pbf"].partial_bytes == 400
+
+
+def test_refresh_discovers_a_part_file_with_nothing_in_memory(tmp_data_dir):
+    """The restart case: the process is gone but the resume base is still there."""
+    (tmp_data_dir / ("europe.osm.pbf" + PART_SUFFIX)).write_bytes(b"x" * 700)
+
+    dm = _make_dm()  # __init__ runs _refresh_local_files
+
+    assert "europe.osm.pbf" in dm._files
+    with dm._lock:
+        state = dm._files["europe.osm.pbf"]
+        assert state.status == "paused"
+        assert state.partial_bytes == 700
+        assert state.local_size is None
+        # Resolved from the bundled continental URLs, so it stays resumable.
+        assert state.url == "https://download.geofabrik.de/europe-latest.osm.pbf"
+
+
+def test_check_keeps_a_paused_row_paused(tmp_data_dir):
+    dm, state = _paused_by_cancel(tmp_data_dir)
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        dm.check_file("test.osm.pbf")
+
+    with dm._lock:
+        assert state.status == "paused"  # not "not_downloaded"
+        assert state.partial_bytes == 400
+        assert state.server_size == 1000
+
+
+def test_deleting_the_part_file_drops_the_paused_row(tmp_data_dir):
+    dm, _ = _paused_by_cancel(tmp_data_dir)
+    (tmp_data_dir / ("test.osm.pbf" + PART_SUFFIX)).unlink()
+
+    with patch.object(dm, "_broadcast") as bc:
+        with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)) as head:
+            dm.check_file("test.osm.pbf")
+
+    assert "test.osm.pbf" not in dm._files
+    head.assert_not_called()
+    assert bc.call_args_list == [(({"type": "file_removed", "filename": "test.osm.pbf"},),)]
+
+
+def test_paused_row_can_be_resumed_from_its_partial(tmp_data_dir):
+    dm, _ = _paused_by_cancel(tmp_data_dir)
+    captured = {}
+
+    def _capture(url, dest, start_byte, size, tracker, st, c, session):
+        captured["start_byte"] = start_byte
+
+    assert dm.start_download("test.osm.pbf") is True
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        with patch.object(dm, "_do_download", side_effect=_capture):
+            with patch.object(dm, "_verify_checksum"):
+                dm._download_worker("test.osm.pbf", threading.Event())
+
+    assert captured["start_byte"] == 400  # picked up where the cancel left off
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "up_to_date"
+
+
+def test_completing_a_download_clears_the_partial(tmp_data_dir):
+    filename = "test.osm.pbf"
+    (tmp_data_dir / (filename + PART_SUFFIX)).write_bytes(b"x" * 1000)
+    dm = _make_dm()
+    dm._url_mapping[filename] = _URL
+    with dm._lock:
+        dm._files[filename] = FileState(filename=filename, url=_URL, status="downloading")
+        dm._files[filename].partial_bytes = 1000
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        with patch.object(dm, "_do_download"):
+            with patch.object(dm, "_verify_checksum"):
+                dm._download_worker(filename, threading.Event())
+
+    with dm._lock:
+        state = dm._files[filename]
+        assert state.status == "up_to_date"
+        assert state.partial_bytes is None
+        assert state.local_size == 1000
+
+
+def test_a_complete_file_beside_a_stray_part_is_not_paused(tmp_data_dir):
+    (tmp_data_dir / "test.osm.pbf").write_bytes(b"x" * 1000)
+    (tmp_data_dir / ("test.osm.pbf" + PART_SUFFIX)).write_bytes(b"x" * 50)
+    dm = _make_dm()
+    dm._url_mapping["test.osm.pbf"] = _URL
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        dm.check_file("test.osm.pbf")
+
+    with dm._lock:
+        state = dm._files["test.osm.pbf"]
+        assert state.status == "up_to_date"  # the finished file wins
+        assert state.local_size == 1000
+        assert state.partial_bytes == 50  # still reported, just not decisive

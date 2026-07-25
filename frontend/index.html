@@ -196,6 +196,8 @@ th.sort-asc, th.sort-desc { color: var(--blue); }
   border-radius: 3px;
   transition: width .3s;
 }
+/* Paused: the bytes are there but nothing is moving — read as inert, not active. */
+.progress-bar-fill.paused { background: var(--gray); }
 .progress-meta { font-size: .72rem; color: var(--gray); }
 
 /* ── Form ── */
@@ -528,6 +530,7 @@ footer .credits-sep { color: var(--border); }
     <button class="btn btn-secondary" onclick="checkAll()" data-i18n="btn_check_all">Check all</button>
     <button class="btn btn-primary" onclick="downloadOutdated()" data-i18n="btn_download_outdated">Download all updates</button>
   </div>
+  <div id="downloads-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
 
   <div class="card">
     <div class="card-header" data-i18n="card_files">Available files</div>
@@ -982,6 +985,8 @@ const TRANSLATIONS = {
     status_checking: 'Wird geprüft',
     status_waiting_retry: 'Verbindung unterbrochen',
     retry_countdown: 'Neuer Versuch in {time} (Versuch {n})',
+    status_paused: 'Pausiert',
+    paused_meta: (pct, have, total) => `${pct}% · ${have} von ${total} geladen`,
     status_error: 'Fehler',
     status_unknown: 'Unbekannt',
     ws_connecting: 'Verbinde …',
@@ -1149,6 +1154,8 @@ const TRANSLATIONS = {
     status_checking: 'Checking',
     status_waiting_retry: 'Connection lost',
     retry_countdown: 'Retry in {time} (attempt {n})',
+    status_paused: 'Paused',
+    paused_meta: (pct, have, total) => `${pct}% · ${have} of ${total} downloaded`,
     status_error: 'Error',
     status_unknown: 'Unknown',
     ws_connecting: 'Connecting…',
@@ -1528,6 +1535,7 @@ function getStatusLabels() {
     update_available: ['badge-orange', '↑ ' + t('status_update_available')],
     not_downloaded:   ['badge-gray',   '↓ ' + t('status_not_downloaded')],
     downloading:      ['badge-blue',   '↓ ' + t('status_downloading')],
+    paused:           ['badge-gray',   '⏸ ' + t('status_paused')],
     checking:         ['badge-blue',   '⟳ ' + t('status_checking')],
     waiting_retry:    ['badge-orange', '⟳ ' + t('status_waiting_retry')],
     error:            ['badge-red',    '✗ ' + t('status_error')],
@@ -1540,7 +1548,7 @@ function statusBadge(status) {
 }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
-const STATUS_ORDER = ['up_to_date','update_available','not_downloaded','downloading','checking','error','unknown'];
+const STATUS_ORDER = ['up_to_date','update_available','not_downloaded','downloading','paused','waiting_retry','checking','error','unknown'];
 
 function sortFiles(col) {
   if (currentSort.col === col) {
@@ -1732,6 +1740,13 @@ function renderFiles() {
            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
            <div class="progress-meta">${pct}%${fmtSpeed(f.speed_bps) ? ' · ' + fmtSpeed(f.speed_bps) : ''}${eta ? ' · ' + eta : ''}</div>
          </div>`;
+    } else if (f.status === 'paused' && f.partial_bytes) {
+      // downloaded_bytes is 0 once the worker is gone, so measure the .part itself.
+      const ppct = f.server_size ? Math.round(f.partial_bytes / f.server_size * 100) : 0;
+      progressCell = `<div class="progress-wrap">
+           <div class="progress-bar-bg"><div class="progress-bar-fill paused" style="width:${ppct}%"></div></div>
+           <div class="progress-meta">${t('paused_meta', ppct, fmtSize(f.partial_bytes), fmtSize(f.server_size))}</div>
+         </div>`;
     } else if (f.status === 'waiting_retry' && f.retry_at) {
       const secsLeft = Math.max(0, Math.round((new Date(f.retry_at) - Date.now()) / 1000));
       const attempt = f.retry_attempt ?? 1;
@@ -1741,13 +1756,16 @@ function renderFiles() {
       progressCell = '—';
     }
 
-    const canDownload = f.url && ['update_available','not_downloaded','unknown','error'].includes(f.status);
+    const canDownload = f.url && ['update_available','not_downloaded','unknown','error','paused'].includes(f.status);
     const canCancel   = ['downloading', 'waiting_retry'].includes(f.status);
 
+    // Filenames travel in data attributes, never interpolated into an inline
+    // handler: escHtml does not escape the apostrophe that would break out of one.
+    const fileAttr = `data-file="${escHtml(f.filename)}"`;
     const actions = `
-      ${canDownload ? `<button class="btn btn-secondary btn-sm" onclick="downloadOne('${f.filename}')">${t('btn_download')}</button>` : ''}
-      ${canCancel   ? `<button class="btn btn-danger btn-sm" onclick="cancelDownload('${f.filename}')">${t('btn_cancel')}</button>` : ''}
-      ${f.url ? `<button class="btn btn-secondary btn-sm" onclick="checkOne('${f.filename}')">${t('btn_check')}</button>` : ''}
+      ${canDownload ? `<button class="btn btn-secondary btn-sm" ${fileAttr} data-file-action="download">${t('btn_download')}</button>` : ''}
+      ${canCancel   ? `<button class="btn btn-danger btn-sm" ${fileAttr} data-file-action="cancel">${t('btn_cancel')}</button>` : ''}
+      ${f.url ? `<button class="btn btn-secondary btn-sm" ${fileAttr} data-file-action="check">${t('btn_check')}</button>` : ''}
     `.trim();
 
     const errTip = f.error ? ` title="${escHtml(f.error)}"` : '';
@@ -1782,30 +1800,53 @@ async function loadFiles() {
   } catch {}
 }
 
+function _clearDownloadError() {
+  document.getElementById('downloads-error').style.display = 'none';
+}
+
+function _downloadError(msg) {
+  const el = document.getElementById('downloads-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// Every action on this tab posts JSON and has nothing to report on success, so
+// they share one round-trip. Results arrive over the WebSocket; the only thing
+// worth showing here is a request that never got through.
+async function _postDownloadAction(path, body) {
+  _clearDownloadError();
+  try {
+    const res = await fetch(path, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      _downloadError(data.detail || t('err_server'));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    _downloadError(t('err_conn', e.message));
+    return false;
+  }
+}
+
 async function checkAll() {
-  await fetch('/api/check', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).catch(() => {});
+  await _postDownloadAction('/api/check', {});
 }
 
 async function checkOne(filename) {
-  await fetch('/api/check', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ filenames: [filename] })
-  }).catch(() => {});
+  await _postDownloadAction('/api/check', { filenames: [filename] });
 }
 
 async function downloadOne(filename) {
   _unlockAudio();
-  await fetch('/api/download', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ filenames: [filename] })
-  }).catch(() => {});
+  await _postDownloadAction('/api/download', { filenames: [filename] });
 }
 
 async function cancelDownload(filename) {
-  await fetch('/api/cancel', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ filename })
-  }).catch(() => {});
+  await _postDownloadAction('/api/cancel', { filename });
 }
 
 async function downloadOutdated() {
@@ -1814,10 +1855,7 @@ async function downloadOutdated() {
     .filter(f => ['update_available','not_downloaded'].includes(f.status) && f.url)
     .map(f => f.filename);
   if (!targets.length) { alert(t('alert_no_updates')); return; }
-  await fetch('/api/download', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ filenames: targets })
-  }).catch(() => {});
+  await _postDownloadAction('/api/download', { filenames: targets });
 }
 
 // URL-Info flow
@@ -1854,10 +1892,24 @@ async function fetchUrlInfo() {
 
 async function addUrl() {
   if (!urlInfoData) return;
-  await fetch('/api/add-url', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ url: urlInfoData.url, filename: urlInfoData.filename })
-  }).catch(() => {});
+  const errEl = document.getElementById('url-error');
+  errEl.style.display = 'none';
+  try {
+    const res = await fetch('/api/add-url', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ url: urlInfoData.url, filename: urlInfoData.filename })
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      errEl.textContent = data.detail || t('err_server');
+      errEl.style.display = 'block';
+      return;  // leave the URL in the box so it can be retried
+    }
+  } catch (e) {
+    errEl.textContent = t('err_conn', e.message);
+    errEl.style.display = 'block';
+    return;
+  }
   document.getElementById('url-preview').style.display = 'none';
   document.getElementById('url-input').value = '';
 }
@@ -2040,7 +2092,7 @@ function renderFilterJobs() {
       <div class="card-header" style="justify-content:space-between">
         <span>${escHtml(j.source_files.join(', '))} → <em>${escHtml(j.suffix)}</em> (${escHtml(fmts)})</span>
         <div style="display:flex;align-items:center;gap:.5rem">
-          ${(j.status === 'running' || j.status === 'pending' || j.status === 'queued') ? `<button class="btn btn-danger btn-sm" onclick="cancelJob('${escHtml(j.id)}')">${t('btn_cancel_job')}</button>` : ''}
+          ${(j.status === 'running' || j.status === 'pending' || j.status === 'queued') ? `<button class="btn btn-danger btn-sm" data-job-id="${escHtml(j.id)}" data-action="cancel-job">${t('btn_cancel_job')}</button>` : ''}
           <span class="badge ${cls}">${statusLabel}</span>
         </div>
       </div>
@@ -2376,6 +2428,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn.dataset.action === 'load') loadPreset(id);
     if (btn.dataset.action === 'edit') editPreset(id);
     if (btn.dataset.action === 'delete') deletePreset(id);
+  });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-file-action]');
+    if (!btn) return;
+    const filename = btn.dataset.file;
+    if (btn.dataset.fileAction === 'download') downloadOne(filename);
+    if (btn.dataset.fileAction === 'cancel')   cancelDownload(filename);
+    if (btn.dataset.fileAction === 'check')    checkOne(filename);
+  });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-job-id]');
+    if (!btn) return;
+    if (btn.dataset.action === 'cancel-job') cancelJob(btn.dataset.jobId);
   });
 
   // Overwrite modal buttons
