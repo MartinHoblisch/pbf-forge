@@ -7,7 +7,7 @@ PBF Forge relies on GitHub's built-in security features. This document outlines 
 ### Dependabot
 
 **Status:** Enabled  
-**Scope:** `backend/` (pip), root (GitHub Actions, pre-commit)  
+**Scope:** `backend/` (pip), root (GitHub Actions, pre-commit, Docker)  
 **Cadence:** Weekly updates  
 **Config:** `.github/dependabot.yml`
 
@@ -15,8 +15,11 @@ Automated dependency updates for:
 - Python packages via pip
 - GitHub Actions versions
 - pre-commit hook revisions
+- The pinned base image digest in `Dockerfile`
 
 GitHub Actions updates are grouped into one pull request, so sub-actions pinned to a shared SHA (`github/codeql-action/*`) always move together.
+
+The Docker ecosystem is restricted to digest refreshes: major and minor tag bumps are ignored, because the Ubuntu tag also determines the `osmium-tool`, `gdal-bin` and `python3` versions. Changing it is a deliberate migration, not a dependency bump.
 
 Dependabot vulnerability alerts and security updates are enabled on the repository.
 
@@ -94,7 +97,8 @@ Workflows run on:
 
 - **No required review:** Branch protection does not require approvals, so a single maintainer can merge unreviewed
 - **Force push permitted:** History on `main` can be rewritten
-- **System packages unmanaged:** `osmium-tool` and `gdal-bin` are installed via apt, and no Dependabot ecosystem covers apt. Their versions are capped by the Ubuntu 24.04 archive and refreshed by `apt-get upgrade` on each image build
+- **System packages unmanaged:** `osmium-tool` and `gdal-bin` are installed via apt, and no Dependabot ecosystem covers apt. Their versions are capped by the Ubuntu 24.04 archive and refreshed by `apt-get upgrade` on each image build. Dependabot tracks the base image digest, which pulls in patched layers, but cannot advance a package past what the archive holds
+- **Universe packages carry no vendor security guarantee:** `osmium-tool` and `gdal-bin` live in Ubuntu universe, which has no guaranteed Canonical security maintenance in an LTS (that would require Ubuntu Pro `esm-apps`, not attached here). Trivy reads Ubuntu OVAL/USN data, so a universe vulnerability without a USN can stay unreported — a green scan is weaker evidence here than for `main` packages. Base image migration tracked in issue #44
 - **No DAST:** Runtime security testing not automated
 - **No SBOM:** GitHub's dependency graph is populated, but no SBOM artifact is published with releases
 - **Manual security review:** All releases require manual audit
