@@ -20,7 +20,7 @@ import json
 import pytest
 
 import presets as pm
-from presets import _ID_MIGRATION
+from presets import _ID_MIGRATION, _SUFFIX_MIGRATION
 
 
 def _write(presets: list[dict]) -> None:
@@ -84,6 +84,45 @@ def test_uuid_id_unchanged(tmp_data_dir):
     assert result[0]["id"] == uuid_str
     assert result[0]["name"] == "My Custom Preset"
     assert result[0]["suffix"] == "meine_endung"
+
+
+# ── Suffix-only migration ────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "preset_id,legacy_suffix,expected_suffix",
+    [(pid, old, new) for pid, (old, new) in _SUFFIX_MIGRATION.items()],
+)
+def test_migrates_german_suffix_on_modern_id(
+    tmp_data_dir, preset_id, legacy_suffix, expected_suffix
+):
+    """An earlier release migrated ids and names but left the German suffix.
+    Those presets no longer match _ID_MIGRATION, so the suffix is repaired
+    separately — otherwise output files keep German names forever."""
+    _write([{"id": preset_id, "name": "Name", "suffix": legacy_suffix, "tags": ["x"]}])
+
+    result = pm.list_presets()
+
+    assert result[0]["suffix"] == expected_suffix
+    assert _read()[0]["suffix"] == expected_suffix
+
+
+def test_custom_suffix_on_default_preset_kept(tmp_data_dir):
+    """Only the German default suffix is replaced; a user-chosen one survives."""
+    _write([{"id": "preset-waterways", "name": "Waterways", "suffix": "my_rivers"}])
+
+    result = pm.list_presets()
+
+    assert result[0]["suffix"] == "my_rivers"
+
+
+def test_no_save_when_suffix_already_english(tmp_data_dir):
+    _write([{"id": "preset-waterways", "name": "Waterways", "suffix": "waterways"}])
+    mtime_before = pm.PRESETS_FILE.stat().st_mtime_ns
+
+    pm.list_presets()
+
+    assert pm.PRESETS_FILE.stat().st_mtime_ns == mtime_before
 
 
 # ── Mixed file ───────────────────────────────────────────────────────────────

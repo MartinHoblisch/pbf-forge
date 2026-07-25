@@ -34,6 +34,19 @@ _ID_MIGRATION = {
     "preset-gebaeude": ("preset-buildings", "Buildings", "buildings"),
 }
 
+# An earlier release renamed the ids and names but left the filename suffix in
+# German. Those installs no longer match _ID_MIGRATION, so repair the suffix
+# separately. Maps id → (legacy suffix, English suffix); the suffix is only
+# replaced while it still holds the German default, so a preset the user
+# renamed keeps its own suffix.
+_SUFFIX_MIGRATION = {
+    "preset-railway-network": ("schienennetz", "railway_network"),
+    "preset-waterways": ("wasserstrassen", "waterways"),
+    "preset-road-network": ("strassennetz", "road_network"),
+    "preset-protected-areas": ("schutzgebiete", "protected_areas"),
+    "preset-buildings": ("gebaeude", "buildings"),
+}
+
 
 def _migrate(presets: list[dict]) -> tuple[list[dict], bool]:
     """Rewrite legacy preset identifiers in place. Returns (presets, changed)."""
@@ -43,6 +56,10 @@ def _migrate(presets: list[dict]) -> tuple[list[dict], bool]:
             new_id, new_name, new_suffix = _ID_MIGRATION[p["id"]]
             p["id"] = new_id
             p["name"] = new_name
+            p["suffix"] = new_suffix
+            changed = True
+        legacy_suffix, new_suffix = _SUFFIX_MIGRATION.get(p.get("id"), (None, None))
+        if legacy_suffix is not None and p.get("suffix") == legacy_suffix:
             p["suffix"] = new_suffix
             changed = True
     return presets, changed
