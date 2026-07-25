@@ -70,10 +70,11 @@ def test_check_file_update_available(tmp_data_dir):
 
 
 def test_check_file_error_on_connection_error(tmp_data_dir):
+    # The file has to exist on disk: a check now re-reads the directory first and
+    # drops rows whose file is gone, which would otherwise mask the error status.
+    (tmp_data_dir / "test.osm.pbf").write_bytes(b"x")
     dm = _make_dm(tmp_data_dir)
     dm._url_mapping["test.osm.pbf"] = "https://example.com/test.osm.pbf"
-    with dm._lock:
-        dm._files["test.osm.pbf"] = FileState(filename="test.osm.pbf")
     with patch.object(dm, "_head", side_effect=requests.ConnectionError("refused")):
         dm.check_file("test.osm.pbf")
     with dm._lock:

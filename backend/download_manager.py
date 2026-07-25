@@ -43,6 +43,28 @@ from config import (
 
 _log = logging.getLogger(__name__)
 
+# In-progress transfers are written to <name>.osm.pbf.part and only renamed into
+# place once the checksum matches, so a stray .part is a resumable remnant.
+PART_SUFFIX = ".part"
+
+# Statuses that mean a worker thread is alive and owns this file's row. While a
+# transfer is running only a .part file exists on disk, so anything that reads
+# the directory must neither reset such a row's status nor prune it.
+_ACTIVE_STATUSES = ("downloading", "waiting_retry")
+
+# Statuses that a directory scan must leave alone on top of the active ones:
+# an in-flight check owns the row just as much, and an error is a result the
+# user still needs to see.
+_PRESERVED_STATUSES = _ACTIVE_STATUSES + ("checking", "error")
+
+
+def _stat_or_none(path: Path) -> Optional[os.stat_result]:
+    """stat() a path, or None if it is not there (or unreadable)."""
+    try:
+        return path.stat()
+    except OSError:
+        return None
+
 
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     """Return seconds to wait before next fast retry.
@@ -80,7 +102,7 @@ class FileState:
     server_size: Optional[int] = None
     server_mtime: Optional[str] = None
     # unknown | not_downloaded | checking | up_to_date | update_available
-    # downloading | waiting_retry | error
+    # downloading | paused | waiting_retry | error
     status: str = "unknown"
     downloaded_bytes: int = 0
     speed_bps: float = 0.0
@@ -88,6 +110,9 @@ class FileState:
     error: Optional[str] = None
     retry_at: Optional[str] = None  # ISO timestamp of next slow retry
     retry_attempt: Optional[int] = None  # slow retry attempt counter
+    # Bytes sitting in the .part file. Reported separately from local_size so a
+    # half-finished transfer can never be mistaken for a usable local file.
+    partial_bytes: Optional[int] = None
 
     def to_dict(self) -> dict:
         return {
@@ -104,6 +129,7 @@ class FileState:
             "error": self.error,
             "retry_at": self.retry_at,
             "retry_attempt": self.retry_attempt,
+            "partial_bytes": self.partial_bytes,
         }
 
 
@@ -211,31 +237,70 @@ class DownloadManager:
                 return url
         return None
 
-    def _refresh_local_files(self) -> None:
-        found: set[str] = set()
-        for path in DATA_DIR.glob("*.osm.pbf"):
-            fn = path.name
-            found.add(fn)
-            stat = path.stat()
-            with self._lock:
-                if fn not in self._files:
-                    self._files[fn] = FileState(filename=fn)
-                state = self._files[fn]
-                state.local_size = stat.st_size
-                state.local_mtime = datetime.fromtimestamp(
-                    stat.st_mtime, tz=timezone.utc
-                ).isoformat()
-                state.url = self._resolve_url(fn)
-                if state.status not in ("downloading", "checking", "error"):
-                    state.status = "unknown"
+    def _sync_local_state(self, filename: str) -> bool:
+        """Re-read one file from disk into its FileState.
 
-        # Remove states for files no longer on disk (skip active downloads)
+        Every path that reports on a file goes through here, so a single check
+        and a check-all always see the same size, timestamp and URL.
+
+        A lone .part file counts as present: it is the resume base for a paused
+        transfer, and dropping the row would leave the user no way to continue it.
+
+        Returns False when nothing is left on disk and the row was dropped.
+        """
+        complete = _stat_or_none(DATA_DIR / filename)
+        partial = _stat_or_none(DATA_DIR / (filename + PART_SUFFIX))
+
+        if complete is None and partial is None:
+            with self._lock:
+                state = self._files.get(filename)
+                # Nothing tracked, or a worker is about to create the .part file.
+                if state is None or state.status in _ACTIVE_STATUSES:
+                    return True
+                del self._files[filename]
+            self._broadcast({"type": "file_removed", "filename": filename})
+            return False
+
+        with self._lock:
+            if filename not in self._files:
+                self._files[filename] = FileState(filename=filename)
+            state = self._files[filename]
+            state.local_size = complete.st_size if complete else None
+            state.local_mtime = (
+                datetime.fromtimestamp(complete.st_mtime, tz=timezone.utc).isoformat()
+                if complete
+                else None
+            )
+            state.partial_bytes = partial.st_size if partial else None
+            # Keep a previously known URL when the mapping no longer resolves:
+            # dropping it would strand the row with nothing left to check against.
+            if url := self._resolve_url(filename):
+                state.url = url
+            if state.status not in _PRESERVED_STATUSES:
+                state.status = "unknown" if complete else "paused"
+        return True
+
+    def _refresh_local_files(self) -> None:
+        # A .part file on its own is enough to keep a row: that is what makes a
+        # paused download survive a restart instead of leaking disk space unseen.
+        found = {path.name for path in DATA_DIR.glob("*.osm.pbf")}
+        found |= {
+            path.name[: -len(PART_SUFFIX)] for path in DATA_DIR.glob("*.osm.pbf" + PART_SUFFIX)
+        }
+        for filename in sorted(found):
+            self._sync_local_state(filename)
+
+        # Remove states for files no longer on disk (skip active transfers)
         with self._lock:
             gone = [
-                k for k in self._files if k not in found and self._files[k].status != "downloading"
+                k
+                for k in self._files
+                if k not in found and self._files[k].status not in _ACTIVE_STATUSES
             ]
             for k in gone:
                 del self._files[k]
+        for filename in gone:
+            self._broadcast({"type": "file_removed", "filename": filename})
 
     def list_files(self) -> list[dict]:
         self._refresh_local_files()
@@ -244,6 +309,11 @@ class DownloadManager:
 
     def check_file(self, filename: str) -> None:
         """HEAD-request one file against Geofabrik. Runs in a thread."""
+        # Read the disk first, so a single check reports what is actually there
+        # rather than whatever this process last remembered.
+        if not self._sync_local_state(filename):
+            return  # File is gone; its row has already been dropped.
+
         with self._lock:
             if filename not in self._files:
                 self._files[filename] = FileState(filename=filename)
@@ -253,17 +323,43 @@ class DownloadManager:
         if not url:
             return
 
+        # A running transfer owns the status column: the progress bar and the
+        # cancel button are rendered from it, and the worker only writes byte
+        # counters back. Refresh the server figures around it, never over it.
         with self._lock:
-            state.status = "checking"
-        self._broadcast({"type": "file_update", "file": state.to_dict()})
+            active = state.status in _ACTIVE_STATUSES
+            if not active:
+                state.status = "checking"
+        if not active:
+            self._broadcast({"type": "file_update", "file": state.to_dict()})
 
         try:
             size, mtime = self._head(url)
+        except Exception as exc:
             with self._lock:
-                state.server_size = size
-                state.server_mtime = mtime.isoformat() if mtime else None
+                active = state.status in _ACTIVE_STATUSES
+                if not active:
+                    state.status = "error"
+                    state.error = str(exc)
+            if active:
+                # Surfacing this would replace a live progress bar with a red
+                # badge over a transfer that is still perfectly healthy.
+                _log.warning("Check of %s failed during transfer: %s", filename, exc)
+            else:
+                self._broadcast({"type": "file_update", "file": state.to_dict()})
+            return
+
+        with self._lock:
+            state.server_size = size
+            state.server_mtime = mtime.isoformat() if mtime else None
+            # Re-read the status instead of trusting the snapshot taken before
+            # the request: a HEAD may take up to 30 seconds, long enough for a
+            # download to have started in the meantime.
+            if state.status not in _ACTIVE_STATUSES:
                 if state.local_size is None:
-                    state.status = "not_downloaded"
+                    # A .part remnant is resumable, so say so rather than
+                    # reporting the file as never fetched.
+                    state.status = "paused" if state.partial_bytes else "not_downloaded"
                 elif (
                     mtime
                     and state.local_mtime
@@ -275,10 +371,6 @@ class DownloadManager:
                 else:
                     state.status = "update_available"
                 state.error = None
-        except Exception as exc:
-            with self._lock:
-                state.status = "error"
-                state.error = str(exc)
 
         self._broadcast({"type": "file_update", "file": state.to_dict()})
 
@@ -295,7 +387,10 @@ class DownloadManager:
             if filename not in self._files:
                 return False
             state = self._files[filename]
-            if state.status == "downloading":
+            # The cancel flag outlives the status: the worker pops it in its
+            # finally block. Checking it too keeps a second worker from ever
+            # appending to the same .part file if the status drifts.
+            if state.status == "downloading" or filename in self._cancel_flags:
                 return False
             url = state.url or self._resolve_url(filename)
             if not url:
@@ -367,7 +462,7 @@ class DownloadManager:
             else:
                 state = self._files[filename]
                 state.url = url
-            if state.status == "downloading":
+            if state.status == "downloading" or filename in self._cancel_flags:
                 return False
             state.status = "downloading"
             state.error = None
@@ -417,7 +512,7 @@ class DownloadManager:
             url = state.url
 
         dest = DATA_DIR / filename
-        part = dest.with_name(dest.name + ".part")
+        part = dest.with_name(dest.name + PART_SUFFIX)
         tracker = _SpeedTracker()
 
         try:
@@ -425,7 +520,7 @@ class DownloadManager:
                 size, mtime = self._head(url, session=session)
                 with self._lock:
                     state.server_size = size
-                    state.server_mtime = mtime.isoformat()
+                    state.server_mtime = mtime.isoformat() if mtime else None
 
                 # Reject pathological downloads (wrong URL, hostile mirror, etc.)
                 if size > MAX_DOWNLOAD_SIZE:
@@ -534,9 +629,13 @@ class DownloadManager:
                         break  # exit fast retry loop (slow loop handled everything)
 
             if cancel.is_set():
-                # .part intentionally kept on disk — resume base for the next attempt.
+                # .part intentionally kept on disk — resume base for the next
+                # attempt. Report it as paused so the row stays and offers a
+                # resume instead of vanishing on the next directory scan.
+                leftover = _stat_or_none(part)
                 with self._lock:
-                    state.status = "unknown"
+                    state.status = "paused" if leftover else "unknown"
+                    state.partial_bytes = leftover.st_size if leftover else None
                     state.speed_bps = 0.0
                     state.eta_seconds = 0.0
             else:
@@ -558,6 +657,7 @@ class DownloadManager:
                     state.status = "up_to_date"
                     state.local_size = dest.stat().st_size
                     state.local_mtime = mtime.isoformat() if mtime else None
+                    state.partial_bytes = None  # .part was renamed into place
                     state.speed_bps = 0.0
                     state.eta_seconds = 0.0
                     state.downloaded_bytes = 0

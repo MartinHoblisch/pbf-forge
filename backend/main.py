@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 import state
 from config import CONFIG_DIR, DATA_DIR, TEMP_DIR, USER_CONFIG_FILE
@@ -145,8 +146,12 @@ async def ws_endpoint(ws: WebSocket):
         await ws.close(code=1008)
         return
     await state.ws_manager.connect(ws)
-    await ws.send_json({"type": "files", "files": state.download_manager.list_files()})
-    await ws.send_json({"type": "filter_jobs", "jobs": state.filter_manager.list_jobs()})
+    # Both snapshots stat the disk. Off the event loop, or a reconnect stalls the
+    # progress broadcasts of every download already running.
+    files = await run_in_threadpool(state.download_manager.list_files)
+    jobs = await run_in_threadpool(state.filter_manager.list_jobs)
+    await ws.send_json({"type": "files", "files": files})
+    await ws.send_json({"type": "filter_jobs", "jobs": jobs})
     try:
         while True:
             await ws.receive_text()
