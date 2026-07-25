@@ -1,3 +1,5 @@
+"""API contract tests for the /api/settings endpoints."""
+
 from __future__ import annotations
 
 import json

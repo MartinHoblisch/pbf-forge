@@ -2079,6 +2079,9 @@ function _closeOverwriteModal(result) {
 }
 
 // ─── Risk modal (Gate 0) ──────────────────────────────────────────────────────
+// Gate 0 is the backend's pre-start check: /api/filter/check returns a `risk`
+// object when a job's sources look too large for the machine's RAM. The user
+// confirms or cancels before any work begins.
 let _riskResolve = null;
 
 function _showRiskModal(risk) {
@@ -2213,7 +2216,8 @@ function loadPreset(id) {
   document.getElementById('geo-ways').checked      = (p.geometry_types||[]).includes('ways');
   document.getElementById('geo-relations').checked = (p.geometry_types||[]).includes('relations');
 
-  // Handle output_formats (array) with backward compat for old output_format (string)
+  // Presets predating multi-format output stored a single format string in
+  // output_format instead of the output_formats array. Accept both shapes.
   const fmts = p.output_formats || (p.output_format ? [p.output_format] : ['gpkg']);
   document.querySelectorAll('input[name="fmt"]').forEach(cb => {
     cb.checked = fmts.includes(cb.value);

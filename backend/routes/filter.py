@@ -1,3 +1,5 @@
+"""HTTP endpoints for filter jobs: request validation, start, status, log download."""
+
 from __future__ import annotations
 
 import re

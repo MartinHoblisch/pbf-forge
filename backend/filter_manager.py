@@ -1,3 +1,10 @@
+"""Filter job execution: the osmium/ogr2ogr pipeline and the bookkeeping around it.
+
+A job filters one or more PBF sources by tag and geometry type, then writes the
+result in the requested formats. Work happens in subprocesses whose output is
+streamed to the client; jobs survive a backend restart via a JSON manifest.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -39,16 +46,18 @@ _FMT_EXT = {
 # (which would be interpreted as a CLI flag) or contain shell-special chars.
 _VALID_TAG = re.compile(r"^[^-\s\n\r\x00][^\n\r\x00]*$")
 
-# Gate 0: flag non-PBF jobs where total source size exceeds this fraction of
-# system RAM. PBF-only jobs stream end-to-end and are never flagged.
+# Gate 0 is the pre-start risk check (assess_job_risk): before any work begins,
+# a job whose sources look too large for the machine's RAM raises a confirmation
+# dialog in the UI. It flags non-PBF jobs whose total source size exceeds this
+# fraction of system RAM. PBF-only jobs stream end-to-end and are never flagged.
 RISK_RAM_FACTOR = 0.5
 
 # Stall handling: prolonged silence produces a WARNING, never a kill.
-# osmium tags-filter legitimately reads a 32-GB input up to 4 times before
-# writing any output, silently when piped — auto-killing on silence killed
-# healthy jobs twice (wall-clock rate, then the 300s stall-kill). Liveness
-# is judged from stdout/stderr activity, output-file growth, and /proc-IO
-# counters; only ABSOLUTE_TIMEOUT_SECONDS kills.
+# Silence is not evidence of a hang — osmium tags-filter reads its input up to
+# four times to resolve references before writing any output, and stays quiet
+# while doing so when its streams are piped. On a 32-GB source that is hours of
+# healthy work. Liveness is therefore judged from stdout/stderr activity,
+# output-file growth, and /proc-IO counters; only ABSOLUTE_TIMEOUT_SECONDS kills.
 STALL_CHECK_INTERVAL = 2.0
 STALL_WARN_SECONDS = 300.0
 ABSOLUTE_TIMEOUT_SECONDS = 24 * 3600.0
@@ -383,7 +392,7 @@ class FilterManager:
         ]
 
     def assess_job_risk(self, source_files: list[str], output_formats: list[str]) -> dict | None:
-        """Gate 0 (audit V6): cheap pre-job RAM-risk estimate.
+        """Gate 0: cheap pre-job RAM-risk estimate.
 
         The GeoJSON conversion step loads the whole filtered GeoJSON into RAM
         (10-20x its size, verified). The filtered size is unknown before the
@@ -566,7 +575,9 @@ class FilterManager:
                                 raise RuntimeError("PBF tag reduction failed")
                             await self._finish_phase(job)
 
-                        # All PBF phases done — publish atomically (audit F4).
+                        # Every phase above wrote into tmp, so only a complete
+                        # run reaches the final path. A failure leaves nothing
+                        # there that a user could mistake for a finished result.
                         shutil.move(str(pbf_work), str(pbf_out))
                         job.output_files.append(str(pbf_out))
                         intermediate = pbf_out
@@ -617,7 +628,8 @@ class FilterManager:
                     else:
                         continue
 
-                    # G2: run osmium export at most once per source, share across formats.
+                    # osmium export runs at most once per source; every selected
+                    # output format reuses the result.
                     shared_geojson: Path | None = None
                     shared_fields: list[str] = []
 
@@ -633,8 +645,10 @@ class FilterManager:
 
                         # Single export route for every non-PBF format: osmium
                         # export with a disk-backed node index, then ogr2ogr.
-                        # One route = one schema, regardless of which formats
-                        # were co-selected (audit finding F1).
+                        # Routing gpkg through GDAL's OSM driver instead would
+                        # be faster but yields a different column set, so the
+                        # same filter would produce two schemas depending on
+                        # which formats happened to be selected together.
                         if shared_geojson is None:
                             shared_geojson = tmp / f"{stem}_export.geojsonseq"
                             # Disk-backed node index keeps RAM bounded on
@@ -758,7 +772,9 @@ class FilterManager:
                             job.exclude_tags,
                             job.geometry_types,
                         )
-                        # All export phases done — publish atomically (audit F4).
+                        # Conversion and metadata embedding both succeeded, so
+                        # the finished file can take the final path. A failure
+                        # anywhere above leaves that path untouched.
                         out_file.unlink(missing_ok=True)
                         shutil.move(str(work_file), str(out_file))
                         job.output_files.append(str(out_file))
@@ -814,12 +830,9 @@ class FilterManager:
     def _preflight_warnings(self, job: FilterJob, total_source_bytes: int) -> None:
         """Append disk-space warning to job log. Never blocks the job.
 
-        Per-job RAM risk is now assessed by assess_job_risk() (Gate 0), which
-        shows a pre-start confirmation dialog when source size exceeds 50% of
-        MemTotal. That replaces the old in-log `source_size × 0.4 RSS` estimate
-        which produced false alarms on trimmed-down jobs. This method therefore
-        handles only the disk-space check after the filter pass — there is no
-        RAM heuristic here, but RAM risk is not ignored; it lives in Gate 0.
+        Disk space only. RAM risk is handled before the job starts, by
+        assess_job_risk() (Gate 0), which can still ask the user to confirm;
+        a warning written here would arrive too late to act on.
         """
         warnings: list[str] = []
 

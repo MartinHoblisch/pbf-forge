@@ -1,3 +1,5 @@
+"""Tests for the /ws endpoint: initial snapshots, broadcast fan-out, disconnects."""
+
 from __future__ import annotations
 
 import state

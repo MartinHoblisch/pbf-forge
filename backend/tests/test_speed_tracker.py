@@ -1,3 +1,5 @@
+"""Tests for the rolling download-speed tracker and its broadcast throttle."""
+
 from __future__ import annotations
 
 import threading

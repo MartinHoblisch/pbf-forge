@@ -1,3 +1,5 @@
+"""FastAPI application entry point: startup, routing, WebSocket, static files."""
+
 from __future__ import annotations
 
 import asyncio

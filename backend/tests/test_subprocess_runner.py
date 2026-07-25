@@ -1,3 +1,5 @@
+"""Tests for FilterManager._run_cmd: exit codes, log capture, timeout handling."""
+
 from __future__ import annotations
 
 import asyncio
@@ -140,8 +142,8 @@ async def test_timeout_kills_process_and_raises():
 
     with patch("asyncio.create_subprocess_exec", return_value=proc):
         with pytest.raises(RuntimeError, match="absolute limit"):
-            # Now raises "exceeded absolute limit of Xh" (F3: stall watchdog replaces
-            # the old wall-clock rate; TimeoutError path still kills + raises)
+            # Silence alone never kills a job; only the absolute timeout does,
+            # and it kills the process before raising.
             await fm._run_cmd(["sleep", "10"], job)
 
     proc.kill.assert_called_once()

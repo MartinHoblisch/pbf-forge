@@ -1,3 +1,10 @@
+"""Strip unwanted tags from a PBF file, keeping the objects themselves intact.
+
+Used by the "manual columns" mode, where the output should carry only the tag
+keys the user picked. osmium-tool has no equivalent operation, so this walks the
+file with pyosmium instead.
+"""
+
 from __future__ import annotations
 
 import osmium

@@ -1,3 +1,5 @@
+"""Tests for the presets module: CRUD, corrupt-file handling, storage migration."""
+
 from __future__ import annotations
 
 import json

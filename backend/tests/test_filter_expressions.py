@@ -1,3 +1,5 @@
+"""Tests for the osmium tags-filter expressions built from tags and geometry types."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock

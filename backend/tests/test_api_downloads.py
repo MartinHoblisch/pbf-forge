@@ -1,3 +1,5 @@
+"""API contract tests for the download endpoints under /api."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

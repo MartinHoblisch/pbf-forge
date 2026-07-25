@@ -1,3 +1,5 @@
+"""Tests for the phase list and progress weights FilterManager plans per job."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock

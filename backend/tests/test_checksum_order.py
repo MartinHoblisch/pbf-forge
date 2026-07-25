@@ -1,4 +1,4 @@
-"""D1: checksum verification must run BEFORE os.utime; mismatch quarantines the file."""
+"""Checksum verification must run BEFORE os.utime; a mismatch quarantines the file."""
 
 from __future__ import annotations
 

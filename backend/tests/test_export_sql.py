@@ -1,3 +1,5 @@
+"""Tests for the SELECT statement FilterManager hands to ogr2ogr."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock

@@ -1,3 +1,5 @@
+"""CRUD endpoints for filter presets."""
+
 from __future__ import annotations
 
 from typing import Literal

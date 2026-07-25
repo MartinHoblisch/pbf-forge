@@ -1,9 +1,7 @@
-"""Tests for disk preflight warning emitted at job start.
+"""Tests for the disk-space warning emitted at job start.
 
-Previously also tested RAM-based heuristics; those were removed once
-sparse_file_array + streaming JSON embed brought the pipeline's peak
-RSS down to ~1-2 GB on Europe-scale sources, making the old estimate
-(source × 0.4) a false-alarm generator.
+Disk space only. RAM risk is checked before the job starts, by
+FilterManager.assess_job_risk — see test_job_risk.py.
 """
 
 from __future__ import annotations

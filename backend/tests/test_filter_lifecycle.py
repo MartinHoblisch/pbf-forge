@@ -147,7 +147,7 @@ async def test_cancel_running_without_proc_still_marks_error():
     assert job.status == "error"
 
 
-# ── Job queue (S6) ────────────────────────────────────────────────────────────
+# ── Job queue ─────────────────────────────────────────────────────────────────
 
 
 async def test_second_job_queues_when_at_capacity():
