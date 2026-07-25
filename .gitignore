@@ -119,5 +119,6 @@ config/jobs/
 # === Local-only / personal ===
 local/
 .scan-patterns.local
+CLAUDE.md
 .claude/
 docs/superpowers/
