@@ -95,6 +95,7 @@ logs/
 
 
 # === Project: OSM data & outputs ===
+data/
 *.pbf
 *.geojson
 *.gpkg
