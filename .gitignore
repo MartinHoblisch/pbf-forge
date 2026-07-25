@@ -110,6 +110,9 @@ config/.osm_tool_presets.json
 config/.osm_tool_urls.json
 config/.filter_history.json
 
+# job queue persistence (manifest.json + per-job logs) — runtime state
+config/jobs/
+
 # === GeoParquet ===
 *.parquet
 
