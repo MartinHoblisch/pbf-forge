@@ -35,17 +35,20 @@ def _read() -> list[dict]:
 
 
 @pytest.mark.parametrize(
-    "old_id,expected_new_id,expected_new_name",
-    [(old, new, name) for old, (new, name) in _ID_MIGRATION.items()],
+    "old_id,expected_new_id,expected_new_name,expected_new_suffix",
+    [(old, new, name, suffix) for old, (new, name, suffix) in _ID_MIGRATION.items()],
 )
-def test_migrates_each_legacy_id(tmp_data_dir, old_id, expected_new_id, expected_new_name):
-    _write([{"id": old_id, "name": "OLD NAME", "tags": ["x"]}])
+def test_migrates_each_legacy_id(
+    tmp_data_dir, old_id, expected_new_id, expected_new_name, expected_new_suffix
+):
+    _write([{"id": old_id, "name": "OLD NAME", "suffix": "old_suffix", "tags": ["x"]}])
 
     result = pm.list_presets()
 
     assert len(result) == 1
     assert result[0]["id"] == expected_new_id
     assert result[0]["name"] == expected_new_name
+    assert result[0]["suffix"] == expected_new_suffix
     assert result[0]["tags"] == ["x"]  # other fields preserved
 
 
@@ -74,12 +77,13 @@ def test_modern_id_unchanged(tmp_data_dir):
 def test_uuid_id_unchanged(tmp_data_dir):
     """User-created presets (UUID IDs) must never be touched by the migrator."""
     uuid_str = "12345678-1234-1234-1234-1234567890ab"
-    _write([{"id": uuid_str, "name": "My Custom Preset"}])
+    _write([{"id": uuid_str, "name": "My Custom Preset", "suffix": "meine_endung"}])
 
     result = pm.list_presets()
 
     assert result[0]["id"] == uuid_str
     assert result[0]["name"] == "My Custom Preset"
+    assert result[0]["suffix"] == "meine_endung"
 
 
 # ── Mixed file ───────────────────────────────────────────────────────────────

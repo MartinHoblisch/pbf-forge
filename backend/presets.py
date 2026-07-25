@@ -16,11 +16,11 @@ _log = logging.getLogger(__name__)
 _DEFAULT_FILE = Path(__file__).parent / "presets_default.json"
 
 _ID_MIGRATION = {
-    "preset-schienennetz": ("preset-railway-network", "Railway Network"),
-    "preset-wasserstrassen": ("preset-waterways", "Waterways"),
-    "preset-strassennetz": ("preset-road-network", "Road Network"),
-    "preset-schutzgebiete": ("preset-protected-areas", "Protected Areas"),
-    "preset-gebaeude": ("preset-buildings", "Buildings"),
+    "preset-schienennetz": ("preset-railway-network", "Railway Network", "railway_network"),
+    "preset-wasserstrassen": ("preset-waterways", "Waterways", "waterways"),
+    "preset-strassennetz": ("preset-road-network", "Road Network", "road_network"),
+    "preset-schutzgebiete": ("preset-protected-areas", "Protected Areas", "protected_areas"),
+    "preset-gebaeude": ("preset-buildings", "Buildings", "buildings"),
 }
 
 
@@ -28,9 +28,10 @@ def _migrate(presets: list[dict]) -> tuple[list[dict], bool]:
     changed = False
     for p in presets:
         if p.get("id") in _ID_MIGRATION:
-            new_id, new_name = _ID_MIGRATION[p["id"]]
+            new_id, new_name, new_suffix = _ID_MIGRATION[p["id"]]
             p["id"] = new_id
             p["name"] = new_name
+            p["suffix"] = new_suffix
             changed = True
     return presets, changed
 
