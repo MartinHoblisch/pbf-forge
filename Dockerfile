@@ -1,14 +1,13 @@
-# Ubuntu 24.04 LTS (Noble Numbat). Dependabot bumps the tag when a new LTS ships.
-# For fully reproducible builds, replace the tag with a digest:
-#   docker pull ubuntu:24.04 && docker inspect ubuntu:24.04 --format='{{index .RepoDigests 0}}'
-# Refresh quarterly or when security advisories appear — see CONTRIBUTING.md.
+# Ubuntu 24.04 LTS (Noble Numbat), pinned by digest so builds are reproducible.
+# Dependabot refreshes the digest weekly; the tag stays put, because moving to
+# the next LTS also moves osmium-tool, GDAL and python3 (tracked in issue #44).
 FROM ubuntu:24.04@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
 
 # Avoid interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Package versions locked by Ubuntu 24.04 LTS APT snapshot (Noble):
-#   osmium-tool ~2.19  gdal-bin ~3.8  python3 ~3.12
+#   osmium-tool ~1.16  gdal-bin ~3.8  python3 ~3.12
 # To verify installed versions: apt-cache policy <package>
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     osmium-tool \

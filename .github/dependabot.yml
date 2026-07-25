@@ -12,6 +12,21 @@ updates:
     schedule:
       interval: weekly
 
+  # osmium-tool and gdal-bin come from the base image, so the digest pin is the
+  # only lever over their versions.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Digest refreshes only. A tag bump would move osmium-tool, GDAL and
+      # python3 across several releases at once — deliberate work, tracked in
+      # issue #44, not something to land as an unreviewed dependency PR.
+      - dependency-name: ubuntu
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
