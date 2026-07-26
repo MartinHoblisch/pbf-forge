@@ -23,6 +23,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 - **Icons render on every platform** — the UI drew its icons as emoji characters (bell, folder, gear, lightning, moon, and the download status glyphs), which resolve through the system font stack. On a Linux install without a colour-emoji font they came out as blank boxes or nothing at all, so the sound-notification toggle was invisible there. All of them are now inline SVG from a single sprite, needing no font and inheriting the surrounding text colour.
 - `start.sh` now builds the image before starting the readiness poll. Previously the build ran in the background while the poll counted down 30 seconds, so a cold build (minutes of apt/pip work) always exhausted the budget and the browser never opened. The browser now also opens after a readiness timeout instead of being skipped silently, matching `start.bat`.
+- GeoPackage metadata writes now close their SQLite connection. `sqlite3.connect()` used as a context manager commits the transaction but leaves the handle open for the garbage collector, so every GeoPackage output leaked two connections — one for the attribution write and one for the provenance write — until collection got around to them.
+- Host paths shown for outputs stay consistent with the mount that is actually active. Repointing the data directory writes the new path to the config but requires a restart before the container's bind mount follows; the value is now read once at startup, so paths keep describing where files really are until that restart happens.
+- Resource limits (Full Power / Background presets, thread and nice overrides) are now covered by tests at the point where they take effect. The limits are read inside the filter manager, whose module-level config path was never redirected in the test environment, so the whole feature was silently exercised against defaults only.
 
 ## [1.0.0] - 2026-05-02
 

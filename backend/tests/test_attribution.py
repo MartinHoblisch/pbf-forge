@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,19 +15,34 @@ import pytest
 from config import ATTRIBUTION
 from filter_manager import FilterManager
 
+# ── helpers ───────────────────────────────────────────────────────────────────
+# closing() around connect(): the connection's own context manager commits the
+# transaction but leaves the handle open, which surfaces as an intermittent
+# ResourceWarning once the garbage collector gets around to it.
+
+
+def _make_gpkg(path) -> None:
+    """A minimal SQLite file standing in for a GeoPackage."""
+    with closing(sqlite3.connect(str(path))) as conn, conn:
+        conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
+
+
+def _query(path, sql: str) -> list[tuple]:
+    with closing(sqlite3.connect(str(path))) as conn:
+        return conn.execute(sql).fetchall()
+
+
 # ── Provenance ────────────────────────────────────────────────────────────────
 
 
 def test_provenance_gpkg_row_inserted(tmp_path):
     fm = FilterManager(ws_manager=MagicMock())
     gpkg = tmp_path / "test.gpkg"
-    with sqlite3.connect(str(gpkg)) as conn:
-        conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
+    _make_gpkg(gpkg)
 
     fm._embed_provenance(gpkg, "gpkg", "berlin.osm.pbf", ["amenity=cafe"], [], ["nodes"])
 
-    with sqlite3.connect(str(gpkg)) as conn:
-        rows = conn.execute("SELECT md_scope, mime_type, metadata FROM gpkg_metadata").fetchall()
+    rows = _query(gpkg, "SELECT md_scope, mime_type, metadata FROM gpkg_metadata")
 
     assert len(rows) == 1
     scope, mime, metadata = rows[0]
@@ -129,13 +145,11 @@ def fm():
 
 def test_gpkg_attribution_inserted(tmp_path, fm):
     gpkg = tmp_path / "test.gpkg"
-    with sqlite3.connect(str(gpkg)) as conn:
-        conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
+    _make_gpkg(gpkg)
 
     fm._embed_attribution_gpkg(gpkg)
 
-    with sqlite3.connect(str(gpkg)) as conn:
-        rows = conn.execute("SELECT metadata FROM gpkg_metadata").fetchall()
+    rows = _query(gpkg, "SELECT metadata FROM gpkg_metadata")
 
     assert len(rows) == 1
     assert rows[0][0] == ATTRIBUTION
@@ -143,13 +157,11 @@ def test_gpkg_attribution_inserted(tmp_path, fm):
 
 def test_gpkg_attribution_string_contains_odbl(tmp_path, fm):
     gpkg = tmp_path / "test.gpkg"
-    with sqlite3.connect(str(gpkg)) as conn:
-        conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
+    _make_gpkg(gpkg)
 
     fm._embed_attribution_gpkg(gpkg)
 
-    with sqlite3.connect(str(gpkg)) as conn:
-        metadata = conn.execute("SELECT metadata FROM gpkg_metadata").fetchone()[0]
+    metadata = _query(gpkg, "SELECT metadata FROM gpkg_metadata")[0][0]
 
     assert "ODbL" in metadata
     assert "OpenStreetMap" in metadata
@@ -158,13 +170,11 @@ def test_gpkg_attribution_string_contains_odbl(tmp_path, fm):
 
 def test_gpkg_attribution_scope_and_mime(tmp_path, fm):
     gpkg = tmp_path / "test.gpkg"
-    with sqlite3.connect(str(gpkg)) as conn:
-        conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
+    _make_gpkg(gpkg)
 
     fm._embed_attribution_gpkg(gpkg)
 
-    with sqlite3.connect(str(gpkg)) as conn:
-        row = conn.execute("SELECT md_scope, mime_type FROM gpkg_metadata").fetchone()
+    row = _query(gpkg, "SELECT md_scope, mime_type FROM gpkg_metadata")[0]
 
     assert row[0] == "dataset"
     assert row[1] == "text/plain"
@@ -215,13 +225,11 @@ def test_geojson_existing_keys_preserved(tmp_path, fm):
 
 def test_embed_attribution_dispatches_gpkg(tmp_path, fm):
     gpkg = tmp_path / "out.gpkg"
-    with sqlite3.connect(str(gpkg)) as conn:
-        conn.execute("CREATE TABLE dummy (id INTEGER PRIMARY KEY)")
+    _make_gpkg(gpkg)
 
     fm._embed_attribution(gpkg, "gpkg")
 
-    with sqlite3.connect(str(gpkg)) as conn:
-        rows = conn.execute("SELECT metadata FROM gpkg_metadata").fetchall()
+    rows = _query(gpkg, "SELECT metadata FROM gpkg_metadata")
     assert len(rows) == 1
 
 
