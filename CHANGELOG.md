@@ -21,6 +21,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Icons render on every platform** — the UI drew its icons as emoji characters (bell, folder, gear, lightning, moon, and the download status glyphs), which resolve through the system font stack. On a Linux install without a colour-emoji font they came out as blank boxes or nothing at all, so the sound-notification toggle was invisible there. All of them are now inline SVG from a single sprite, needing no font and inheriting the surrounding text colour.
 - `start.sh` now builds the image before starting the readiness poll. Previously the build ran in the background while the poll counted down 30 seconds, so a cold build (minutes of apt/pip work) always exhausted the budget and the browser never opened. The browser now also opens after a readiness timeout instead of being skipped silently, matching `start.bat`.
 
 ## [1.0.0] - 2026-05-02
