@@ -52,6 +52,24 @@ header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
 .dot.ok  { background: #4ade80; }
 .dot.err { background: #f87171; }
 
+/* ── Icons ──
+   Inline SVG rather than emoji characters. The bell, folder and gear emoji this
+   UI used before resolved through the system font stack, so on a Linux install
+   without a colour-emoji font they rendered as blank boxes or nothing at all -
+   which silently hid the sound toggle. SVG needs no font and inherits the
+   surrounding text colour. */
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  vertical-align: -.125em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* ── Lang button ── */
 #lang-btn, #sound-btn {
   background: rgba(255,255,255,.15);
@@ -67,7 +85,15 @@ header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
   flex-shrink: 0;
 }
 #lang-btn:hover, #sound-btn:hover { background: rgba(255,255,255,.25); }
-#sound-btn { font-size: .95rem; padding: .18rem .5rem; line-height: 1.2; }
+/* Icon-only button: flex centring instead of a text baseline, and a fixed icon
+   size, so its height matches the language button beside it exactly. */
+#sound-btn {
+  padding: .25rem .55rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+#sound-btn .icon { width: 14px; height: 14px; }
 
 /* ── Tabs ── */
 nav.tabs {
@@ -500,15 +526,37 @@ footer .credits-sep { color: var(--border); }
 </head>
 <body>
 
+<!-- ── Icon sprite ──
+     Referenced as <svg class="icon"><use href="#i-name"/></svg>. Kept in one
+     place so a glyph is defined once and can be swapped at runtime by changing
+     the href (see updateSoundBtn). -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M4 19V7a2 2 0 0 1 2-2h3.5l2 2H18a2 2 0 0 1 2 2v1"/><path d="M2.5 19h15.2a1.5 1.5 0 0 0 1.45-1.1L21 11H6.2a1.5 1.5 0 0 0-1.45 1.1z"/></symbol>
+  <symbol id="i-drive" viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 5v5h8V5"/><path d="M8 15h8v4H8z"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><path d="M3 3l18 18"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M10 4v16M14 4v16"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+</svg>
+
 <header>
   <h1>PBF Forge</h1>
   <div id="dir-badge" class="dir-badge" style="display:none">
-    <span>📁</span>
+    <svg class="icon"><use href="#i-folder"/></svg>
     <span class="dir-badge-path" id="dir-badge-text"></span>
-    <button class="dir-badge-edit" onclick="openChangeDirModal()" id="btn-dir-badge-edit" data-i18n-title="cd_title" title="Change directory">✎</button>
+    <button class="dir-badge-edit" onclick="openChangeDirModal()" id="btn-dir-badge-edit" data-i18n-title="cd_title" title="Change directory"><svg class="icon"><use href="#i-pencil"/></svg></button>
   </div>
   <button id="lang-btn" onclick="toggleLang()">EN</button>
-  <button id="sound-btn" onclick="toggleSound()">🔕</button>
+  <button id="sound-btn" onclick="toggleSound()"><svg class="icon"><use href="#i-bell-off"/></svg></button>
   <div id="ws-indicator">
     <span class="dot" id="ws-dot"></span>
     <span id="ws-text">Verbinde …</span>
@@ -630,7 +678,7 @@ footer .credits-sep { color: var(--border); }
             <label><input type="checkbox" name="fmt" value="geojson" onchange="document.getElementById('geojson-mode-hint').style.display=this.checked?'block':'none';_updateFilterHints()"> GeoJSON</label>
             <label><input type="checkbox" name="fmt" value="gpkg" checked> GeoPackage</label>
             <div style="display:inline-flex;align-items:center;gap:.25rem">
-              <label style="margin:0"><input type="checkbox" name="fmt" value="pbf" onchange="document.getElementById('pbf-hint').style.display=this.checked?'inline-block':'none';document.getElementById('pbf-mode-hint').style.display=this.checked?'block':'none'"> PBF</label><span id="pbf-hint" onclick="event.stopPropagation()" style="display:none;cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_pbf">ℹ info</span>
+              <label style="margin:0"><input type="checkbox" name="fmt" value="pbf" onchange="document.getElementById('pbf-hint').style.display=this.checked?'inline-block':'none';document.getElementById('pbf-mode-hint').style.display=this.checked?'block':'none'"> PBF</label><span id="pbf-hint" onclick="event.stopPropagation()" style="display:none;cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_pbf">info</span>
             </div>
           </div>
         </div>
@@ -642,15 +690,15 @@ footer .credits-sep { color: var(--border); }
           <div class="radio-group">
             <div style="display:flex;align-items:center;gap:.4rem">
               <label style="margin:0"><input type="radio" name="cols" value="other_tags" checked> <span data-i18n="radio_standard">Standard</span></label>
-              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_standard">ℹ info</span>
+              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_standard">info</span>
             </div>
             <div style="display:flex;align-items:center;gap:.4rem">
               <label style="margin:0"><input type="radio" name="cols" value="all"> <span data-i18n="radio_all">Expand all</span></label>
-              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_expand_all">ℹ info</span>
+              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_expand_all">info</span>
             </div>
             <div style="display:flex;align-items:center;gap:.4rem">
               <label style="margin:0"><input type="radio" name="cols" value="manual"> <span data-i18n="radio_manual">Select manually</span></label>
-              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_manual">ℹ info</span>
+              <span onclick="event.stopPropagation()" style="cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_manual">info</span>
             </div>
           </div>
           <p id="geojson-mode-hint" class="info" style="display:none;margin-top:.35rem" data-i18n="geojson_mode_hint">For GeoJSON, <strong>Standard</strong> and <strong>Expand all</strong> are identical.</p>
@@ -664,7 +712,7 @@ footer .credits-sep { color: var(--border); }
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
           <span style="font-size:.8rem;color:var(--gray)" id="resource-status-label"></span>
-          <button class="btn btn-secondary" style="font-size:.8rem;padding:.2rem .6rem" onclick="openResourceModal()" data-i18n-title="btn_resource_limits">⚙</button>
+          <button class="btn btn-secondary" style="font-size:.8rem;padding:.2rem .6rem" onclick="openResourceModal()" data-i18n-title="btn_resource_limits"><svg class="icon"><use href="#i-sliders"/></svg></button>
         </div>
         <button class="btn btn-primary" style="width:100%" onclick="runFilter()" data-i18n="btn_run_filter">Run filter</button>
         <div id="filter-error" style="display:none;color:var(--red);font-size:.85rem;margin-top:.5rem"></div>
@@ -788,7 +836,7 @@ footer .credits-sep { color: var(--border); }
       <label class="field-label" data-i18n="onboard_label">Directory (Windows path)</label>
       <div class="path-input-wrap">
         <input type="text" id="onboarding-path" data-i18n-placeholder="ph_data_dir" placeholder="e.g. C:\Users\yourname\osm-data">
-        <button class="btn btn-secondary" id="btn-browse-onboarding" type="button" data-i18n-title="fb_title" title="Choose folder" data-i18n="onboard_browse">📂 Browse</button>
+        <button class="btn btn-secondary" id="btn-browse-onboarding" type="button" data-i18n-title="fb_title" title="Choose folder"><svg class="icon"><use href="#i-folder-open"/></svg> <span data-i18n="onboard_browse">Browse</span></button>
       </div>
     </div>
     <button class="btn btn-primary" onclick="saveDataDir()" style="width:100%" data-i18n="onboard_save">Save &amp; prepare restart</button>
@@ -818,7 +866,7 @@ footer .credits-sep { color: var(--border); }
       <label class="field-label" data-i18n="cd_label">New directory (Windows path)</label>
       <div class="path-input-wrap">
         <input type="text" id="change-dir-input" data-i18n-placeholder="ph_data_dir" placeholder="e.g. C:\Users\yourname\osm-data">
-        <button class="btn btn-secondary" id="btn-browse-changedir" type="button" data-i18n-title="fb_title" title="Choose folder" data-i18n="onboard_browse">📂 Browse</button>
+        <button class="btn btn-secondary" id="btn-browse-changedir" type="button" data-i18n-title="fb_title" title="Choose folder"><svg class="icon"><use href="#i-folder-open"/></svg> <span data-i18n="onboard_browse">Browse</span></button>
       </div>
     </div>
     <div style="display:flex;gap:.5rem;justify-content:flex-end">
@@ -835,8 +883,8 @@ footer .credits-sep { color: var(--border); }
     <h2 data-i18n="resource_title">Resource Limits</h2>
     <p style="font-size:.85rem;color:var(--gray);margin-bottom:.75rem" data-i18n="resource_desc">Takes effect on the next job start. No restart needed.</p>
     <div class="resource-presets">
-      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')" data-i18n="resource_preset_full">⚡ Full Power</button>
-      <button class="resource-preset-btn" id="btn-preset-background" onclick="setResourcePreset('background')" data-i18n="resource_preset_background">🌙 Background</button>
+      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')"><svg class="icon"><use href="#i-bolt"/></svg> <span data-i18n="resource_preset_full">Full Power</span></button>
+      <button class="resource-preset-btn" id="btn-preset-background" onclick="setResourcePreset('background')"><svg class="icon"><use href="#i-moon"/></svg> <span data-i18n="resource_preset_background">Background</span></button>
     </div>
     <div class="resource-hint" id="resource-hint"></div>
     <details class="resource-advanced" style="margin-top:.75rem">
@@ -863,7 +911,7 @@ footer .credits-sep { color: var(--border); }
   <div class="overlay-box fs-browser-box">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
       <h2 style="margin:0" data-i18n="fb_title">Choose folder</h2>
-      <button class="btn btn-secondary btn-sm" id="btn-fs-close">✕</button>
+      <button class="btn btn-secondary btn-sm" id="btn-fs-close"><svg class="icon"><use href="#i-x"/></svg></button>
     </div>
     <div class="fs-breadcrumb" id="fs-breadcrumb"></div>
     <div class="fs-list" id="fs-list"></div>
@@ -1034,7 +1082,7 @@ const TRANSLATIONS = {
     onboard_title: 'Arbeitsverzeichnis einrichten',
     onboard_p: 'PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf deinem Computer. Gib hier den vollständigen Pfad an — der Ordner wird angelegt, falls er noch nicht existiert. Dort findest du später deine Ergebnisse.',
     onboard_label: 'Verzeichnis (Windows-Pfad)',
-    onboard_browse: '📂 Durchsuchen',
+    onboard_browse: 'Durchsuchen',
     onboard_save: 'Speichern &amp; Neustart vorbereiten',
     onboard_err_path: 'Bitte einen Pfad eingeben.',
     onboard_err_server: 'Serverfehler beim Speichern.',
@@ -1061,8 +1109,8 @@ const TRANSLATIONS = {
     risk_confirm: 'Trotzdem starten',
     resource_title: 'Ressourcen-Limits',
     resource_desc: 'Wirkt ab dem nächsten Job-Start. Kein Neustart nötig.',
-    resource_preset_full: '⚡ Vollgas',
-    resource_preset_background: '🌙 Schonend',
+    resource_preset_full: 'Vollgas',
+    resource_preset_background: 'Schonend',
     resource_advanced: 'Erweitert (Override)',
     resource_label_threads: 'Threads',
     resource_label_nice: 'Priorität (nice)',
@@ -1203,7 +1251,7 @@ const TRANSLATIONS = {
     onboard_title: 'Set up working directory',
     onboard_p: 'PBF Forge stores all map files (downloads and export results) in one folder on your computer. Enter its full path here — the folder is created if it does not exist yet. This is where you will find your results later.',
     onboard_label: 'Directory (Windows path)',
-    onboard_browse: '📂 Browse',
+    onboard_browse: 'Browse',
     onboard_save: 'Save &amp; prepare restart',
     onboard_err_path: 'Please enter a path.',
     onboard_err_server: 'Server error while saving.',
@@ -1231,8 +1279,8 @@ const TRANSLATIONS = {
     label_suffix: 'Suffix',
     resource_title: 'Resource Limits',
     resource_desc: 'Takes effect on the next job start. No restart needed.',
-    resource_preset_full: '⚡ Full Power',
-    resource_preset_background: '🌙 Background',
+    resource_preset_full: 'Full Power',
+    resource_preset_background: 'Background',
     resource_advanced: 'Advanced (Override)',
     resource_label_threads: 'Threads',
     resource_label_nice: 'Priority (nice)',
@@ -1531,15 +1579,16 @@ function _tickPhaseTimer(jobId) {
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 function getStatusLabels() {
+  const ic = name => `<svg class="icon"><use href="#i-${name}"/></svg> `;
   return {
-    up_to_date:       ['badge-green',  '✓ ' + t('status_up_to_date')],
-    update_available: ['badge-orange', '↑ ' + t('status_update_available')],
-    not_downloaded:   ['badge-gray',   '↓ ' + t('status_not_downloaded')],
-    downloading:      ['badge-blue',   '↓ ' + t('status_downloading')],
-    paused:           ['badge-gray',   '⏸ ' + t('status_paused')],
-    checking:         ['badge-blue',   '⟳ ' + t('status_checking')],
-    waiting_retry:    ['badge-orange', '⟳ ' + t('status_waiting_retry')],
-    error:            ['badge-red',    '✗ ' + t('status_error')],
+    up_to_date:       ['badge-green',  ic('check')      + t('status_up_to_date')],
+    update_available: ['badge-orange', ic('arrow-up')   + t('status_update_available')],
+    not_downloaded:   ['badge-gray',   ic('arrow-down') + t('status_not_downloaded')],
+    downloading:      ['badge-blue',   ic('arrow-down') + t('status_downloading')],
+    paused:           ['badge-gray',   ic('pause')      + t('status_paused')],
+    checking:         ['badge-blue',   ic('refresh')    + t('status_checking')],
+    waiting_retry:    ['badge-orange', ic('refresh')    + t('status_waiting_retry')],
+    error:            ['badge-red',    ic('x')          + t('status_error')],
     unknown:          ['badge-gray',   '? ' + t('status_unknown')],
   };
 }
@@ -1655,7 +1704,7 @@ function _checkBatch(batch, items, key, activeStates) {
 function updateSoundBtn() {
   const btn = document.getElementById('sound-btn');
   if (!btn) return;
-  btn.textContent = soundEnabled ? '🔔' : '🔕';
+  btn.querySelector('use').setAttribute('href', soundEnabled ? '#i-bell' : '#i-bell-off');
   btn.title = t(soundEnabled ? 'sound_on' : 'sound_off');
 }
 
@@ -2136,7 +2185,7 @@ function renderFilterJobs() {
       <div class="card-body" style="padding:.75rem 1.25rem">
         ${progressHtml}
         ${j.error ? `<div style="color:var(--red);font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_err_prefix')} ${escHtml(j.error)}</div>` : ''}
-        ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${j.output_files.map(f => escHtml(f)).join('<br>')}</div>` : ''}
+        ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${(j.output_files_host || j.output_files).map(f => escHtml(f)).join('<br>')}</div>` : ''}
         ${logHtml}
         ${logFileLinkHtml}
       </div>
@@ -2571,7 +2620,7 @@ async function _fsBrowse(path) {
   if (data.parent !== null && data.parent !== undefined) {
     rows.push({ path: data.parent, label: t('fb_parent'), icon: '', up: true });
   }
-  data.dirs.forEach(d => rows.push({ path: path ? path + '/' + d : d, label: d, icon: path ? '📁' : '💾', up: false }));
+  data.dirs.forEach(d => rows.push({ path: path ? path + '/' + d : d, label: d, icon: path ? 'folder' : 'drive', up: false }));
 
   if (!rows.length) {
     listEl.innerHTML = `<div style="padding:.75rem 1rem;color:var(--gray);font-size:.85rem">${t('fb_no_subdirs')}</div>`;
@@ -2579,7 +2628,7 @@ async function _fsBrowse(path) {
   }
 
   listEl.innerHTML = rows.map(r =>
-    `<div class="fs-entry${r.up ? ' fs-entry-up' : ''}" data-path="${escHtml(r.path)}">${r.icon ? r.icon + ' ' : ''}${escHtml(r.label)}</div>`
+    `<div class="fs-entry${r.up ? ' fs-entry-up' : ''}" data-path="${escHtml(r.path)}">${r.icon ? `<svg class="icon"><use href="#i-${r.icon}"/></svg> ` : ''}${escHtml(r.label)}</div>`
   ).join('');
   listEl.querySelectorAll('.fs-entry').forEach(el =>
     el.addEventListener('click', () => _fsBrowse(el.dataset.path))

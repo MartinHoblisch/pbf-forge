@@ -27,23 +27,45 @@ fi
 
 mkdir -p "$DATA_DIR"
 
-export DATA_DIR
-docker compose down --remove-orphans 2>/dev/null || true
-docker compose up --build &
-COMPOSE_PID=$!
+URL="http://127.0.0.1:8000"
 
+export DATA_DIR
 trap 'docker compose down; exit' INT TERM
+docker compose down --remove-orphans 2>/dev/null || true
+
+# Build in the foreground, before starting the readiness poll. A cold build
+# installs osmium/GDAL and pip dependencies and takes minutes; if the build ran
+# in the background the poll below would spend its whole budget waiting for apt
+# and give up before the container ever started.
+if ! docker compose build; then
+    echo ""
+    echo "ERROR: Docker image build failed. See the output above."
+    exit 1
+fi
+
+docker compose up &
+COMPOSE_PID=$!
 
 echo ""
 echo "Waiting for PBF Forge to be ready..."
-for _ in $(seq 1 30); do
-    if curl -sf http://127.0.0.1:8000 >/dev/null 2>&1; then
-        echo "PBF Forge running at: http://127.0.0.1:8000"
-        xdg-open http://127.0.0.1:8000 2>/dev/null || true
+READY=""
+for _ in $(seq 1 60); do
+    if curl -sf "$URL" >/dev/null 2>&1; then
+        READY="yes"
         break
     fi
     sleep 1
 done
+
+if [ -z "$READY" ]; then
+    echo "WARNING: Server did not respond within 60 seconds. Opening browser anyway."
+    echo "If the page fails to load, wait a moment and refresh."
+fi
+
+echo "PBF Forge running at: $URL"
+xdg-open "$URL" >/dev/null 2>&1 \
+    || python3 -m webbrowser "$URL" >/dev/null 2>&1 \
+    || echo "Could not open a browser automatically - please open $URL manually."
 
 echo "Press Ctrl+C to stop."
 wait $COMPOSE_PID

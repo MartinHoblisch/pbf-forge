@@ -10,6 +10,7 @@ known-first-party = [
     "download_manager",
     "filter_history",
     "filter_manager",
+    "host_paths",
     "main",
     "pbf_tag_reducer",
     "presets",
