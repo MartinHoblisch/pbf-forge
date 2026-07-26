@@ -14,6 +14,10 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **Exclusion filtering** — a second tag set ("OSM-Tags zum Ausschließen") runs as an inverted `osmium tags-filter --invert-match` pass after the include pass, producing the set difference. Example: include `railway=rail`, exclude `railway:traffic_mode=passenger` to extract a freight-usable rail network. Empty exclude field skips the second pass entirely (backwards compatible).
 - Exclude tags embedded in GeoPackage and GeoJSON provenance metadata for reproducibility.
 
+### Fixed
+
+- `start.sh` now builds the image before starting the readiness poll. Previously the build ran in the background while the poll counted down 30 seconds, so a cold build (minutes of apt/pip work) always exhausted the budget and the browser never opened. The browser now also opens after a readiness timeout instead of being skipped silently, matching `start.bat`.
+
 ## [1.0.0] - 2026-05-02
 
 ### Added
