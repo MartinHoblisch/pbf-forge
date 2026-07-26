@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import config
@@ -20,8 +21,20 @@ import config
 _WIN_DRIVE = re.compile(r"^[A-Za-z]:([\\/]|$)")
 
 
+@lru_cache(maxsize=1)
 def host_data_dir() -> str:
-    """Host path of the data directory, or "" if unset or unreadable."""
+    """Host path of the data directory, or "" if unset or unreadable.
+
+    Cached for the lifetime of the process, which is both cheaper and more
+    accurate. Changing the data directory writes the new path to the config but
+    also sets `pending_restart`, because the container's bind mount can only be
+    repointed by restarting through start.sh. Until that restart happens, `/data`
+    still resolves to the old host directory — so the value read at startup is
+    the one that actually describes where files are, and re-reading the file
+    would start reporting paths that nothing lives under yet.
+
+    Callers that legitimately need a re-read (tests) use `cache_clear()`.
+    """
     try:
         cfg = json.loads(config.USER_CONFIG_FILE.read_text(encoding="utf-8"))
     except Exception:

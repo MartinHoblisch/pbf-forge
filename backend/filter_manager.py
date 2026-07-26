@@ -20,6 +20,7 @@ import tempfile
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1123,7 +1124,10 @@ class FilterManager:
 
     def _embed_attribution_gpkg(self, path: Path) -> None:
         try:
-            with sqlite3.connect(str(path)) as conn:
+            # closing() around connect(): the connection's own context manager
+            # commits the transaction but does not close the handle, leaving it
+            # to the garbage collector.
+            with closing(sqlite3.connect(str(path))) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS gpkg_metadata (
@@ -1235,7 +1239,8 @@ class FilterManager:
 
     def _embed_provenance_gpkg(self, path: Path, provenance: dict) -> None:
         try:
-            with sqlite3.connect(str(path)) as conn:
+            # See _embed_attribution_gpkg: connect() alone never closes.
+            with closing(sqlite3.connect(str(path))) as conn, conn:
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS gpkg_metadata (

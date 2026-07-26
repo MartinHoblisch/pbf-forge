@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 import config
 import download_manager as dm_module
 import filter_manager as fm_module
+import host_paths
 import main as main_module
 import presets as presets_module
 import routes.filter as routes_filter_module
@@ -58,6 +59,7 @@ def reset_state(tmp_data_dir, tmp_config_dir, monkeypatch):
     monkeypatch.setattr(fm_module, "DATA_DIR", tmp_data_dir)
     monkeypatch.setattr(fm_module, "CONFIG_DIR", tmp_config_dir)
     monkeypatch.setattr(fm_module, "TEMP_DIR", tmp_temp_dir)
+    monkeypatch.setattr(fm_module, "USER_CONFIG_FILE", user_config_file)
     monkeypatch.setattr(presets_module, "PRESETS_FILE", presets_file)
     monkeypatch.setattr(routes_filter_module, "DATA_DIR", tmp_data_dir)
     monkeypatch.setattr(routes_settings_module, "USER_CONFIG_FILE", user_config_file)
@@ -66,11 +68,17 @@ def reset_state(tmp_data_dir, tmp_config_dir, monkeypatch):
     monkeypatch.setattr(main_module, "TEMP_DIR", tmp_temp_dir)
     monkeypatch.setattr(main_module, "USER_CONFIG_FILE", user_config_file)
 
+    # host_data_dir() is memoised for the process lifetime, so each test needs a
+    # clean slate before and after it writes its own user config.
+    host_paths.host_data_dir.cache_clear()
+
     state.ws_manager = None
     state.download_manager = None
     state.filter_manager = None
 
     yield
+
+    host_paths.host_data_dir.cache_clear()
 
     state.ws_manager = None
     state.download_manager = None
