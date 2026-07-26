@@ -33,6 +33,7 @@ from config import (
     USER_CONFIG_FILE,
 )
 from filter_history import FilterHistory
+from host_paths import host_data_dir, to_host_path
 
 _log = logging.getLogger(__name__)
 
@@ -178,6 +179,9 @@ class FilterJob:
             self._log_fh = None
 
     def to_dict(self) -> dict:
+        # Host paths are derived, never stored: the user may repoint the data
+        # directory, and restored jobs must then show the current mapping.
+        host_root = host_data_dir() if self.output_files else ""
         return {
             "id": self.id,
             "source_files": self.source_files,
@@ -194,6 +198,7 @@ class FilterJob:
             "log": self.log,
             "log_file": self.log_file,
             "output_files": self.output_files,
+            "output_files_host": [to_host_path(p, host_root) for p in self.output_files],
             "error": self.error,
             "phases": [p.to_dict() for p in self.phases],
             "current_phase_index": self.current_phase_index,
@@ -210,6 +215,7 @@ class FilterJob:
         """Persist-friendly snapshot: drop in-memory log (lives on disk separately)."""
         d = self.to_dict()
         d.pop("log", None)
+        d.pop("output_files_host", None)  # derived from current config, never stored
         return d
 
 

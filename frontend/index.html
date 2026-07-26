@@ -2136,7 +2136,7 @@ function renderFilterJobs() {
       <div class="card-body" style="padding:.75rem 1.25rem">
         ${progressHtml}
         ${j.error ? `<div style="color:var(--red);font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_err_prefix')} ${escHtml(j.error)}</div>` : ''}
-        ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${j.output_files.map(f => escHtml(f)).join('<br>')}</div>` : ''}
+        ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${(j.output_files_host || j.output_files).map(f => escHtml(f)).join('<br>')}</div>` : ''}
         ${logHtml}
         ${logFileLinkHtml}
       </div>
