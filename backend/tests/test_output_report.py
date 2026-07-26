@@ -8,8 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 import config
-from filter_manager import FilterJob, FilterManager, Phase
+from filter_manager import FilterJob, FilterManager, Phase, _fmt_duration
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -251,7 +253,62 @@ async def test_no_reports_for_a_failed_job(tmp_data_dir):
     assert sorted(out_dir.rglob("*.txt")) == []
 
 
+async def test_report_names_the_job_log_file(tmp_data_dir):
+    """A job created through create_job carries a log file, which the report cites."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    out_dir = tmp_data_dir / "out"
+    job = fm.create_job(
+        source_files=["a.osm.pbf"],
+        tags=["railway=rail"],
+        exclude_tags=[],
+        geometry_types=["ways"],
+        suffix="t",
+        output_formats=["pbf"],
+        output_dir=str(out_dir),
+        columns_mode="other_tags",
+        manual_keys=[],
+    )
+
+    await _run(fm, job)
+
+    text = (out_dir / "pbf" / "a_t.osm.pbf.txt").read_text(encoding="utf-8")
+    assert f"Job log           {job.id}.log" in text
+
+
 # ── Layout, rendered directly ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [
+        (0.0, "0.0 s"),
+        (9.44, "9.4 s"),
+        (59.9, "59.9 s"),
+        (60.0, "1m 00s"),
+        (754.0, "12m 34s"),
+        (3600.0, "1h 00m 00s"),
+        (7354.0, "2h 02m 34s"),  # the realistic case for a continent-sized job
+    ],
+)
+def test_fmt_duration(seconds, expected):
+    assert _fmt_duration(seconds) == expected
+
+
+def test_render_report_when_the_output_file_cannot_be_sized(tmp_data_dir):
+    """A vanished or unreadable output still produces a report."""
+    fm = _fm()
+    _ensure_source(tmp_data_dir)
+    text = fm._render_output_report(
+        _job(tmp_data_dir),
+        tmp_data_dir / "out" / "pbf" / "gone.osm.pbf",
+        "a.osm.pbf",
+        "pbf",
+        finished_at=datetime(2026, 7, 26, 9, 42, 7, tzinfo=timezone.utc),
+        duration_seconds=1.0,
+        host_root="",
+    )
+    assert "Size              unknown" in text
 
 
 def test_render_output_report_layout(tmp_data_dir):
