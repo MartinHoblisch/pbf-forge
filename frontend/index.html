@@ -680,6 +680,7 @@ footer .credits-sep { color: var(--border); }
           <button class="btn btn-danger btn-sm" onclick="cancelRunningJobs()" data-i18n="btn_cancel_jobs">Cancel</button>
         </div>
       </div>
+      <div id="jobs-error" style="display:none;color:var(--red);font-size:.85rem;margin-bottom:.75rem"></div>
       <div id="filter-jobs-list">
         <div style="color:var(--gray);font-size:.875rem" data-i18n="no_jobs">No jobs yet.</div>
       </div>
@@ -1945,22 +1946,58 @@ async function loadFilterJobs() {
   } catch {}
 }
 
+function _clearJobsError() {
+  document.getElementById('jobs-error').style.display = 'none';
+}
+
+function _jobsError(msg) {
+  const el = document.getElementById('jobs-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// Job actions carry no payload and have nothing to report on success — the new
+// state arrives over the WebSocket. A request that never landed is worth saying
+// out loud though: a cancel that silently failed leaves an osmium run burning
+// CPU while the user believes they stopped it.
+async function _jobRequest(path, method, benignStatuses = []) {
+  try {
+    const res = await fetch(path, { method });
+    if (!res.ok && !benignStatuses.includes(res.status)) {
+      const data = await res.json().catch(() => ({}));
+      _jobsError(data.detail || t('err_server'));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    _jobsError(t('err_conn', e.message));
+    return false;
+  }
+}
+
 async function clearFilterJobs() {
-  await fetch('/api/filter/jobs', { method: 'DELETE' }).catch(() => {});
+  _clearJobsError();
+  // Drop them locally only once the server has actually cleared them, or the
+  // list looks emptied and quietly refills on the next reload.
+  if (!(await _jobRequest('/api/filter/jobs', 'DELETE'))) return;
   filterJobs = filterJobs.filter(j => j.status === 'running' || j.status === 'pending');
   renderFilterJobs();
 }
 
+// A cancel races the job finishing by itself. The backend answers 404 once it is
+// no longer running, which is the outcome that was asked for — not an error.
 async function cancelRunningJobs() {
+  _clearJobsError();
   const running = filterJobs.filter(j => j.status === 'running' || j.status === 'pending');
   await Promise.all(running.map(j =>
-    fetch(`/api/filter/cancel/${j.id}`, { method: 'POST' }).catch(() => {})
+    _jobRequest(`/api/filter/cancel/${j.id}`, 'POST', [404])
   ));
   renderFilterJobs();
 }
 
 async function cancelJob(jobId) {
-  await fetch(`/api/filter/cancel/${jobId}`, { method: 'POST' }).catch(() => {});
+  _clearJobsError();
+  await _jobRequest(`/api/filter/cancel/${jobId}`, 'POST', [404]);
 }
 
 function _getSelectedSourceSizeMB() {
