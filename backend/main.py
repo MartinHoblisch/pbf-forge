@@ -159,11 +159,34 @@ async def ws_endpoint(ws: WebSocket):
         state.ws_manager.disconnect(ws)
 
 
+# The frontend is a single HTML file that is replaced whenever the user pulls
+# and rebuilds. Without Cache-Control a browser falls back to heuristic
+# freshness — roughly 10% of the file's age when it was cached — and can keep
+# serving the previous version for hours without ever contacting the server, so
+# an update appears not to have arrived. "no-cache" still permits caching but
+# forces revalidation on every load.
+#
+# StaticFiles answers that revalidation with a bodyless 304. The index route
+# below returns a plain FileResponse, which has no conditional handling and so
+# resends the file each time; at ~115 KB over loopback that is not worth
+# restructuring the routing for.
+_REVALIDATE = {"Cache-Control": "no-cache"}
+
+
+class _RevalidatingStaticFiles(StaticFiles):
+    """StaticFiles that asks the browser to revalidate, as the index route does."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers.update(_REVALIDATE)
+        return response
+
+
 @app.get("/")
 def index():
-    return FileResponse(_STATIC / "index.html")
+    return FileResponse(_STATIC / "index.html", headers=_REVALIDATE)
 
 
 # Serve frontend static files last so API routes take priority
 if _STATIC.exists():
-    app.mount("/", StaticFiles(directory=str(_STATIC)), name="static")
+    app.mount("/", _RevalidatingStaticFiles(directory=str(_STATIC)), name="static")
