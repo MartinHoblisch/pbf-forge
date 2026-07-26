@@ -99,6 +99,57 @@ def _fmt_size(n: int) -> str:
     return f"{n:.1f} PB"
 
 
+def _fmt_duration(seconds: float) -> str:
+    """Human-readable duration: '9.4 s', '12m 34s', '1h 02m 34s'."""
+    if seconds < 60:
+        return f"{seconds:.1f} s"
+    minutes, secs = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {secs:02d}s"
+    return f"{minutes}m {secs:02d}s"
+
+
+# ── Output report ─────────────────────────────────────────────────────────────
+# Every finished output file gets a plain-text sidecar describing how it was
+# made. Laid out for reading, not parsing: the machine-readable copy of the same
+# facts is embedded in the file itself by _embed_provenance().
+
+_REPORT_WIDTH = 80
+_REPORT_KEY_WIDTH = 18
+
+_FMT_LABEL = {
+    "pbf": "PBF (OSM protocol buffer)",
+    "geojson": "GeoJSON (RFC 7946)",
+    "gpkg": "GPKG (GeoPackage)",
+}
+
+
+def _report_row(key: str, values: list[str]) -> list[str]:
+    """A 'key    value' line, with any further values aligned underneath."""
+    indent = " " * (2 + _REPORT_KEY_WIDTH)
+    return [
+        f"  {key.ljust(_REPORT_KEY_WIDTH)}{values[0]}",
+        *(indent + v for v in values[1:]),
+    ]
+
+
+def _attributes_description(job: FilterJob, fmt: str) -> str:
+    """How the attribute mode actually affected this output format."""
+    manual = job.columns_mode == "manual" and job.manual_keys
+    if fmt == "pbf":
+        # For PBF the column modes do not apply: the format has no schema, so
+        # tags are copied verbatim unless the manual reduction pass ran.
+        if manual:
+            return "reduced to: " + ", ".join(job.manual_keys)
+        return "all original OSM tags preserved"
+    if manual:
+        return "manual columns: " + ", ".join(job.manual_keys)
+    if job.columns_mode == "all":
+        return "one column per tag key"
+    return "curated keys as columns, remaining tags folded into other_tags"
+
+
 @dataclass
 class Phase:
     label: str
@@ -508,6 +559,11 @@ class FilterManager:
             await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
             return
 
+        # Which source and which format produced each published file. Recorded
+        # at publish time because both are in scope there; recovering them
+        # afterwards from job.output_files would mean parsing filenames.
+        published: list[tuple[Path, str, str]] = []
+
         try:
             with tempfile.TemporaryDirectory(dir=TEMP_DIR) as _tmp:
                 tmp = Path(_tmp)
@@ -586,6 +642,7 @@ class FilterManager:
                         # there that a user could mistake for a finished result.
                         shutil.move(str(pbf_work), str(pbf_out))
                         job.output_files.append(str(pbf_out))
+                        published.append((pbf_out, source, "pbf"))
                         intermediate = pbf_out
                     elif non_pbf:
                         intermediate = tmp / f"{stem}.osm.pbf"
@@ -784,6 +841,7 @@ class FilterManager:
                         out_file.unlink(missing_ok=True)
                         shutil.move(str(work_file), str(out_file))
                         job.output_files.append(str(out_file))
+                        published.append((out_file, source, fmt))
                         gc.collect()
 
                     # Eager cleanup: free disk space from shared export temp.
@@ -807,7 +865,9 @@ class FilterManager:
             job.append_log("\n".join(inv_lines) + "\n")
 
             job.status = "done"
-            job.finished_at = datetime.now().strftime("%H:%M")
+            finished_dt = datetime.now().astimezone()
+            job.finished_at = finished_dt.strftime("%H:%M")
+            self._write_output_reports(job, published, finished_dt, job_dur)
 
         except Exception as exc:
             job.status = "error"
@@ -1205,6 +1265,113 @@ class FilterManager:
             self._stream_inject_geojson_keys(path, {"provenance": provenance})
         except Exception as exc:
             _log.warning("Failed to embed provenance in GeoJSON: %s", exc)
+
+    def _write_output_reports(
+        self,
+        job: FilterJob,
+        published: list[tuple[Path, str, str]],
+        finished_at: datetime,
+        duration_seconds: float,
+    ) -> None:
+        """Write a '<output filename>.txt' report beside every published file.
+
+        Best-effort, like the metadata embedding above: the report is a
+        convenience, so a disk error here must not turn a finished job into a
+        failed one. An existing report of the same name is overwritten.
+        """
+        host_root = host_data_dir()
+        for out_path, source, fmt in published:
+            # with_name, not with_suffix: 'berlin_barge.osm.pbf' must become
+            # 'berlin_barge.osm.pbf.txt', not 'berlin_barge.osm.txt'.
+            report_path = out_path.with_name(out_path.name + ".txt")
+            try:
+                text = self._render_output_report(
+                    job,
+                    out_path,
+                    source,
+                    fmt,
+                    finished_at=finished_at,
+                    duration_seconds=duration_seconds,
+                    host_root=host_root,
+                )
+                report_path.write_text(text, encoding="utf-8")
+            except Exception as exc:
+                _log.warning("Could not write output report %s: %s", report_path, exc)
+
+    def _render_output_report(
+        self,
+        job: FilterJob,
+        out_path: Path,
+        source: str,
+        fmt: str,
+        *,
+        finished_at: datetime,
+        duration_seconds: float,
+        host_root: str,
+    ) -> str:
+        """Render one report body. Touches disk only to size the output file."""
+        try:
+            out_size = _fmt_size(out_path.stat().st_size)
+        except OSError:
+            out_size = "unknown"
+
+        lines = ["=" * _REPORT_WIDTH, "  PBF FORGE - OUTPUT REPORT", "=" * _REPORT_WIDTH, ""]
+
+        lines.append("OUTPUT")
+        lines += _report_row("File", [out_path.name])
+        lines += _report_row("Folder", [to_host_path(str(out_path.parent), host_root)])
+        lines += _report_row("Format", [_FMT_LABEL.get(fmt, fmt.upper())])
+        lines += _report_row("Size", [out_size])
+        lines.append("")
+
+        lines.append("INPUT")
+        source_size = _fmt_size(self._source_size(source))
+        lines += _report_row("Source extract", [f"{source}  ({source_size})"])
+        lines.append("")
+
+        lines.append("FILTER")
+        if job.tags:
+            lines += _report_row("Include tags", list(job.tags))
+        if job.exclude_tags:
+            lines += _report_row("Exclude tags", list(job.exclude_tags))
+        if job.geometry_types:
+            lines += _report_row("Geometry types", [", ".join(job.geometry_types)])
+        lines += _report_row("Attributes", [_attributes_description(job, fmt)])
+        if job.suffix:
+            lines += _report_row("Filename suffix", [job.suffix])
+        lines.append("")
+
+        lines.append("JOB")
+        lines += _report_row("Job ID", [job.id])
+        lines += _report_row("Completed", [finished_at.isoformat(sep=" ", timespec="seconds")])
+        lines += _report_row(
+            "Job duration",
+            [f"{_fmt_duration(duration_seconds)}  (whole job, all output files)"],
+        )
+        if job.log_file:
+            lines += _report_row("Job log", [Path(job.log_file).name])
+        lines.append("")
+
+        # Phases that actually fed this file: the shared filter/exclude/reduce
+        # passes for its source, plus its own export pass — never another
+        # format's export.
+        phases = [
+            p
+            for p in job.phases
+            if p.source == source and (p.step != "export_convert" or p.fmt == fmt)
+        ]
+        if phases:
+            lines.append("PHASES (this output)")
+            for phase in phases:
+                label = phase.label.split(" · ", 1)[-1]
+                dur = (
+                    "-" if phase.duration_seconds is None else _fmt_duration(phase.duration_seconds)
+                )
+                lines.append(f"  {label}".ljust(_REPORT_WIDTH - len(dur)) + dur)
+            lines.append("")
+
+        lines += ["-" * _REPORT_WIDTH, "Generated by PBF Forge v1.0.0", ATTRIBUTION, ""]
+        return "\n".join(lines)
 
     async def cancel_job(self, job_id: str) -> bool:
         proc = self._procs.get(job_id)
