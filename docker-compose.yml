@@ -14,4 +14,7 @@ services:
       - HOST_DATA_DIR=${DATA_DIR:-./data}
     mem_limit: 4g
     memswap_limit: 4g
-    restart: unless-stopped
+    # on-failure, not unless-stopped: the Quit button in the UI stops the server
+    # with a clean exit, and any always-restart policy would immediately bring
+    # the container back up. Crashes are still restarted.
+    restart: on-failure

@@ -1,6 +1,6 @@
 # Roadmap
 
-Features under consideration for future releases. Open an [Issue](https://github.com/martinhoblisch/pbf-forge/issues) or start a [Discussion](https://github.com/martinhoblisch/pbf-forge/discussions) if something here is blocking you — real user signal determines priority.
+Features under consideration for future releases. Open an [Issue](https://github.com/MartinHoblisch/pbf-forge/issues) or start a [Discussion](https://github.com/MartinHoblisch/pbf-forge/discussions) if something here is blocking you — real user signal determines priority.
 
 ---
 

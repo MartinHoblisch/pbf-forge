@@ -15,8 +15,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - Exclude tags embedded in GeoPackage and GeoJSON provenance metadata for reproducibility.
 - **Output report** — every finished output file gets a plain-text sidecar next to it, named after the file itself (`berlin_barge.gpkg.txt`). It records the source extract and its size, every include and exclude tag, the geometry types and attribute mode, the completion timestamp, the job duration and the per-phase timings, plus the host folder and the job-log filename. A report of the same name is overwritten. Writing it can never fail a finished job.
 
+- **Quit button** — a power button in the header stops the server and, with it, the container, so a session can be ended from the browser instead of from a second terminal. It asks for confirmation, and names the cost explicitly when downloads or filter jobs are still running. The tab is not closed automatically: browsers only allow that for windows a script opened, and `start.bat` / `start.sh` open an ordinary one. `stop.bat` and `stop.sh` keep working unchanged.
+- The output report now states the **data timestamp of the source extract** under `Source extract` — the moment the extract was cut from the OSM database, read from the PBF header's replication timestamp. This is not the download time, which says nothing about how current the data is. Extracts without that header field fall back to the file's own date, which for a downloaded extract is the publication time the server reported.
+- The footer credits **osmium-tool and GDAL**, which do the filtering and the format conversion, and links to the project on GitHub.
+
 ### Changed
 
+- The footer no longer scrolls away — it is sticky, like the header and the tab bar already were.
+- The Geofabrik credit in the footer reads "Extracts: Geofabrik" rather than "Data: Geofabrik". The data is OpenStreetMap's; Geofabrik is where the built-in extracts are downloaded from.
+- **The container is no longer restarted automatically after a clean exit.** `docker-compose.yml` now sets `restart: on-failure` instead of `restart: unless-stopped`, which is what lets the Quit button work — under the old policy Docker brought the container straight back up. Crashes are still restarted. The container no longer comes up by itself after a Docker Desktop or host restart; use `start.bat` / `start.sh`.
 - Finished filter jobs now list their outputs by **host path** (`H:\pbf-forge\data\gpkg\berlin_barge.gpkg`) instead of the container path (`/data/gpkg/berlin_barge.gpkg`), so the path can be pasted straight into a file manager. Falls back to the container path while the data directory is unconfigured.
 
 ### Fixed

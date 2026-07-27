@@ -53,7 +53,7 @@ cd pbf-forge
 ./start.sh
 ```
 
-Logs stream in the terminal. Browser opens automatically once the container is ready. Stop with Ctrl+C (shuts down the container) or `./stop.sh`.
+Logs stream in the terminal. Browser opens automatically once the container is ready. Stop with the Quit button in the header, with Ctrl+C (shuts down the container), or with `./stop.sh`.
 
 > **Linux:** if you get `permission denied while trying to connect to the Docker daemon socket`, your user is not in the `docker` group yet. Run `sudo usermod -aG docker $USER`, then log out and back in (or run `newgrp docker` in the current shell). Then retry `./start.sh`.
 
@@ -65,7 +65,7 @@ cd pbf-forge
 start.bat
 ```
 
-Docker Desktop starts automatically if not running. The browser opens at <http://localhost:8000> once the container is ready. Stop with `stop.bat`.
+Docker Desktop starts automatically if not running. The browser opens at <http://localhost:8000> once the container is ready. Stop with the Quit button in the header, or with `stop.bat`.
 
 `start.sh` / `start.bat` handle first-run setup (config file creation, data directory). Running `docker compose up` directly is not recommended on a fresh clone — it skips this setup step.
 
