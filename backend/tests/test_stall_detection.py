@@ -10,6 +10,7 @@ kills the process.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -120,6 +121,32 @@ async def test_absolute_timeout_still_kills(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="absolute limit"):
         await fm._run_cmd(cmd, job, watch_path=tmp_path / "x.bin")
+
+
+async def test_absolute_timeout_reaps_the_killed_process(tmp_path, monkeypatch):
+    """Killing on timeout must be followed by a wait. An unreaped child keeps
+    asyncio's stdout pipe transport alive with a read still in flight, which
+    surfaces later as an `unclosed transport` ResourceWarning."""
+    monkeypatch.setattr(fm_mod, "STALL_CHECK_INTERVAL", 0.1)
+    spawned: list = []
+    real_exec = asyncio.create_subprocess_exec
+
+    async def spy(*args, **kwargs):
+        proc = await real_exec(*args, **kwargs)
+        spawned.append(proc)
+        return proc
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spy)
+    fm = _make_fm()
+    job = _make_job()
+    job.timeout_seconds = 1.0
+    cmd = [sys.executable, "-c", "import time; time.sleep(30)"]
+
+    with pytest.raises(RuntimeError, match="absolute limit"):
+        await fm._run_cmd(cmd, job, watch_path=tmp_path / "x.bin")
+
+    assert len(spawned) == 1
+    assert spawned[0].returncode is not None
 
 
 async def test_wait_after_stdout_eof_is_bounded(tmp_path, monkeypatch):

@@ -8,6 +8,7 @@ streamed to the client; jobs survive a backend restart via a JSON manifest.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import gc
 import json
 import logging
@@ -63,6 +64,8 @@ RISK_RAM_FACTOR = 0.5
 STALL_CHECK_INTERVAL = 2.0
 STALL_WARN_SECONDS = 300.0
 ABSOLUTE_TIMEOUT_SECONDS = 24 * 3600.0
+# How long to wait for a killed subprocess to be reaped before giving up on it.
+KILL_REAP_SECONDS = 10.0
 
 
 def _ts() -> str:
@@ -1536,6 +1539,12 @@ class FilterManager:
                 proc.kill()
             except OSError:
                 pass
+            # Reap the killed process. Without this the child is never awaited,
+            # so asyncio keeps its stdout pipe transport alive with a read still
+            # in flight — an unclosed transport and a lingering process handle
+            # for every job that hits the absolute limit.
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(proc.wait(), timeout=KILL_REAP_SECONDS)
             raise RuntimeError(
                 f"Subprocess exceeded absolute limit of {job.timeout_seconds / 3600:.0f}h"
             )
