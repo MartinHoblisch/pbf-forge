@@ -110,6 +110,28 @@ def test_index_route_returns_html(client):
     assert "text/html" in resp.headers.get("content-type", "")
 
 
+def test_frontend_is_served_with_revalidation(client):
+    """The single-page frontend must never be served from cache unchecked.
+
+    Without Cache-Control a browser applies heuristic freshness — about 10% of
+    the file's age — and can keep showing the previous build for hours after an
+    update without ever asking the server, which looks like the update never
+    arrived.
+    """
+    for path in ("/", "/index.html"):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        assert resp.headers.get("cache-control") == "no-cache", path
+
+
+def test_static_frontend_revalidation_is_cheap(client):
+    """A revalidated static asset comes back as a bodyless 304, not a resend."""
+    etag = client.get("/index.html").headers["etag"]
+    resp = client.get("/index.html", headers={"If-None-Match": etag})
+    assert resp.status_code == 304
+    assert resp.content == b""
+
+
 # ── lifespan: _delayed_check_all triggered when configured ───────────────────
 
 
