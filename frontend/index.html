@@ -555,7 +555,7 @@ footer .credits-sep { color: var(--border); }
     <span class="dir-badge-path" id="dir-badge-text"></span>
     <button class="dir-badge-edit" onclick="openChangeDirModal()" id="btn-dir-badge-edit" data-i18n-title="cd_title" title="Change directory"><svg class="icon"><use href="#i-pencil"/></svg></button>
   </div>
-  <button id="lang-btn" onclick="toggleLang()">EN</button>
+  <button id="lang-btn" onclick="toggleLang()" data-i18n-title="lang_switch" title="Switch to German">EN</button>
   <button id="sound-btn" onclick="toggleSound()"><svg class="icon"><use href="#i-bell-off"/></svg></button>
   <div id="ws-indicator">
     <span class="dot" id="ws-dot"></span>
@@ -911,7 +911,7 @@ footer .credits-sep { color: var(--border); }
   <div class="overlay-box fs-browser-box">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
       <h2 style="margin:0" data-i18n="fb_title">Choose folder</h2>
-      <button class="btn btn-secondary btn-sm" id="btn-fs-close"><svg class="icon"><use href="#i-x"/></svg></button>
+      <button class="btn btn-secondary btn-sm" id="btn-fs-close" data-i18n-title="btn_close" title="Close"><svg class="icon"><use href="#i-x"/></svg></button>
     </div>
     <div class="fs-breadcrumb" id="fs-breadcrumb"></div>
     <div class="fs-list" id="fs-list"></div>
@@ -1067,6 +1067,7 @@ const TRANSLATIONS = {
     confirm_delete_preset: 'Preset wirklich löschen?',
     btn_download: 'Herunterladen',
     btn_cancel: 'Abbrechen',
+    btn_close: 'Schließen',
     btn_check: 'Prüfen',
     alert_no_updates: 'Keine veralteten oder fehlenden Dateien mit bekannter URL.',
     no_files: 'Keine PBF-Dateien im Datenverzeichnis gefunden.',
@@ -1119,6 +1120,9 @@ const TRANSLATIONS = {
     btn_resource_limits: 'Ressourcen-Limits',
     sound_on: 'Signalton an — klingelt, wenn alle Downloads bzw. alle Filter-Jobs fertig sind',
     sound_off: 'Signalton aus — zum Aktivieren klicken',
+    // The button is labelled with the language it switches to, so each block
+    // only ever needs to name the other one.
+    lang_switch: 'Auf Englisch umschalten',
   },
   en: {
     tab_downloads: 'Download Manager',
@@ -1236,6 +1240,7 @@ const TRANSLATIONS = {
     confirm_delete_preset: 'Really delete preset?',
     btn_download: 'Download',
     btn_cancel: 'Cancel',
+    btn_close: 'Close',
     btn_check: 'Check',
     alert_no_updates: 'No outdated or missing files with known URL.',
     no_files: 'No PBF files found in data directory.',
@@ -1289,6 +1294,7 @@ const TRANSLATIONS = {
     btn_resource_limits: 'Resource Limits',
     sound_on: 'Completion sound on — chimes when all downloads or all filter jobs are finished',
     sound_off: 'Completion sound off — click to enable',
+    lang_switch: 'Switch to German',
   }
 };
 
