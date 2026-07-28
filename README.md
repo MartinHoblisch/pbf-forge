@@ -4,7 +4,7 @@
 
 # PBF Forge
 
-> Self-hosted web UI for downloading OSM PBF extracts from Geofabrik and filtering them by tag. Docker-only. Exports GeoPackage and GeoJSON.
+> Self-hosted web UI for downloading OSM PBF extracts — from Geofabrik or any other PBF host — and filtering them by tag. Docker-only. Exports GeoPackage and GeoJSON.
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
