@@ -84,7 +84,22 @@ async def test_cancel_running_job_kills_proc_and_marks_error():
     proc.kill.assert_called_once()
     assert job.status == "error"
     assert job.error == "Cancelled by user"
+    # The error state is shared with a job that failed on its own; the flag is
+    # what lets a client tell a stopped job from a failed one.
+    assert job.cancelled is True
+    assert job.to_dict()["cancelled"] is True
     ws.broadcast.assert_called()  # state update emitted
+
+
+@pytest.mark.asyncio
+async def test_a_job_that_was_not_cancelled_says_so():
+    ws = AsyncMock()
+    fm = FilterManager(ws)
+    job = _job("done-id", "done")
+    fm._jobs["done-id"] = job
+
+    assert job.cancelled is False
+    assert job.to_dict()["cancelled"] is False
 
 
 @pytest.mark.asyncio
