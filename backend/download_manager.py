@@ -109,6 +109,23 @@ def _freshness(state: "FileState", server_size: int, server_mtime: Optional[date
     return verdict if _is_superseded(server_mtime, written_at) else "paused"
 
 
+def _scanned_status(state: "FileState", partial: Optional[os.stat_result]) -> str:
+    """The status a directory scan reports for a row no worker owns.
+
+    The verdict of a check is a function of four figures the row already
+    carries — the local size and date, and the published ones — so a scan can
+    re-derive it rather than throw it away. Discarding it reset every checked
+    row to "unknown" on each page load, which read as though the check had
+    never happened while its own columns still showed the result.
+
+    Only a row that has never been checked has nothing to derive from.
+    """
+    if state.server_size is None:
+        return "paused" if partial else "unknown"
+    server_mtime = datetime.fromisoformat(state.server_mtime) if state.server_mtime else None
+    return _freshness(state, state.server_size, server_mtime)
+
+
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     """Return seconds to wait before next fast retry.
 
@@ -347,15 +364,8 @@ class DownloadManager:
             # dropping it would strand the row with nothing left to check against.
             if url := self._resolve_url(filename):
                 state.url = url
-            # A paused row keeps its status for as long as its .part is there.
-            # A scan has no server figures to re-derive that verdict from, and
-            # discarding it would drop a transfer the user paused on purpose
-            # back to the freshness of the older complete file beside it.
-            keeps_status = state.status in _PRESERVED_STATUSES or (
-                state.status == "paused" and partial is not None
-            )
-            if not keeps_status:
-                state.status = "unknown" if complete else "paused"
+            if state.status not in _PRESERVED_STATUSES:
+                state.status = _scanned_status(state, partial)
         return True
 
     def _refresh_local_files(self) -> None:

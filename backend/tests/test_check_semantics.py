@@ -463,6 +463,72 @@ def test_a_scan_stops_reporting_paused_once_the_partial_is_gone(tmp_data_dir):
         assert dm._files["test.osm.pbf"].status == "unknown"
 
 
+# ── A scan keeps what a check established ────────────────────────────────────
+#
+# The verdict of a check is a function of four figures the row already carries.
+# Throwing it away on every directory scan reset each checked row to "unknown"
+# on every page load, while its own local and server columns went on showing
+# the result of the check that supposedly never happened.
+
+
+_CURRENT_BUILD = datetime(2024, 7, 1, tzinfo=timezone.utc)  # after _SERVER_MTIME
+
+
+def _checked(tmp_data_dir, local_bytes: int, local_written: datetime, server=(1000, None)):
+    complete = tmp_data_dir / "test.osm.pbf"
+    complete.write_bytes(b"x" * local_bytes)
+    _stamp(complete, local_written)
+
+    dm = _make_dm()
+    dm._url_mapping["test.osm.pbf"] = _URL
+    size, mtime = server[0], server[1] or _SERVER_MTIME
+    with patch.object(dm, "_head", return_value=(size, mtime)):
+        dm.check_file("test.osm.pbf")
+    return dm
+
+
+def test_a_scan_keeps_an_up_to_date_verdict(tmp_data_dir):
+    dm = _checked(tmp_data_dir, 1000, _CURRENT_BUILD)
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "up_to_date"
+
+    rows = {row["filename"]: row for row in dm.list_files()}
+
+    assert rows["test.osm.pbf"]["status"] == "up_to_date"
+
+
+def test_a_scan_keeps_an_update_available_verdict(tmp_data_dir):
+    dm = _checked(tmp_data_dir, 800, datetime(2023, 1, 1, tzinfo=timezone.utc))
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "update_available"
+
+    rows = {row["filename"]: row for row in dm.list_files()}
+
+    assert rows["test.osm.pbf"]["status"] == "update_available"
+
+
+def test_a_scan_leaves_a_row_that_was_never_checked_unknown(tmp_data_dir):
+    """Nothing to re-derive from — inventing a verdict would be worse."""
+    (tmp_data_dir / "test.osm.pbf").write_bytes(b"x" * 1000)
+    dm = _make_dm()
+    dm._url_mapping["test.osm.pbf"] = _URL
+
+    rows = {row["filename"]: row for row in dm.list_files()}
+
+    assert rows["test.osm.pbf"]["status"] == "unknown"
+
+
+def test_a_scan_re_derives_the_verdict_rather_than_repeating_it(tmp_data_dir):
+    """The point is the figures, not the label: a file that shrank on disk is
+    no longer up to date, and the scan has to say so without a second check."""
+    dm = _checked(tmp_data_dir, 1000, _CURRENT_BUILD)
+    (tmp_data_dir / "test.osm.pbf").write_bytes(b"x" * 400)
+
+    rows = {row["filename"]: row for row in dm.list_files()}
+
+    assert rows["test.osm.pbf"]["status"] == "update_available"
+
+
 def test_a_complete_file_beside_a_stray_part_is_not_paused(tmp_data_dir):
     (tmp_data_dir / "test.osm.pbf").write_bytes(b"x" * 1000)
     (tmp_data_dir / ("test.osm.pbf" + PART_SUFFIX)).write_bytes(b"x" * 50)
