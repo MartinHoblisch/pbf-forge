@@ -10,6 +10,7 @@ on every value they produce.
 
 from __future__ import annotations
 
+import os
 import threading
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -375,6 +376,91 @@ def test_completing_a_download_clears_the_partial(tmp_data_dir):
         assert state.status == "up_to_date"
         assert state.partial_bytes is None
         assert state.local_size == 1000
+
+
+# ── A paused update survives a check ─────────────────────────────────────────
+#
+# Cancelling an update leaves the previous complete file next to the .part of
+# the new one. Judging that row by the complete file alone reports it as
+# update_available and takes the progress bar away, even though the partial is
+# exactly the progress towards that update.
+
+_OLD_BUILD = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_PART_WRITTEN = datetime(2024, 6, 2, tzinfo=timezone.utc)  # after _SERVER_MTIME
+
+
+def _stamp(path, when: datetime) -> None:
+    os.utime(path, (when.timestamp(), when.timestamp()))
+
+
+def _cancelled_update(tmp_data_dir, part_written: datetime = _PART_WRITTEN):
+    """An outdated complete file plus the .part of the update that was cancelled."""
+    complete = tmp_data_dir / "test.osm.pbf"
+    complete.write_bytes(b"x" * 800)
+    _stamp(complete, _OLD_BUILD)
+
+    part = tmp_data_dir / ("test.osm.pbf" + PART_SUFFIX)
+    part.write_bytes(b"x" * 300)
+    _stamp(part, part_written)
+
+    dm = _make_dm()
+    dm._url_mapping["test.osm.pbf"] = _URL
+    with dm._lock:
+        dm._files["test.osm.pbf"] = FileState(filename="test.osm.pbf", url=_URL, status="paused")
+    return dm
+
+
+def test_check_keeps_a_cancelled_update_paused(tmp_data_dir):
+    dm = _cancelled_update(tmp_data_dir)
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        dm.check_file("test.osm.pbf")
+
+    with dm._lock:
+        state = dm._files["test.osm.pbf"]
+        assert state.status == "paused"
+        assert state.partial_bytes == 300  # what the progress bar is drawn from
+
+
+def test_check_all_keeps_a_cancelled_update_paused(tmp_data_dir):
+    dm = _cancelled_update(tmp_data_dir)
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        dm.check_all()
+
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "paused"
+
+
+def test_a_directory_scan_keeps_a_cancelled_update_paused(tmp_data_dir):
+    """Listing the files must not undo it either — no server figures are involved."""
+    dm = _cancelled_update(tmp_data_dir)
+
+    rows = {row["filename"]: row for row in dm.list_files()}
+
+    assert rows["test.osm.pbf"]["status"] == "paused"
+    assert rows["test.osm.pbf"]["partial_bytes"] == 300
+
+
+def test_check_gives_up_on_a_partial_the_server_has_built_past(tmp_data_dir):
+    """A newer build on the server is what ends the resume, and only that."""
+    dm = _cancelled_update(tmp_data_dir, part_written=datetime(2024, 5, 1, tzinfo=timezone.utc))
+
+    with patch.object(dm, "_head", return_value=(1000, _SERVER_MTIME)):
+        dm.check_file("test.osm.pbf")
+
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "update_available"
+
+
+def test_a_scan_stops_reporting_paused_once_the_partial_is_gone(tmp_data_dir):
+    dm = _cancelled_update(tmp_data_dir)
+    (tmp_data_dir / ("test.osm.pbf" + PART_SUFFIX)).unlink()
+
+    dm.list_files()
+
+    with dm._lock:
+        assert dm._files["test.osm.pbf"].status == "unknown"
 
 
 def test_a_complete_file_beside_a_stray_part_is_not_paused(tmp_data_dir):
