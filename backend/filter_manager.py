@@ -103,6 +103,23 @@ def _fmt_size(n: int) -> str:
     return f"{n:.1f} PB"
 
 
+def _export_is_empty(path: Path) -> bool:
+    """True when an osmium GeoJSONSeq export contains no feature.
+
+    A tag expression that matches nothing yields a zero-byte export. The leading
+    chunk is inspected as well so that a stray record separator or newline is not
+    mistaken for a feature.
+    """
+    try:
+        if path.stat().st_size == 0:
+            return True
+        with open(path, "rb") as fh:
+            head = fh.read(4096)
+    except OSError:
+        return False
+    return not head.strip(b"\x1e \t\r\n")
+
+
 def _fmt_duration(seconds: float) -> str:
     """Human-readable duration: '9.4 s', '12m 34s', '1h 02m 34s'."""
     if seconds < 60:
@@ -567,6 +584,9 @@ class FilterManager:
         # at publish time because both are in scope there; recovering them
         # afterwards from job.output_files would mean parsing filenames.
         published: list[tuple[Path, str, str]] = []
+        # Sources whose filter expression matched nothing. Kept per source so a
+        # batch in which only some sources come up empty still publishes the rest.
+        empty_sources: list[str] = []
 
         try:
             with tempfile.TemporaryDirectory(dir=TEMP_DIR) as _tmp:
@@ -748,6 +768,22 @@ class FilterManager:
                             if rc != 0:
                                 raise RuntimeError(f"osmium export exited with code {rc}")
 
+                            # An expression that matches nothing leaves an empty
+                            # export. ogr2ogr cannot open an empty datasource and
+                            # answers with a list of every driver it knows plus
+                            # exit code 1 — nothing a user could act on. The
+                            # cause is reported here instead, before conversion.
+                            if _export_is_empty(shared_geojson):
+                                job.append_log(
+                                    f"{_ts()}{source}: no features matched this filter — "
+                                    f"nothing to convert\n"
+                                )
+                                empty_sources.append(source)
+                                await self._finish_phase(job)
+                                shared_geojson.unlink(missing_ok=True)
+                                shared_geojson = None
+                                break
+
                             if job.columns_mode == "other_tags":
                                 # Standard mode: fold every non-curated tag
                                 # into a compact other_tags JSON column. This
@@ -868,7 +904,17 @@ class FilterManager:
             )
             job.append_log("\n".join(inv_lines) + "\n")
 
-            job.status = "done"
+            if empty_sources and not job.output_files:
+                # Narrowing a filter until nothing matches is ordinary use, not a
+                # failure — so this is not an error. It still gets a status of its
+                # own, because reporting "done" with no files would read as a
+                # silent success.
+                job.status = "no_matches"
+                job.append_log(
+                    f"{_ts()}No features matched this filter. No output files were written.\n"
+                )
+            else:
+                job.status = "done"
             finished_dt = datetime.now().astimezone()
             job.finished_at = finished_dt.strftime("%H:%M")
             self._write_output_reports(job, published, finished_dt, job_dur)

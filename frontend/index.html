@@ -1008,6 +1008,8 @@ const TRANSLATIONS = {
     job_running: 'Läuft …',
     job_done: 'Fertig',
     job_error: 'Fehler',
+    job_no_matches: 'Keine Treffer',
+    job_no_matches_hint: 'Keine Objekte entsprechen diesem Filter. Es wurden keine Dateien erzeugt.',
     job_err_prefix: 'Fehler:',
     job_output_prefix: 'Ausgabe:',
     job_log_file_link: 'Log-Datei anzeigen →',
@@ -1181,6 +1183,8 @@ const TRANSLATIONS = {
     job_running: 'Running…',
     job_done: 'Done',
     job_error: 'Error',
+    job_no_matches: 'No matches',
+    job_no_matches_hint: 'No features matched this filter. No files were written.',
     job_err_prefix: 'Error:',
     job_output_prefix: 'Output:',
     job_log_file_link: 'View log file →',
@@ -2094,6 +2098,7 @@ function renderFilterJobs() {
     running: t('job_running'),
     done: t('job_done'),
     error: t('job_error'),
+    no_matches: t('job_no_matches'),
   };
 
   const runningIds = new Set();
@@ -2190,6 +2195,7 @@ function renderFilterJobs() {
       </div>
       <div class="card-body" style="padding:.75rem 1.25rem">
         ${progressHtml}
+        ${j.status === 'no_matches' ? `<div style="color:var(--orange);font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_no_matches_hint')}</div>` : ''}
         ${j.error ? `<div style="color:var(--red);font-size:.85rem;margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_err_prefix')} ${escHtml(j.error)}</div>` : ''}
         ${j.output_files && j.output_files.length ? `<div style="font-size:.82rem;color:var(--green);margin-bottom:.5rem"><span style="color:var(--gray);font-size:.75rem">[${j.finished_at || '--:--'}]</span> ${t('job_output_prefix')}<br>${(j.output_files_host || j.output_files).map(f => escHtml(f)).join('<br>')}</div>` : ''}
         ${logHtml}
