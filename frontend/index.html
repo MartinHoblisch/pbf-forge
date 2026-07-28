@@ -1772,22 +1772,33 @@ function playCompletionSound(failed) {
   else        { _beep(ctx, 660, now, 0.18); _beep(ctx, 880, now + 0.20, 0.32); }
 }
 
+// Stopping something is not finishing it, so a cancel must not ring. A cancelled
+// download ends as paused, or as unknown when it left no .part behind; a
+// cancelled filter job is flagged by the backend, because it ends in the same
+// error state as one that genuinely failed.
+const _dlStopped = f => ['paused', 'unknown'].includes(f.status);
+const _fjStopped = j => j.cancelled === true;
+
 // Edge detection (active → nothing active). Safe to call after every snapshot.
 function checkCompletionSound() {
-  _checkBatch(_dlBatch, files, 'filename', DL_ACTIVE);
-  _checkBatch(_fjBatch, filterJobs, 'id', FJ_ACTIVE);
+  _checkBatch(_dlBatch, files, 'filename', DL_ACTIVE, _dlStopped);
+  _checkBatch(_fjBatch, filterJobs, 'id', FJ_ACTIVE, _fjStopped);
 }
 
-function _checkBatch(batch, items, key, activeStates) {
+function _checkBatch(batch, items, key, activeStates, wasStopped) {
   let stillActive = false;
   for (const it of items) {
     if (activeStates.includes(it.status)) { batch.add(it[key]); stillActive = true; }
   }
   if (stillActive || !batch.size) return;
   // Only members of this batch count — stale errors from earlier runs must not ring.
-  const failed = items.some(it => batch.has(it[key]) && it.status === 'error');
+  const members = items.filter(it => batch.has(it[key]));
   batch.clear();
-  playCompletionSound(failed);
+  const finished = members.filter(it => !wasStopped(it));
+  // Cancelling the last one that was running ends the batch without a result to
+  // announce. If something else in it did run to an end, that still rings.
+  if (!finished.length) return;
+  playCompletionSound(finished.some(it => it.status === 'error'));
 }
 
 function updateSoundBtn() {

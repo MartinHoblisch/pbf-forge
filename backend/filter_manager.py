@@ -216,6 +216,10 @@ class FilterJob:
     columns_mode: str  # other_tags | all | manual
     manual_keys: list[str]
     status: str = "pending"
+    # A cancelled job ends in the same error state as one that failed on its
+    # own. Recording which it was keeps clients from treating a job the user
+    # stopped as a result worth announcing.
+    cancelled: bool = False
     finished_at: Optional[str] = None
     output_files: list[str] = field(default_factory=list)
     error: Optional[str] = None
@@ -278,6 +282,7 @@ class FilterJob:
             "columns_mode": self.columns_mode,
             "manual_keys": self.manual_keys,
             "status": self.status,
+            "cancelled": self.cancelled,
             "finished_at": self.finished_at,
             "log": self.log,
             "log_file": self.log_file,
@@ -378,6 +383,7 @@ class FilterManager:
                     manual_keys=entry.get("manual_keys", []),
                 )
                 job.status = entry.get("status", "error")
+                job.cancelled = entry.get("cancelled", False)
                 job.finished_at = entry.get("finished_at")
                 job.output_files = entry.get("output_files", [])
                 job.error = entry.get("error")
@@ -1486,6 +1492,7 @@ class FilterManager:
                 pass
         if job and job.status == "running":
             job.status = "error"
+            job.cancelled = True
             job.error = "Cancelled by user"
             self._persist_jobs()
             await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
