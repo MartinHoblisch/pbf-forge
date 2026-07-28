@@ -14,6 +14,7 @@ orchestration error paths:
   - manual column-mode dispatch
   - attribution + provenance embedded after success
   - phase_started_at cleared on error so the FE elapsed-ticker stops
+  - an export with no features stops before ogr2ogr
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from filter_manager import FilterJob, FilterManager
+from filter_manager import FilterJob, FilterManager, _export_is_empty
 
 
 def _job(tmp_data_dir, **overrides) -> FilterJob:
@@ -336,3 +337,91 @@ async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
     assert not any(c[0] == "ogr2ogr" for c in captured_cmds)
     embed_a.assert_not_called()
     embed_p.assert_not_called()
+
+
+# ── zero matches ─────────────────────────────────────────────────────────────
+# An expression matching nothing leaves an empty export. Handing that to ogr2ogr
+# produces a driver listing and exit code 1 instead of a usable message, so the
+# pipeline has to recognise it first.
+
+
+def test_export_is_empty_detects_no_features(tmp_path):
+    assert _export_is_empty(tmp_path / "missing.geojsonseq") is False
+
+    zero = tmp_path / "zero.geojsonseq"
+    zero.write_bytes(b"")
+    assert _export_is_empty(zero) is True
+
+    # osmium prefixes each record with RS (\x1e); separators alone are no feature.
+    separators = tmp_path / "sep.geojsonseq"
+    separators.write_bytes(b"\x1e\n")
+    assert _export_is_empty(separators) is True
+
+    one = tmp_path / "one.geojsonseq"
+    one.write_text('\x1e{"type":"Feature"}\n', encoding="utf-8")
+    assert _export_is_empty(one) is False
+
+
+async def _run_with_empty_export(fm, job, captured_cmds):
+    async def fake_run_cmd(cmd, _job, **_):
+        captured_cmds.append(list(cmd))
+        if "-o" in cmd:
+            Path(cmd[cmd.index("-o") + 1]).write_bytes(b"")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
+            await fm.run_job(job)
+
+
+async def test_run_job_empty_export_reports_no_matches_without_ogr2ogr(tmp_data_dir):
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+
+    captured_cmds = []
+    await _run_with_empty_export(fm, job, captured_cmds)
+
+    assert job.status == "no_matches"
+    assert job.error is None
+    assert job.output_files == []
+    assert not any(c[0] == "ogr2ogr" for c in captured_cmds)
+    # The fold would only turn an empty file into another empty file.
+    assert not any("geojsonseq_fold.py" in str(c) for c in captured_cmds)
+    assert "no features matched this filter" in job.log
+    assert job.finished_at
+
+
+async def test_run_job_empty_export_skips_every_requested_format(tmp_data_dir):
+    """One empty export ends the source — it must not be retried per format."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg", "geojson"])
+
+    captured_cmds = []
+    await _run_with_empty_export(fm, job, captured_cmds)
+
+    assert job.status == "no_matches"
+    exports = [c for c in captured_cmds if c[0] == "osmium" and "export" in c]
+    assert len(exports) == 1
+
+
+async def test_run_job_empty_export_alongside_pbf_output_stays_done(tmp_data_dir):
+    """A PBF output is a real (if empty) file, so the job did produce a result."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["pbf", "gpkg"])
+
+    async def fake_run_cmd(cmd, _job, **_):
+        if "-o" in cmd:
+            target = Path(cmd[cmd.index("-o") + 1])
+            # tags-filter still writes a valid, header-only PBF; only the
+            # GeoJSONSeq export comes out empty.
+            target.write_bytes(b"" if target.suffix == ".geojsonseq" else b"x")
+        return 0
+
+    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
+        await fm.run_job(job)
+
+    assert job.status == "done"
+    assert [p for p in job.output_files if p.endswith(".osm.pbf")]
