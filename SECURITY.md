@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Open a [private security advisory](https://github.com/martinhoblisch/pbf-forge/security/advisories/new) with a description and reproduction steps. Please do not open a public GitHub Issue for security reports.
+Open a [private security advisory](https://github.com/MartinHoblisch/pbf-forge/security/advisories/new) with a description and reproduction steps. Please do not open a public GitHub Issue for security reports.
 
 ## Scope
 

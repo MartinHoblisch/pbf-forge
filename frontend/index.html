@@ -26,12 +26,18 @@
 
 body { background: #f1f5f9; color: #111827; min-height: 100vh; display: flex; flex-direction: column; }
 
-/* ── Header ── */
+/* ── Header ──
+   The header and footer bars carry the app name, the data directory, the
+   connection state and the attribution. Every one of those was set smaller
+   than the body text it frames, so their type and icons run 30% above their
+   original sizes. The bars themselves did not grow with them: the vertical
+   padding was cut back so the larger content fills the space that used to
+   sit empty above and below it. */
 header {
   background: #1e3a5f;
   color: #fff;
   padding: 0 1.5rem;
-  height: 52px;
+  height: 44px;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -39,16 +45,16 @@ header {
   top: 0;
   z-index: 100;
 }
-header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
+header h1 { font-size: 1.43rem; font-weight: 600; letter-spacing: .02em; }
 #ws-indicator {
   margin-left: auto;
-  font-size: .75rem;
+  font-size: .975rem;
   display: flex;
   align-items: center;
   gap: .4rem;
   opacity: .85;
 }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #6b7280; }
 .dot.ok  { background: #4ade80; }
 .dot.err { background: #f87171; }
 
@@ -69,16 +75,18 @@ header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* For glyphs drawn as filled shapes instead of strokes, such as the GitHub mark. */
+.icon-solid { fill: currentColor; stroke: none; }
 
 /* ── Lang button ── */
-#lang-btn, #sound-btn {
+#lang-btn, #sound-btn, #quit-btn {
   background: rgba(255,255,255,.15);
   border: 1px solid rgba(255,255,255,.3);
   color: #fff;
-  padding: .25rem .65rem;
+  padding: .15rem .845rem;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: .78rem;
+  font-size: 1.014rem;
   font-weight: 600;
   letter-spacing: .04em;
   transition: background .15s;
@@ -87,13 +95,16 @@ header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
 #lang-btn:hover, #sound-btn:hover { background: rgba(255,255,255,.25); }
 /* Icon-only button: flex centring instead of a text baseline, and a fixed icon
    size, so its height matches the language button beside it exactly. */
-#sound-btn {
-  padding: .25rem .55rem;
+#sound-btn, #quit-btn {
+  padding: .15rem .715rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
 }
-#sound-btn .icon { width: 14px; height: 14px; }
+#sound-btn .icon, #quit-btn .icon { width: 18px; height: 18px; }
+/* Quit ends the session, so it reads as destructive on hover rather than
+   looking like the two toggles it sits next to. */
+#quit-btn:hover { background: var(--red); border-color: var(--red); }
 
 /* ── Tabs ── */
 nav.tabs {
@@ -102,7 +113,7 @@ nav.tabs {
   display: flex;
   padding: 0 1.5rem;
   position: sticky;
-  top: 52px;
+  top: 44px;
   z-index: 99;
 }
 .tab-btn {
@@ -396,9 +407,9 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
   gap: .4rem;
   background: rgba(255,255,255,.12);
   border-radius: var(--radius);
-  padding: .25rem .65rem;
-  font-size: .78rem;
-  max-width: 320px;
+  padding: .15rem .845rem;
+  font-size: 1.014rem;
+  max-width: 416px;
 }
 .dir-badge-path {
   overflow: hidden;
@@ -412,7 +423,7 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
   color: rgba(255,255,255,.7);
   cursor: pointer;
   padding: 0 .15rem;
-  font-size: .9rem;
+  font-size: 1.17rem;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -498,20 +509,34 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
 .ow-file-list div:last-child { border-bottom: none; }
 
 /* ── Footer ── */
+/* Sticky like the header and the tab bar, so the attribution stays on screen
+   while a long job list scrolls. Sticky rather than fixed: the bar wraps onto
+   several lines on narrow windows, and a fixed bar would need a matching
+   body padding that cannot follow that changing height. */
 footer {
   background: #fff;
   border-top: 1px solid var(--border);
-  padding: .85rem 1.5rem;
-  font-size: .78rem;
+  padding: .4rem 1.5rem;
+  font-size: 1.014rem;
   color: var(--gray);
   display: flex;
   align-items: center;
   gap: 1.5rem;
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  z-index: 98;
 }
 footer a { color: var(--gray); text-decoration: none; }
 footer a:hover { color: var(--blue); text-decoration: underline; }
 footer .credits-sep { color: var(--border); }
+/* Leads the bar, in place of the app name the header already carries. */
+#github-link {
+  display: inline-flex;
+  align-items: center;
+}
+#github-link .icon { width: 21px; height: 21px; }
+#github-link:hover { color: var(--blue); text-decoration: none; }
 
 /* ── Resource limits modal ── */
 .resource-presets { display: flex; gap: .5rem; margin-bottom: .75rem; }
@@ -546,6 +571,10 @@ footer .credits-sep { color: var(--border); }
   <symbol id="i-pause" viewBox="0 0 24 24"><path d="M10 4v16M14 4v16"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v5h-5"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></symbol>
+  <!-- GitHub mark: one filled path, so it needs .icon-solid rather than the
+       stroke styling the rest of the sprite uses. -->
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M12 .5C5.7.5.6 5.6.6 11.9c0 5 3.3 9.3 7.8 10.8.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.9 1.2 1.9 1.2 3.2 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6a11.4 11.4 0 0 0 7.8-10.8C23.4 5.6 18.3.5 12 .5z"/></symbol>
 </svg>
 
 <header>
@@ -559,8 +588,9 @@ footer .credits-sep { color: var(--border); }
   <button id="sound-btn" onclick="toggleSound()"><svg class="icon"><use href="#i-bell-off"/></svg></button>
   <div id="ws-indicator">
     <span class="dot" id="ws-dot"></span>
-    <span id="ws-text">Verbinde …</span>
+    <span id="ws-text">verbinde …</span>
   </div>
+  <button id="quit-btn" onclick="quitApp()" data-i18n-title="quit_title" title="Quit PBF Forge (stops the container)"><svg class="icon"><use href="#i-power"/></svg></button>
 </header>
 
 <nav class="tabs">
@@ -818,13 +848,13 @@ footer .credits-sep { color: var(--border); }
 </main>
 
 <footer>
-  <span><strong>PBF Forge</strong></span>
+  <a id="github-link" href="https://github.com/MartinHoblisch/pbf-forge" target="_blank" rel="noopener" data-i18n-title="github_title" title="Open the project on GitHub"><svg class="icon icon-solid"><use href="#i-github"/></svg></a>
   <span class="credits-sep">|</span>
   <span>by Martin Hoblisch</span>
   <span class="credits-sep">|</span>
   <span>&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (<a href="https://opendatacommons.org/licenses/odbl/" target="_blank" rel="noopener">ODbL 1.0</a>)</span>
   <span class="credits-sep">|</span>
-  <span>Data: <a href="https://www.geofabrik.de" target="_blank" rel="noopener">Geofabrik</a></span>
+  <span><span data-i18n="credits_built_with">Built with</span> <a href="https://osmcode.org/osmium-tool/" target="_blank" rel="noopener">osmium-tool</a> &amp; <a href="https://gdal.org/" target="_blank" rel="noopener">GDAL</a></span>
 </footer>
 
 <!-- ── Onboarding overlay ── -->
@@ -854,6 +884,17 @@ footer .credits-sep { color: var(--border); }
       <div class="spinner-lg"></div>
       <span style="font-size:.85rem;color:var(--gray)" data-i18n="lock_waiting">Waiting for restart — this page will refresh automatically …</span>
     </div>
+  </div>
+</div>
+
+<!-- ── Goodbye overlay ──
+     Shown after the server has been asked to stop. The tab is not closed for
+     the user: window.close() only works on windows a script opened, and
+     start.bat / start.sh open an ordinary one. -->
+<div id="overlay-quit" class="overlay" style="display:none">
+  <div class="overlay-box" style="text-align:center">
+    <h2 data-i18n="quit_done_title">PBF Forge has stopped</h2>
+    <p data-i18n="quit_done_body">The container has been shut down. You can close this tab. To start again, run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux).</p>
   </div>
 </div>
 
@@ -1040,9 +1081,9 @@ const TRANSLATIONS = {
     paused_meta: (pct, have, total) => `${pct}% · ${have} von ${total} geladen`,
     status_error: 'Fehler',
     status_unknown: 'Unbekannt',
-    ws_connecting: 'Verbinde …',
-    ws_connected: 'Verbunden',
-    ws_disconnected: 'Getrennt – verbinde neu …',
+    ws_connecting: 'verbinde …',
+    ws_connected: 'verbunden',
+    ws_disconnected: 'getrennt – verbinde neu …',
     ws_error: 'Verbindungsfehler',
     eta_lt1min: 'Noch <1 Min',
     eta_hr: (h, m) => `Noch ~${h} Std ${m} Min`,
@@ -1125,6 +1166,14 @@ const TRANSLATIONS = {
     // The button is labelled with the language it switches to, so each block
     // only ever needs to name the other one.
     lang_switch: 'Auf Englisch umschalten',
+    quit_title: 'PBF Forge beenden (stoppt den Container)',
+    quit_confirm: 'PBF Forge beenden? Der Docker-Container wird gestoppt.',
+    quit_confirm_busy: 'Es laufen noch Downloads oder Filter-Jobs. Beim Beenden werden sie abgebrochen. Trotzdem beenden?',
+    quit_done_title: 'PBF Forge wurde beendet',
+    quit_done_body: 'Der Container ist gestoppt. Dieser Tab kann geschlossen werden. Zum Neustarten <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) ausführen.',
+    quit_failed: 'Beenden fehlgeschlagen. Der Server läuft weiter — mit stop.bat bzw. ./stop.sh stoppen.',
+    github_title: 'Projekt auf GitHub öffnen',
+    credits_built_with: 'Gebaut mit',
   },
   en: {
     tab_downloads: 'Download Manager',
@@ -1215,10 +1264,10 @@ const TRANSLATIONS = {
     paused_meta: (pct, have, total) => `${pct}% · ${have} of ${total} downloaded`,
     status_error: 'Error',
     status_unknown: 'Unknown',
-    ws_connecting: 'Connecting…',
-    ws_connected: 'Connected',
-    ws_disconnected: 'Disconnected – reconnecting…',
-    ws_error: 'Connection error',
+    ws_connecting: 'connecting…',
+    ws_connected: 'connected',
+    ws_disconnected: 'disconnected – reconnecting…',
+    ws_error: 'connection error',
     eta_lt1min: '<1 min left',
     eta_hr: (h, m) => `~${h} hr ${m} min left`,
     eta_min: m => `~${m} min left`,
@@ -1299,6 +1348,14 @@ const TRANSLATIONS = {
     sound_on: 'Completion sound on — chimes when all downloads or all filter jobs are finished',
     sound_off: 'Completion sound off — click to enable',
     lang_switch: 'Switch to German',
+    quit_title: 'Quit PBF Forge (stops the container)',
+    quit_confirm: 'Quit PBF Forge? This stops the Docker container.',
+    quit_confirm_busy: 'Downloads or filter jobs are still running. Quitting cancels them. Quit anyway?',
+    quit_done_title: 'PBF Forge has stopped',
+    quit_done_body: 'The container has been shut down. You can close this tab. To start again, run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux).',
+    quit_failed: 'Could not quit. The server is still running — stop it with stop.bat or ./stop.sh.',
+    github_title: 'Open the project on GitHub',
+    credits_built_with: 'Built with',
   }
 };
 
@@ -1338,6 +1395,27 @@ function toggleLang() {
   renderPresets();
 }
 
+// Quitting stops the container, not just this page, so the confirmation spells
+// out what is lost when work is still in flight. The tab is left open on
+// purpose: window.close() is ignored for windows the user did not open from a
+// script, which is every window start.bat and start.sh produce.
+async function quitApp() {
+  const busy = files.some(f => f.status === 'downloading')
+    || filterJobs.some(j => j.status === 'running' || j.status === 'pending');
+  if (!confirm(t(busy ? 'quit_confirm_busy' : 'quit_confirm'))) return;
+
+  quitting = true;
+  try {
+    const res = await fetch('/api/shutdown', { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch {
+    quitting = false;
+    alert(t('quit_failed'));
+    return;
+  }
+  document.getElementById('overlay-quit').style.display = 'flex';
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let files = [];
 let filterJobs = [];
@@ -1346,6 +1424,7 @@ let presetList = [];
 let _editingPresetId = null;
 let urlInfoData = null;
 let ws = null;
+let quitting = false;
 let currentSort = { col: null, dir: 'asc' };
 let settingsState = { configured: false, host_data_dir: '', pending_restart: false };
 
@@ -1738,6 +1817,9 @@ function connectWs() {
     loadSettings();
   };
   ws.onclose = () => {
+    // After a quit the server is gone on purpose, so reconnecting would only
+    // spin behind the goodbye overlay.
+    if (quitting) return;
     wsStatus = 'ws_disconnected';
     document.getElementById('ws-dot').className = 'dot err';
     document.getElementById('ws-text').textContent = t('ws_disconnected');

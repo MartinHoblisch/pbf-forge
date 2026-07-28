@@ -3,7 +3,7 @@
 ## Dev setup
 
 ```bash
-git clone https://github.com/martinhoblisch/pbf-forge.git
+git clone https://github.com/MartinHoblisch/pbf-forge.git
 cd pbf-forge
 docker compose up          # runs the app at http://127.0.0.1:8000
 ```

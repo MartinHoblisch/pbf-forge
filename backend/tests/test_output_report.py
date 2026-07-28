@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,18 @@ import config
 from filter_manager import FilterJob, FilterManager, Phase, _fmt_duration
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _no_pbf_header(monkeypatch):
+    """Neutralise the PBF header read for every test in this file.
+
+    The sources here are byte fillers, not real PBFs, and pyosmium is absent
+    from the test environment — and stubbed in sys.modules by another test
+    module, so what the header read returns depends on collection order. Tests
+    that care about the timestamp patch this again with their own value.
+    """
+    monkeypatch.setattr("filter_manager._pbf_replication_timestamp", lambda _p: "")
 
 
 def _job(tmp_data_dir, **overrides) -> FilterJob:
@@ -353,3 +366,123 @@ def test_render_output_report_layout(tmp_data_dir):
     assert "12m 34s" in text  # job duration
     assert "8m 12s" in text  # filter phase
     assert "9.4 s" in text  # export phase
+
+
+# ── source data timestamp ─────────────────────────────────────────────────────
+# The report states how current the source data is, which is not the same as
+# when the file was downloaded. _pbf_replication_timestamp is patched here so
+# the tests do not need pyosmium or a real PBF; the header read itself is
+# exercised against real osmium in the container.
+
+
+def _render_input_section(fm: FilterManager, tmp_data_dir, source="a.osm.pbf") -> str:
+    text = fm._render_output_report(
+        _job(tmp_data_dir),
+        tmp_data_dir / "out" / "pbf" / "a_t.osm.pbf",
+        source,
+        "pbf",
+        finished_at=datetime(2026, 7, 26, 9, 42, 7, tzinfo=timezone.utc),
+        duration_seconds=1.0,
+        host_root="",
+    )
+    return text.split("INPUT", 1)[1].split("FILTER", 1)[0]
+
+
+def test_report_shows_the_replication_timestamp_of_the_source(tmp_data_dir, monkeypatch):
+    """The PBF header's replication timestamp is what the report prefers."""
+    _ensure_source(tmp_data_dir)
+    monkeypatch.setattr(
+        "filter_manager._pbf_replication_timestamp", lambda _p: "2026-07-25T20:21:02Z"
+    )
+
+    section = _render_input_section(_fm(), tmp_data_dir)
+
+    assert "  Source extract    a.osm.pbf" in section
+    assert "  Data timestamp    2026-07-25 20:21:02+00:00  (OSM replication)" in section
+
+
+def test_report_keeps_an_unparseable_replication_timestamp_verbatim(tmp_data_dir, monkeypatch):
+    """A header value that is not ISO-8601 is reported as-is, not dropped."""
+    _ensure_source(tmp_data_dir)
+    monkeypatch.setattr("filter_manager._pbf_replication_timestamp", lambda _p: "last tuesday")
+
+    assert "  Data timestamp    last tuesday  (OSM replication)" in _render_input_section(
+        _fm(), tmp_data_dir
+    )
+
+
+@pytest.mark.parametrize(
+    "header_result",
+    [
+        pytest.param(lambda _p: "", id="header_without_the_option"),
+        pytest.param(
+            lambda _p: (_ for _ in ()).throw(RuntimeError("not a PBF")), id="header_unreadable"
+        ),
+    ],
+)
+def test_report_falls_back_to_the_source_file_date(tmp_data_dir, monkeypatch, header_result):
+    """Without a header timestamp, the file's own date is the next best answer.
+
+    It is not the download time: DownloadManager stamps the server's
+    Last-Modified onto the file.
+    """
+    _ensure_source(tmp_data_dir)
+    published = datetime(2026, 7, 25, 20, 21, 2, tzinfo=timezone.utc).timestamp()
+    os.utime(tmp_data_dir / "a.osm.pbf", (published, published))
+    monkeypatch.setattr("filter_manager._pbf_replication_timestamp", header_result)
+
+    section = _render_input_section(_fm(), tmp_data_dir)
+
+    assert "  Data timestamp    2026-07-25 20:21:02+00:00  (source file date)" in section
+
+
+def test_report_omits_the_timestamp_when_the_source_is_gone(tmp_data_dir, monkeypatch):
+    """No source file, no date — the row is dropped rather than faked."""
+    monkeypatch.setattr("filter_manager._pbf_replication_timestamp", lambda _p: "")
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="vanished.osm.pbf")
+
+    assert "Source extract" in section
+    assert "Data timestamp" not in section
+
+
+# ── source URL ────────────────────────────────────────────────────────────────
+# Any server that publishes a PBF next to an .md5 works, so the report names the
+# host each source actually came from rather than assuming a single provider.
+
+
+def test_report_names_the_host_a_source_was_downloaded_from(tmp_data_dir):
+    """A built-in continental extract resolves to its download URL."""
+    _ensure_source(tmp_data_dir, "europe.osm.pbf")
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="europe.osm.pbf")
+
+    assert "  Source URL        https://download.geofabrik.de/europe-latest.osm.pbf" in section
+
+
+def test_report_names_a_non_geofabrik_host(tmp_data_dir, tmp_config_dir):
+    """The host is whatever the user pointed at — nothing assumes Geofabrik."""
+    _ensure_source(tmp_data_dir, "planet.osm.pbf")
+    (tmp_config_dir / ".osm_tool_urls.json").write_text(
+        json.dumps(
+            {"planet.osm.pbf": "https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf"}
+        ),
+        encoding="utf-8",
+    )
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="planet.osm.pbf")
+
+    assert (
+        "  Source URL        https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf" in section
+    )
+    assert "geofabrik" not in section.lower()
+
+
+def test_report_omits_the_url_for_a_hand_placed_file(tmp_data_dir):
+    """A PBF copied into the data directory has no URL — the row is dropped."""
+    _ensure_source(tmp_data_dir, "handmade.osm.pbf")
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="handmade.osm.pbf")
+
+    assert "Source extract" in section
+    assert "Source URL" not in section

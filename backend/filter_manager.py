@@ -34,6 +34,7 @@ from config import (
     TEMP_DIR,
     USER_CONFIG_FILE,
 )
+from download_manager import source_url
 from filter_history import FilterHistory
 from host_paths import host_data_dir, to_host_path
 
@@ -153,6 +154,17 @@ def _report_row(key: str, values: list[str]) -> list[str]:
         f"  {key.ljust(_REPORT_KEY_WIDTH)}{values[0]}",
         *(indent + v for v in values[1:]),
     ]
+
+
+def _pbf_replication_timestamp(path: Path) -> str:
+    """The header's osmosis_replication_timestamp, or '' when the file has none.
+
+    Only the header block is parsed, so the cost does not scale with file size.
+    """
+    import osmium.io  # imported here to keep module-level clean
+
+    with osmium.io.Reader(str(path)) as reader:
+        return reader.header().get("osmosis_replication_timestamp", "")
 
 
 def _attributes_description(job: FilterJob, fmt: str) -> str:
@@ -943,6 +955,35 @@ class FilterManager:
         except OSError:
             return 1
 
+    def _source_data_timestamp(self, source: str) -> Optional[str]:
+        """How current the source extract's data is, or None if undeterminable.
+
+        Prefers the replication timestamp in the PBF header: the moment the
+        extract was cut from the OSM database, which is the figure a downstream
+        consumer needs and is unrelated to when the file was fetched.
+
+        Falls back to the file's mtime, which is not the download time either —
+        DownloadManager stamps the server's Last-Modified onto the file, so for
+        a Geofabrik extract this is its publication time.
+        """
+        path = DATA_DIR / source
+        try:
+            stamp = _pbf_replication_timestamp(path)
+        except Exception:
+            # Sources that are not readable PBF, or a runtime without pyosmium.
+            # The mtime fallback still says something useful.
+            _log.debug("Could not read the PBF header of %s", source, exc_info=True)
+            stamp = ""
+        if stamp:
+            with contextlib.suppress(ValueError):
+                stamp = datetime.fromisoformat(stamp).isoformat(sep=" ", timespec="seconds")
+            return f"{stamp}  (OSM replication)"
+        try:
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+        except OSError:
+            return None
+        return f"{mtime.isoformat(sep=' ', timespec='seconds')}  (source file date)"
+
     def _preflight_warnings(self, job: FilterJob, total_source_bytes: int) -> None:
         """Append disk-space warning to job log. Never blocks the job.
 
@@ -1363,7 +1404,7 @@ class FilterManager:
         duration_seconds: float,
         host_root: str,
     ) -> str:
-        """Render one report body. Touches disk only to size the output file."""
+        """Render one report body. Touches disk only to size and date the files."""
         try:
             out_size = _fmt_size(out_path.stat().st_size)
         except OSError:
@@ -1381,6 +1422,14 @@ class FilterManager:
         lines.append("INPUT")
         source_size = _fmt_size(self._source_size(source))
         lines += _report_row("Source extract", [f"{source}  ({source_size})"])
+        # The host is per-source, not a property of the tool: any server that
+        # publishes a PBF next to an .md5 works. Naming the real one beats
+        # assuming a single provider.
+        if url := source_url(source):
+            lines += _report_row("Source URL", [url])
+        data_timestamp = self._source_data_timestamp(source)
+        if data_timestamp:
+            lines += _report_row("Data timestamp", [data_timestamp])
         lines.append("")
 
         lines.append("FILTER")

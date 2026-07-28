@@ -7,12 +7,13 @@ import json
 import logging
 import os
 import shutil
+import signal
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -122,14 +123,15 @@ app.include_router(settings_routes.router)
 app.include_router(filesystem_routes.router)
 
 
-_ALLOWED_WS_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+_ALLOWED_ORIGIN_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 def _is_allowed_origin(origin: str | None) -> bool:
-    """DNS-rebinding defense: only browser origins on loopback may open the WS.
+    """Only browser origins on loopback may reach the guarded endpoints.
 
-    Absent Origin (non-browser clients like curl) is allowed — DNS-rebinding
-    requires a browser, so the threat doesn't apply there.
+    Absent Origin (non-browser clients like curl) is allowed — the attacks this
+    defends against, DNS rebinding on the WebSocket and cross-site POSTs to the
+    shutdown endpoint, both need a browser, and a browser always sends one.
     """
     if not origin:
         return True
@@ -137,7 +139,7 @@ def _is_allowed_origin(origin: str | None) -> bool:
         host = urlparse(origin).hostname
     except Exception:
         return False
-    return host in _ALLOWED_WS_HOSTS
+    return host in _ALLOWED_ORIGIN_HOSTS
 
 
 @app.websocket("/ws")
@@ -157,6 +159,42 @@ async def ws_endpoint(ws: WebSocket):
             await ws.receive_text()
     except WebSocketDisconnect:
         state.ws_manager.disconnect(ws)
+
+
+# Long enough for the response to reach the browser, short enough that the user
+# does not wonder whether the click registered.
+_SHUTDOWN_GRACE_SECONDS = 0.3
+
+
+def _request_stop() -> None:
+    """Ask uvicorn to shut down gracefully.
+
+    SIGTERM rather than sys.exit: the signal is what uvicorn's handler turns
+    into an orderly shutdown, which runs the lifespan teardown and lets the
+    container exit 0. Raising inside the handler task would not.
+    """
+    os.kill(os.getpid(), signal.SIGTERM)
+
+
+@app.post("/api/shutdown")
+async def shutdown(request: Request):
+    """Stop the server — and with it the container — from the browser.
+
+    The origin guard carries more weight here than on the WebSocket: without it
+    any page the user has open in another tab could POST to the loopback port
+    and kill a running job.
+
+    Docker only leaves the container down afterwards because compose sets
+    `restart: on-failure`; under `always` or `unless-stopped` it would come
+    straight back up.
+    """
+    if not _is_allowed_origin(request.headers.get("origin")):
+        raise HTTPException(status_code=403, detail="Cross-origin shutdown request rejected")
+    # Answer first, exit after: the response has to be on the wire before the
+    # server starts tearing itself down.
+    asyncio.get_running_loop().call_later(_SHUTDOWN_GRACE_SECONDS, _request_stop)
+    _log.info("Shutdown requested from the browser")
+    return {"status": "shutting_down"}
 
 
 # The frontend is a single HTML file that is replaced whenever the user pulls

@@ -4,7 +4,7 @@
 
 # PBF Forge
 
-> Self-hosted web UI for downloading OSM PBF extracts from Geofabrik and filtering them by tag. Docker-only. Exports GeoPackage and GeoJSON.
+> Self-hosted web UI for downloading OSM PBF extracts — from Geofabrik or any other PBF host — and filtering them by tag. Docker-only. Exports GeoPackage and GeoJSON.
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
@@ -53,7 +53,7 @@ cd pbf-forge
 ./start.sh
 ```
 
-Logs stream in the terminal. Browser opens automatically once the container is ready. Stop with Ctrl+C (shuts down the container) or `./stop.sh`.
+Logs stream in the terminal. Browser opens automatically once the container is ready. Stop with the Quit button in the header, with Ctrl+C (shuts down the container), or with `./stop.sh`.
 
 > **Linux:** if you get `permission denied while trying to connect to the Docker daemon socket`, your user is not in the `docker` group yet. Run `sudo usermod -aG docker $USER`, then log out and back in (or run `newgrp docker` in the current shell). Then retry `./start.sh`.
 
@@ -65,7 +65,7 @@ cd pbf-forge
 start.bat
 ```
 
-Docker Desktop starts automatically if not running. The browser opens at <http://localhost:8000> once the container is ready. Stop with `stop.bat`.
+Docker Desktop starts automatically if not running. The browser opens at <http://localhost:8000> once the container is ready. Stop with the Quit button in the header, or with `stop.bat`.
 
 `start.sh` / `start.bat` handle first-run setup (config file creation, data directory). Running `docker compose up` directly is not recommended on a fresh clone — it skips this setup step.
 
@@ -75,8 +75,8 @@ The container binds to `127.0.0.1` only and ships without authentication. **Do n
 
 ## Features
 
-- **Direct Geofabrik downloads** — paste any Geofabrik URL; file size and update check shown before download.
-- **MD5 checksum verification** — every PBF is verified against Geofabrik's `<file>.osm.pbf.md5` before any filter step. Mismatch fails closed.
+- **Direct downloads** — the eight continental extracts are built in; paste any other PBF URL to add it. File size and update check shown before download. Geofabrik is the default host, not a requirement: [planet.openstreetmap.org](https://planet.openstreetmap.org/pbf/) and [BBBike](https://download.bbbike.org/osm/) work the same way.
+- **MD5 checksum verification** — every PBF is verified against the `<file>.osm.pbf.md5` published next to it before any filter step. Mismatch fails closed, and so does a missing checksum file — a host that publishes no `.md5` cannot be used.
 - **Tag filtering via `osmium tags-filter`** — full expression syntax (`n/`, `w/`, `r/`, `nwr/`, multi-tag, negation).
 - **Named presets** — save canned filters for reuse.
 - **Export formats**
@@ -163,7 +163,7 @@ User-facing features under consideration are tracked in [docs/ROADMAP.md](docs/R
 
 **Privacy.** PBF Forge does not collect telemetry, analytics, crash reports, or usage statistics. It does not phone home for update checks. The HTML/CSS/JS are served locally from the container — no Google Fonts, no CDN scripts, no third-party trackers. The only outbound network calls at runtime are to `download.geofabrik.de` for the PBF you requested and its `.md5` checksum file. Container logs (uvicorn access log, application stderr) stay inside the container; nothing is shipped off the host.
 
-**Commercial use.** OpenStreetMap data is licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright). PBF Forge embeds ODbL attribution in every GeoPackage and GeoJSON it produces — you must keep that attribution intact in any downstream product. **Geofabrik downloads themselves are free for non-commercial use; commercial users should review <https://www.geofabrik.de/geofabrik/agb.html> before deploying PBF Forge in a commercial workflow.**
+**Commercial use.** OpenStreetMap data is licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright). PBF Forge embeds ODbL attribution in every GeoPackage and GeoJSON it produces — you must keep that attribution intact in any downstream product. **The terms of the server you download from apply on top of that, and they differ per host.** The built-in continental extracts come from Geofabrik, whose downloads are free for non-commercial use — commercial users should review <https://www.geofabrik.de/geofabrik/agb.html>. If you point PBF Forge at another host, check that host's terms instead.
 
 ---
 

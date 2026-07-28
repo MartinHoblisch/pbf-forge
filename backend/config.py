@@ -20,7 +20,10 @@ PRESETS_FILE = CONFIG_DIR / ".osm_tool_presets.json"
 USER_CONFIG_FILE = CONFIG_DIR / "user-config.json"
 STARTUP_TIME = time.time()
 
-ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0). Data sourced via Geofabrik."
+# Embedded in every output file. Names only what ODbL actually requires — the
+# contributors, not the distributor. The host an extract came from varies per
+# source and is recorded per output in the report instead.
+ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0)."
 
 MAX_CONCURRENT_DOWNLOADS = 3
 CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB
@@ -38,7 +41,7 @@ MAX_DOWNLOAD_SIZE = int(os.getenv("MAX_DOWNLOAD_SIZE", str(100 * 1024 * 1024 * 1
 MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB
 
 # Sent on all outbound HTTP requests so Geofabrik can identify traffic source.
-USER_AGENT = "pbf-forge/1.0.0 (+https://github.com/martinhoblisch/pbf-forge)"
+USER_AGENT = "pbf-forge/1.0.0 (+https://github.com/MartinHoblisch/pbf-forge)"
 
 # Continental extracts offered out of the box. Each continent is keyed twice:
 # under Geofabrik's own "-latest" filename and under the shortened name this
