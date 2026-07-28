@@ -71,6 +71,44 @@ def _basename(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 
+def _is_superseded(server_mtime: Optional[datetime], written_at: Optional[datetime]) -> bool:
+    """True when the server published a build after *written_at*.
+
+    One rule with two users: it decides whether a partial may still be resumed,
+    and whether a paused row should still be offering that resume. Unknown
+    timestamps count as not superseded — the checksum is the backstop.
+    """
+    return server_mtime is not None and written_at is not None and server_mtime > written_at
+
+
+def _freshness(state: "FileState", server_size: int, server_mtime: Optional[datetime]) -> str:
+    """The status a check reports for a row no worker owns.
+
+    Judges the complete file first, then lets a .part override that verdict —
+    but only where a resume would still achieve something. A partial next to a
+    file that is already current is a remnant, not progress; a partial the
+    server has built past is worthless, and the row falls back to what the
+    complete file alone deserves.
+    """
+    if state.local_size is None:
+        verdict = "not_downloaded"
+    elif (
+        server_mtime
+        and state.local_mtime
+        and server_mtime > datetime.fromisoformat(state.local_mtime)
+    ):
+        verdict = "update_available"
+    elif state.local_size >= server_size:
+        verdict = "up_to_date"
+    else:
+        verdict = "update_available"
+
+    if verdict == "up_to_date" or not state.partial_bytes:
+        return verdict
+    written_at = datetime.fromisoformat(state.partial_mtime) if state.partial_mtime else None
+    return verdict if _is_superseded(server_mtime, written_at) else "paused"
+
+
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     """Return seconds to wait before next fast retry.
 
@@ -156,6 +194,10 @@ class FileState:
     # Bytes sitting in the .part file. Reported separately from local_size so a
     # half-finished transfer can never be mistaken for a usable local file.
     partial_bytes: Optional[int] = None
+    # When those bytes were last written. Not reported to clients — it exists so
+    # a check can tell a partial that is still resumable from one the server has
+    # already built past.
+    partial_mtime: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -296,11 +338,23 @@ class DownloadManager:
                 else None
             )
             state.partial_bytes = partial.st_size if partial else None
+            state.partial_mtime = (
+                datetime.fromtimestamp(partial.st_mtime, tz=timezone.utc).isoformat()
+                if partial
+                else None
+            )
             # Keep a previously known URL when the mapping no longer resolves:
             # dropping it would strand the row with nothing left to check against.
             if url := self._resolve_url(filename):
                 state.url = url
-            if state.status not in _PRESERVED_STATUSES:
+            # A paused row keeps its status for as long as its .part is there.
+            # A scan has no server figures to re-derive that verdict from, and
+            # discarding it would drop a transfer the user paused on purpose
+            # back to the freshness of the older complete file beside it.
+            keeps_status = state.status in _PRESERVED_STATUSES or (
+                state.status == "paused" and partial is not None
+            )
+            if not keeps_status:
                 state.status = "unknown" if complete else "paused"
         return True
 
@@ -380,20 +434,7 @@ class DownloadManager:
             # the request: a HEAD may take up to 30 seconds, long enough for a
             # download to have started in the meantime.
             if state.status not in _ACTIVE_STATUSES:
-                if state.local_size is None:
-                    # A .part remnant is resumable, so say so rather than
-                    # reporting the file as never fetched.
-                    state.status = "paused" if state.partial_bytes else "not_downloaded"
-                elif (
-                    mtime
-                    and state.local_mtime
-                    and mtime > datetime.fromisoformat(state.local_mtime)
-                ):
-                    state.status = "update_available"
-                elif state.local_size >= size:
-                    state.status = "up_to_date"
-                else:
-                    state.status = "update_available"
+                state.status = _freshness(state, size, mtime)
                 state.error = None
 
         self._broadcast({"type": "file_update", "file": state.to_dict()})
@@ -560,7 +601,7 @@ class DownloadManager:
         if st is None:
             return 0
         part_mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
-        if server_mtime is not None and server_mtime > part_mtime:
+        if _is_superseded(server_mtime, part_mtime):
             part.unlink(missing_ok=True)
             return 0
         return st.st_size
