@@ -123,5 +123,5 @@ def test_build_phases_source_stat_oserror_uses_fallback_weight(tmp_data_dir):
 
     phases = fm._build_phases(job)
 
-    assert len(phases) == 1
+    assert [p.step for p in phases] == ["filter", "report"]
     assert phases[0].weight == pytest.approx(1.0)

@@ -2229,8 +2229,11 @@ function renderFilterJobs() {
       progressHtml = `<div style="font-size:.82rem;color:var(--gray);padding:.25rem 0">${t('job_queued')}${escHtml(pos)}</div>`;
     } else if (showProgress) {
       runningIds.add(j.id);
-      const phaseIdx = j.current_phase_index || 0;
       const totalPhases = j.phases.length;
+      // The index runs one past the last phase between finishing it and the job
+      // reporting done, which would read as "Step 3 of 2". Pin it to the last
+      // phase: whatever is still happening belongs to that one.
+      const phaseIdx = Math.min(j.current_phase_index || 0, totalPhases - 1);
       const curPhase = j.phases[phaseIdx];
       const phaseLabel = curPhase ? curPhase.label : '';
       const elapsedPhase = j.phase_started_at ? nowSec - j.phase_started_at : 0;

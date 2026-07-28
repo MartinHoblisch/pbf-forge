@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -366,6 +367,124 @@ def test_render_output_report_layout(tmp_data_dir):
     assert "12m 34s" in text  # job duration
     assert "8m 12s" in text  # filter phase
     assert "9.4 s" in text  # export phase
+
+
+async def test_writing_the_reports_is_a_counted_phase(tmp_data_dir):
+    """It used to run past the last phase, which the UI rendered as "step 3 of 2"."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+
+    await _run(fm, job)
+
+    assert [p.label for p in job.phases][-1] == "write reports"
+    # Every phase closed, so the index lands on the count rather than past it.
+    assert job.current_phase_index == len(job.phases)
+    assert job.phases[-1].duration_seconds is not None
+    n = len(job.phases)
+    assert f"Phase {n}/{n}: write reports" in job.log
+    assert f"Phase {n}/{n} done in" in job.log
+
+
+async def test_publishing_an_output_counts_towards_its_export_phase(tmp_data_dir):
+    """Embedding the metadata and moving the file into place produce that output,
+    so the phase named after it must still be open while they run."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+    seen = {}
+
+    def _record_index(*_args, **_kwargs):
+        seen["at_embed"] = job.current_phase_index
+
+    with patch.object(fm, "_run_cmd", side_effect=_fake_run_cmd):
+        with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
+            with patch.object(fm, "_embed_attribution", side_effect=_record_index):
+                with patch.object(fm, "_embed_provenance"):
+                    await fm.run_job(job)
+
+    export_index = next(i for i, p in enumerate(job.phases) if p.step == "export_convert")
+    assert seen["at_embed"] == export_index
+
+
+async def test_the_report_phase_records_no_filter_history(tmp_data_dir):
+    """History estimates a step from its source's size; this phase has no source."""
+    _ensure_source(tmp_data_dir)
+    fm = _fm()
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+
+    with patch.object(fm._history, "record") as record:
+        await _run(fm, job)
+
+    assert record.called
+    assert all(call.args[0] for call in record.call_args_list), "no source-less entries"
+    assert "report" not in [call.args[2] for call in record.call_args_list]
+
+
+def test_report_lists_the_job_wide_report_phase(tmp_data_dir):
+    """The phase that writes the reports belongs to no source, so it has to be
+    listed for every output — and it is still running while it renders them."""
+    fm = _fm()
+    out_path = tmp_data_dir / "out" / "gpkg" / "a_t.gpkg"
+    out_path.parent.mkdir(parents=True)
+    out_path.write_bytes(b"g" * 2048)
+
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+    job.phases = [
+        Phase(
+            label="a.osm.pbf · export gpkg",
+            source="a.osm.pbf",
+            step="export_convert",
+            weight=1,
+            fmt="gpkg",
+        ),
+        Phase(label="write reports", source="", step="report", weight=0.0, fmt="txt"),
+    ]
+    job.phases[0].duration_seconds = 9.4
+    # In flight: this is the state the phase is in while the report is rendered.
+    job.current_phase_index = 1
+    job.phase_started_at = time.time() - 3.0
+
+    text = fm._render_output_report(
+        job,
+        out_path,
+        "a.osm.pbf",
+        "gpkg",
+        finished_at=datetime(2026, 7, 26, 9, 42, 7, tzinfo=timezone.utc),
+        duration_seconds=754.0,
+        host_root="",
+    )
+
+    phases_section = text.split("PHASES", 1)[1]
+    assert "export gpkg" in phases_section
+    assert "write reports" in phases_section
+    # Its elapsed time stands in for a duration it cannot know yet.
+    assert "3.0 s" in phases_section
+
+
+def test_report_shows_a_dash_for_a_phase_that_never_ran(tmp_data_dir):
+    fm = _fm()
+    out_path = tmp_data_dir / "out" / "gpkg" / "a_t.gpkg"
+    out_path.parent.mkdir(parents=True)
+    out_path.write_bytes(b"g")
+
+    job = _job(tmp_data_dir, output_formats=["gpkg"])
+    job.phases = [
+        Phase(label="write reports", source="", step="report", weight=0.0, fmt="txt"),
+    ]
+
+    text = fm._render_output_report(
+        job,
+        out_path,
+        "a.osm.pbf",
+        "gpkg",
+        finished_at=datetime(2026, 7, 26, 9, 42, 7, tzinfo=timezone.utc),
+        duration_seconds=1.0,
+        host_root="",
+    )
+
+    assert "write reports" in text.split("PHASES", 1)[1]
+    assert "3.0 s" not in text
 
 
 # ── source data timestamp ─────────────────────────────────────────────────────

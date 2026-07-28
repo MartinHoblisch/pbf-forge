@@ -159,12 +159,38 @@ def _report_row(key: str, values: list[str]) -> list[str]:
 def _pbf_replication_timestamp(path: Path) -> str:
     """The header's osmosis_replication_timestamp, or '' when the file has none.
 
-    Only the header block is parsed, so the cost does not scale with file size.
+    Selecting NOTHING is what keeps this cheap. A Reader opened for the default
+    entity types starts decoding the data blocks in the background as soon as it
+    is constructed, so asking a multi-GB extract for its header alone streams
+    the whole file — seconds for the first caller in a process, minutes for
+    every one after it. With no entity types selected, only the header block is
+    read and the cost does not scale with file size.
     """
     import osmium.io  # imported here to keep module-level clean
+    import osmium.osm
 
-    with osmium.io.Reader(str(path)) as reader:
+    with osmium.io.Reader(str(path), osmium.osm.osm_entity_bits.NOTHING) as reader:
         return reader.header().get("osmosis_replication_timestamp", "")
+
+
+def _phase_duration(job: "FilterJob", phase: "Phase") -> str:
+    """A phase's duration for the report, formatted.
+
+    The phase that writes the reports is still running while they are being
+    rendered, so it has no recorded duration yet. Its elapsed time is reported
+    instead: all that remains at that point is the write itself, so the two
+    differ by well under the resolution shown here.
+    """
+    seconds = phase.duration_seconds
+    running = (
+        seconds is None
+        and job.phase_started_at is not None
+        and job.current_phase_index < len(job.phases)
+        and phase is job.phases[job.current_phase_index]
+    )
+    if running:
+        seconds = max(0.0, time.time() - job.phase_started_at)
+    return "-" if seconds is None else _fmt_duration(seconds)
 
 
 def _attributes_description(job: FilterJob, fmt: str) -> str:
@@ -880,7 +906,6 @@ class FilterManager:
 
                         if rc != 0:
                             raise RuntimeError(f"Conversion exited with code {rc}")
-                        await self._finish_phase(job)
                         loop = asyncio.get_running_loop()
                         await loop.run_in_executor(None, self._embed_attribution, work_file, fmt)
                         await loop.run_in_executor(
@@ -901,6 +926,11 @@ class FilterManager:
                         job.output_files.append(str(out_file))
                         published.append((out_file, source, fmt))
                         gc.collect()
+                        # Closed only here: embedding the metadata and moving
+                        # the file into place is part of producing this output,
+                        # so its cost belongs to this phase rather than to an
+                        # unnamed stretch after the last one.
+                        await self._finish_phase(job)
 
                     # Eager cleanup: free disk space from shared export temp.
                     if shared_geojson is not None:
@@ -922,20 +952,26 @@ class FilterManager:
             )
             job.append_log("\n".join(inv_lines) + "\n")
 
-            if empty_sources and not job.output_files:
-                # Narrowing a filter until nothing matches is ordinary use, not a
-                # failure — so this is not an error. It still gets a status of its
-                # own, because reporting "done" with no files would read as a
-                # silent success.
-                job.status = "no_matches"
+            nothing_matched = bool(empty_sources) and not job.output_files
+            if nothing_matched:
                 job.append_log(
                     f"{_ts()}No features matched this filter. No output files were written.\n"
                 )
-            else:
-                job.status = "done"
+
             finished_dt = datetime.now().astimezone()
             job.finished_at = finished_dt.strftime("%H:%M")
+            # The reports describe every output, so they are written once all of
+            # them are in place. A phase of their own, so the work is named and
+            # counted rather than running past the last one.
+            await self._start_phase(job)
             self._write_output_reports(job, published, finished_dt, job_dur)
+            await self._finish_phase(job)
+
+            # Narrowing a filter until nothing matches is ordinary use, not a
+            # failure — so this is not an error. It still gets a status of its
+            # own, because reporting "done" with no files would read as a
+            # silent success.
+            job.status = "no_matches" if nothing_matched else "done"
 
         except Exception as exc:
             job.status = "error"
@@ -1048,11 +1084,14 @@ class FilterManager:
         phase = job.phases[idx]
         duration = max(0.0, time.time() - job.phase_started_at)
         phase.duration_seconds = duration
-        size = self._source_size(phase.source)
-        try:
-            self._history.record(phase.source, size, phase.step, phase.fmt, duration)
-        except Exception as exc:
-            _log.warning("filter_history.record failed: %s", exc)
+        # The history estimates a step's cost from the size of the source it ran
+        # on, so a phase that belongs to no single source has nothing to record.
+        if phase.source:
+            size = self._source_size(phase.source)
+            try:
+                self._history.record(phase.source, size, phase.step, phase.fmt, duration)
+            except Exception as exc:
+                _log.warning("filter_history.record failed: %s", exc)
         n, m = idx + 1, len(job.phases)
         job.append_log(f"{_ts()}Phase {n}/{m} done in {duration:.1f}s\n")
         job.current_phase_index += 1
@@ -1116,6 +1155,20 @@ class FilterManager:
                         fmt=fmt,
                     )
                 )
+
+        if phases:
+            # One trailing phase for the job as a whole: the reports are written
+            # once every output is in place and each of them describes the run,
+            # so this phase belongs to no single source.
+            phases.append(
+                Phase(
+                    label="write reports",
+                    source="",
+                    step="report",
+                    weight=0.0,
+                    fmt="txt",
+                )
+            )
 
         return phases
 
@@ -1463,19 +1516,18 @@ class FilterManager:
 
         # Phases that actually fed this file: the shared filter/exclude/reduce
         # passes for its source, plus its own export pass — never another
-        # format's export.
+        # format's export. Phases without a source belong to the whole job and
+        # so apply to every output.
         phases = [
             p
             for p in job.phases
-            if p.source == source and (p.step != "export_convert" or p.fmt == fmt)
+            if (not p.source or p.source == source) and (p.step != "export_convert" or p.fmt == fmt)
         ]
         if phases:
             lines.append("PHASES (this output)")
             for phase in phases:
                 label = phase.label.split(" · ", 1)[-1]
-                dur = (
-                    "-" if phase.duration_seconds is None else _fmt_duration(phase.duration_seconds)
-                )
+                dur = _phase_duration(job, phase)
                 lines.append(f"  {label}".ljust(_REPORT_WIDTH - len(dur)) + dur)
             lines.append("")
 

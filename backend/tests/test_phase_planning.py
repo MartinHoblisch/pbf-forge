@@ -41,7 +41,7 @@ def test_single_source_three_formats(tmp_path, monkeypatch):
     job = _make_job(output_formats=["pbf", "geojson", "gpkg"])
     phases = _make_manager()._build_phases(job)
 
-    assert [p.step for p in phases] == ["filter", "export_convert", "export_convert"]
+    assert [p.step for p in phases] == ["filter", "export_convert", "export_convert", "report"]
     assert phases[0].label == "berlin.osm.pbf · filter"
     assert "geojson" in phases[1].label
     assert "gpkg" in phases[2].label
@@ -64,7 +64,7 @@ def test_two_sources_two_formats(tmp_path, monkeypatch):
     )
     phases = _make_manager()._build_phases(job)
 
-    assert len(phases) == 4
+    assert len(phases) == 5  # 2 per source, plus the job-wide report phase
     assert len([p for p in phases if p.source == "berlin.osm.pbf"]) == 2
     assert len([p for p in phases if p.source == "hamburg.osm.pbf"]) == 2
 
@@ -78,8 +78,7 @@ def test_pbf_only(tmp_path, monkeypatch):
 
     phases = _make_manager()._build_phases(_make_job(output_formats=["pbf"]))
 
-    assert len(phases) == 1
-    assert phases[0].step == "filter"
+    assert [p.step for p in phases] == ["filter", "report"]
 
 
 # ── reduce phase for pbf + manual + manual_keys ───────────────────────────────
@@ -92,7 +91,7 @@ def test_reduce_phase_added_for_manual_pbf(tmp_path, monkeypatch):
     job = _make_job(output_formats=["pbf"], columns_mode="manual", manual_keys=["name"])
     phases = _make_manager()._build_phases(job)
 
-    assert [p.step for p in phases] == ["filter", "reduce"]
+    assert [p.step for p in phases] == ["filter", "reduce", "report"]
 
 
 # ── no reduce without manual_keys ────────────────────────────────────────────
@@ -117,7 +116,7 @@ def test_geojson_only(tmp_path, monkeypatch):
 
     phases = _make_manager()._build_phases(_make_job(output_formats=["geojson"]))
 
-    assert [p.step for p in phases] == ["filter", "export_convert"]
+    assert [p.step for p in phases] == ["filter", "export_convert", "report"]
 
 
 # ── weights scale with file size ──────────────────────────────────────────────
@@ -143,7 +142,7 @@ def test_missing_file_fallback_weight(tmp_path, monkeypatch):
 
     phases = _make_manager()._build_phases(_make_job(source_files=["ghost.osm.pbf"]))
 
-    assert len(phases) == 1
+    assert [p.step for p in phases] == ["filter", "report"]
     assert phases[0].weight == pytest.approx(1.0)
 
 
