@@ -34,6 +34,7 @@ from config import (
     TEMP_DIR,
     USER_CONFIG_FILE,
 )
+from download_manager import source_url
 from filter_history import FilterHistory
 from host_paths import host_data_dir, to_host_path
 
@@ -1421,6 +1422,11 @@ class FilterManager:
         lines.append("INPUT")
         source_size = _fmt_size(self._source_size(source))
         lines += _report_row("Source extract", [f"{source}  ({source_size})"])
+        # The host is per-source, not a property of the tool: any server that
+        # publishes a PBF next to an .md5 works. Naming the real one beats
+        # assuming a single provider.
+        if url := source_url(source):
+            lines += _report_row("Source URL", [url])
         data_timestamp = self._source_data_timestamp(source)
         if data_timestamp:
             lines += _report_row("Data timestamp", [data_timestamp])

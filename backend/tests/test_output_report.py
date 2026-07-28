@@ -444,3 +444,45 @@ def test_report_omits_the_timestamp_when_the_source_is_gone(tmp_data_dir, monkey
 
     assert "Source extract" in section
     assert "Data timestamp" not in section
+
+
+# ── source URL ────────────────────────────────────────────────────────────────
+# Any server that publishes a PBF next to an .md5 works, so the report names the
+# host each source actually came from rather than assuming a single provider.
+
+
+def test_report_names_the_host_a_source_was_downloaded_from(tmp_data_dir):
+    """A built-in continental extract resolves to its download URL."""
+    _ensure_source(tmp_data_dir, "europe.osm.pbf")
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="europe.osm.pbf")
+
+    assert "  Source URL        https://download.geofabrik.de/europe-latest.osm.pbf" in section
+
+
+def test_report_names_a_non_geofabrik_host(tmp_data_dir, tmp_config_dir):
+    """The host is whatever the user pointed at — nothing assumes Geofabrik."""
+    _ensure_source(tmp_data_dir, "planet.osm.pbf")
+    (tmp_config_dir / ".osm_tool_urls.json").write_text(
+        json.dumps(
+            {"planet.osm.pbf": "https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf"}
+        ),
+        encoding="utf-8",
+    )
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="planet.osm.pbf")
+
+    assert (
+        "  Source URL        https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf" in section
+    )
+    assert "geofabrik" not in section.lower()
+
+
+def test_report_omits_the_url_for_a_hand_placed_file(tmp_data_dir):
+    """A PBF copied into the data directory has no URL — the row is dropped."""
+    _ensure_source(tmp_data_dir, "handmade.osm.pbf")
+
+    section = _render_input_section(_fm(), tmp_data_dir, source="handmade.osm.pbf")
+
+    assert "Source extract" in section
+    assert "Source URL" not in section

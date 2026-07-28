@@ -75,8 +75,8 @@ The container binds to `127.0.0.1` only and ships without authentication. **Do n
 
 ## Features
 
-- **Direct Geofabrik downloads** — paste any Geofabrik URL; file size and update check shown before download.
-- **MD5 checksum verification** — every PBF is verified against Geofabrik's `<file>.osm.pbf.md5` before any filter step. Mismatch fails closed.
+- **Direct downloads** — the eight continental extracts are built in; paste any other PBF URL to add it. File size and update check shown before download. Geofabrik is the default host, not a requirement: [planet.openstreetmap.org](https://planet.openstreetmap.org/pbf/) and [BBBike](https://download.bbbike.org/osm/) work the same way.
+- **MD5 checksum verification** — every PBF is verified against the `<file>.osm.pbf.md5` published next to it before any filter step. Mismatch fails closed, and so does a missing checksum file — a host that publishes no `.md5` cannot be used.
 - **Tag filtering via `osmium tags-filter`** — full expression syntax (`n/`, `w/`, `r/`, `nwr/`, multi-tag, negation).
 - **Named presets** — save canned filters for reuse.
 - **Export formats**
@@ -163,7 +163,7 @@ User-facing features under consideration are tracked in [docs/ROADMAP.md](docs/R
 
 **Privacy.** PBF Forge does not collect telemetry, analytics, crash reports, or usage statistics. It does not phone home for update checks. The HTML/CSS/JS are served locally from the container — no Google Fonts, no CDN scripts, no third-party trackers. The only outbound network calls at runtime are to `download.geofabrik.de` for the PBF you requested and its `.md5` checksum file. Container logs (uvicorn access log, application stderr) stay inside the container; nothing is shipped off the host.
 
-**Commercial use.** OpenStreetMap data is licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright). PBF Forge embeds ODbL attribution in every GeoPackage and GeoJSON it produces — you must keep that attribution intact in any downstream product. **Geofabrik downloads themselves are free for non-commercial use; commercial users should review <https://www.geofabrik.de/geofabrik/agb.html> before deploying PBF Forge in a commercial workflow.**
+**Commercial use.** OpenStreetMap data is licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright). PBF Forge embeds ODbL attribution in every GeoPackage and GeoJSON it produces — you must keep that attribution intact in any downstream product. **The terms of the server you download from apply on top of that, and they differ per host.** The built-in continental extracts come from Geofabrik, whose downloads are free for non-commercial use — commercial users should review <https://www.geofabrik.de/geofabrik/agb.html>. If you point PBF Forge at another host, check that host's terms instead.
 
 ---
 

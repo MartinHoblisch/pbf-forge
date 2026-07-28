@@ -81,6 +81,45 @@ def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     return float(2**attempt)
 
 
+def _lookup_url(mapping: dict[str, str], filename: str) -> Optional[str]:
+    """Resolve the download URL of a local extract, including renamed variants.
+
+    Lookup order:
+    1. Direct match (e.g. europe.osm.pbf, europe-latest.osm.pbf)
+    2. Strip 6-digit date: africa-260427.osm.pbf -> africa.osm.pbf
+    3. Strip -latest:      germany-latest.osm.pbf -> germany.osm.pbf
+    """
+    import re
+
+    if url := mapping.get(filename):
+        return url
+    base = re.sub(r"-\d{6}(?=\.osm\.pbf$)", "", filename)
+    if base != filename:
+        if url := mapping.get(base):
+            return url
+    base2 = re.sub(r"-latest(?=\.osm\.pbf$)", "", filename)
+    if base2 != filename:
+        if url := mapping.get(base2):
+            return url
+    return None
+
+
+def source_url(filename: str) -> Optional[str]:
+    """Where a local extract was downloaded from, or None if it was placed by hand.
+
+    Reads the stored mapping rather than taking it from a running
+    DownloadManager, so a caller outside the download subsystem — the output
+    report — can name the real host of each source instead of assuming one.
+    """
+    mapping = dict(CONTINENTAL_URLS)
+    if URLS_FILE.exists():
+        try:
+            mapping.update(json.loads(URLS_FILE.read_text(encoding="utf-8")))
+        except Exception as exc:
+            _log.warning("URL mapping could not be read: %s", exc)
+    return _lookup_url(mapping, filename)
+
+
 def url_to_filename(url: str) -> str:
     """Convert a Geofabrik URL to local filename without '-latest'.
 
@@ -216,26 +255,7 @@ class DownloadManager:
             _log.warning("URL mapping could not be saved: %s", exc)
 
     def _resolve_url(self, filename: str) -> Optional[str]:
-        """Resolve Geofabrik URL for a filename, including date-stamped variants.
-
-        Lookup order:
-        1. Direct match (e.g. europe.osm.pbf, europe-latest.osm.pbf)
-        2. Strip 6-digit date: africa-260427.osm.pbf -> africa.osm.pbf
-        3. Strip -latest:      germany-latest.osm.pbf -> germany.osm.pbf
-        """
-        import re
-
-        if url := self._url_mapping.get(filename):
-            return url
-        base = re.sub(r"-\d{6}(?=\.osm\.pbf$)", "", filename)
-        if base != filename:
-            if url := self._url_mapping.get(base):
-                return url
-        base2 = re.sub(r"-latest(?=\.osm\.pbf$)", "", filename)
-        if base2 != filename:
-            if url := self._url_mapping.get(base2):
-                return url
-        return None
+        return _lookup_url(self._url_mapping, filename)
 
     def _sync_local_state(self, filename: str) -> bool:
         """Re-read one file from disk into its FileState.

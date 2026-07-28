@@ -20,7 +20,10 @@ PRESETS_FILE = CONFIG_DIR / ".osm_tool_presets.json"
 USER_CONFIG_FILE = CONFIG_DIR / "user-config.json"
 STARTUP_TIME = time.time()
 
-ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0). Data sourced via Geofabrik."
+# Embedded in every output file. Names only what ODbL actually requires — the
+# contributors, not the distributor. The host an extract came from varies per
+# source and is recorded per output in the report instead.
+ATTRIBUTION = "© OpenStreetMap contributors (ODbL 1.0)."
 
 MAX_CONCURRENT_DOWNLOADS = 3
 CHUNK_SIZE = 1 * 1024 * 1024  # 1 MB

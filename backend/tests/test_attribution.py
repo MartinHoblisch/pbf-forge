@@ -165,7 +165,9 @@ def test_gpkg_attribution_string_contains_odbl(tmp_path, fm):
 
     assert "ODbL" in metadata
     assert "OpenStreetMap" in metadata
-    assert "Geofabrik" in metadata
+    # The distributor is deliberately absent: ODbL credits the contributors,
+    # and the host varies per source. The report names it per output instead.
+    assert "Geofabrik" not in metadata
 
 
 def test_gpkg_attribution_scope_and_mime(tmp_path, fm):
@@ -205,7 +207,7 @@ def test_geojson_attribution_string_contains_odbl(tmp_path, fm):
     data = json.loads(geojson.read_text(encoding="utf-8"))
     assert "ODbL" in data["attribution"]
     assert "OpenStreetMap" in data["attribution"]
-    assert "Geofabrik" in data["attribution"]
+    assert "Geofabrik" not in data["attribution"]
 
 
 def test_geojson_existing_keys_preserved(tmp_path, fm):
