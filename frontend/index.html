@@ -29,13 +29,15 @@ body { background: #f1f5f9; color: #111827; min-height: 100vh; display: flex; fl
 /* ── Header ──
    The header and footer bars carry the app name, the data directory, the
    connection state and the attribution. Every one of those was set smaller
-   than the body text it frames, so both bars run 30% above their original
-   sizes. The header height follows, or the taller controls would clip. */
+   than the body text it frames, so their type and icons run 30% above their
+   original sizes. The bars themselves did not grow with them: the vertical
+   padding was cut back so the larger content fills the space that used to
+   sit empty above and below it. */
 header {
   background: #1e3a5f;
   color: #fff;
   padding: 0 1.5rem;
-  height: 68px;
+  height: 44px;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -81,7 +83,7 @@ header h1 { font-size: 1.43rem; font-weight: 600; letter-spacing: .02em; }
   background: rgba(255,255,255,.15);
   border: 1px solid rgba(255,255,255,.3);
   color: #fff;
-  padding: .325rem .845rem;
+  padding: .15rem .845rem;
   border-radius: var(--radius);
   cursor: pointer;
   font-size: 1.014rem;
@@ -94,7 +96,7 @@ header h1 { font-size: 1.43rem; font-weight: 600; letter-spacing: .02em; }
 /* Icon-only button: flex centring instead of a text baseline, and a fixed icon
    size, so its height matches the language button beside it exactly. */
 #sound-btn, #quit-btn {
-  padding: .325rem .715rem;
+  padding: .15rem .715rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -111,7 +113,7 @@ nav.tabs {
   display: flex;
   padding: 0 1.5rem;
   position: sticky;
-  top: 68px;
+  top: 44px;
   z-index: 99;
 }
 .tab-btn {
@@ -405,7 +407,7 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
   gap: .4rem;
   background: rgba(255,255,255,.12);
   border-radius: var(--radius);
-  padding: .325rem .845rem;
+  padding: .15rem .845rem;
   font-size: 1.014rem;
   max-width: 416px;
 }
@@ -514,7 +516,7 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
 footer {
   background: #fff;
   border-top: 1px solid var(--border);
-  padding: .85rem 1.5rem;
+  padding: .4rem 1.5rem;
   font-size: 1.014rem;
   color: var(--gray);
   display: flex;
