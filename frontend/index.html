@@ -26,12 +26,16 @@
 
 body { background: #f1f5f9; color: #111827; min-height: 100vh; display: flex; flex-direction: column; }
 
-/* ── Header ── */
+/* ── Header ──
+   The header and footer bars carry the app name, the data directory, the
+   connection state and the attribution. Every one of those was set smaller
+   than the body text it frames, so both bars run 30% above their original
+   sizes. The header height follows, or the taller controls would clip. */
 header {
   background: #1e3a5f;
   color: #fff;
   padding: 0 1.5rem;
-  height: 52px;
+  height: 68px;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -39,16 +43,16 @@ header {
   top: 0;
   z-index: 100;
 }
-header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
+header h1 { font-size: 1.43rem; font-weight: 600; letter-spacing: .02em; }
 #ws-indicator {
   margin-left: auto;
-  font-size: .75rem;
+  font-size: .975rem;
   display: flex;
   align-items: center;
   gap: .4rem;
   opacity: .85;
 }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: #6b7280; }
 .dot.ok  { background: #4ade80; }
 .dot.err { background: #f87171; }
 
@@ -77,10 +81,10 @@ header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
   background: rgba(255,255,255,.15);
   border: 1px solid rgba(255,255,255,.3);
   color: #fff;
-  padding: .25rem .65rem;
+  padding: .325rem .845rem;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: .78rem;
+  font-size: 1.014rem;
   font-weight: 600;
   letter-spacing: .04em;
   transition: background .15s;
@@ -90,12 +94,12 @@ header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .02em; }
 /* Icon-only button: flex centring instead of a text baseline, and a fixed icon
    size, so its height matches the language button beside it exactly. */
 #sound-btn, #quit-btn {
-  padding: .25rem .55rem;
+  padding: .325rem .715rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
 }
-#sound-btn .icon, #quit-btn .icon { width: 14px; height: 14px; }
+#sound-btn .icon, #quit-btn .icon { width: 18px; height: 18px; }
 /* Quit ends the session, so it reads as destructive on hover rather than
    looking like the two toggles it sits next to. */
 #quit-btn:hover { background: var(--red); border-color: var(--red); }
@@ -107,7 +111,7 @@ nav.tabs {
   display: flex;
   padding: 0 1.5rem;
   position: sticky;
-  top: 52px;
+  top: 68px;
   z-index: 99;
 }
 .tab-btn {
@@ -401,9 +405,9 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
   gap: .4rem;
   background: rgba(255,255,255,.12);
   border-radius: var(--radius);
-  padding: .25rem .65rem;
-  font-size: .78rem;
-  max-width: 320px;
+  padding: .325rem .845rem;
+  font-size: 1.014rem;
+  max-width: 416px;
 }
 .dir-badge-path {
   overflow: hidden;
@@ -417,7 +421,7 @@ details.job-log-wrap > summary:hover { color: var(--blue); }
   color: rgba(255,255,255,.7);
   cursor: pointer;
   padding: 0 .15rem;
-  font-size: .9rem;
+  font-size: 1.17rem;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -511,7 +515,7 @@ footer {
   background: #fff;
   border-top: 1px solid var(--border);
   padding: .85rem 1.5rem;
-  font-size: .78rem;
+  font-size: 1.014rem;
   color: var(--gray);
   display: flex;
   align-items: center;
@@ -524,13 +528,12 @@ footer {
 footer a { color: var(--gray); text-decoration: none; }
 footer a:hover { color: var(--blue); text-decoration: underline; }
 footer .credits-sep { color: var(--border); }
-/* Pushed to the far end of the bar, and away from the wrapping text credits. */
+/* Leads the bar, in place of the app name the header already carries. */
 #github-link {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
 }
-#github-link .icon { width: 16px; height: 16px; }
+#github-link .icon { width: 21px; height: 21px; }
 #github-link:hover { color: var(--blue); text-decoration: none; }
 
 /* ── Resource limits modal ── */
@@ -581,11 +584,11 @@ footer .credits-sep { color: var(--border); }
   </div>
   <button id="lang-btn" onclick="toggleLang()" data-i18n-title="lang_switch" title="Switch to German">EN</button>
   <button id="sound-btn" onclick="toggleSound()"><svg class="icon"><use href="#i-bell-off"/></svg></button>
-  <button id="quit-btn" onclick="quitApp()" data-i18n-title="quit_title" title="Quit PBF Forge (stops the container)"><svg class="icon"><use href="#i-power"/></svg></button>
   <div id="ws-indicator">
     <span class="dot" id="ws-dot"></span>
-    <span id="ws-text">Verbinde …</span>
+    <span id="ws-text">verbinde …</span>
   </div>
+  <button id="quit-btn" onclick="quitApp()" data-i18n-title="quit_title" title="Quit PBF Forge (stops the container)"><svg class="icon"><use href="#i-power"/></svg></button>
 </header>
 
 <nav class="tabs">
@@ -843,7 +846,7 @@ footer .credits-sep { color: var(--border); }
 </main>
 
 <footer>
-  <span><strong>PBF Forge</strong></span>
+  <a id="github-link" href="https://github.com/MartinHoblisch/pbf-forge" target="_blank" rel="noopener" data-i18n-title="github_title" title="Open the project on GitHub"><svg class="icon icon-solid"><use href="#i-github"/></svg></a>
   <span class="credits-sep">|</span>
   <span>by Martin Hoblisch</span>
   <span class="credits-sep">|</span>
@@ -852,7 +855,6 @@ footer .credits-sep { color: var(--border); }
   <span><span data-i18n="credits_extracts">Extracts</span>: <a href="https://www.geofabrik.de" target="_blank" rel="noopener">Geofabrik</a></span>
   <span class="credits-sep">|</span>
   <span><span data-i18n="credits_built_with">Built with</span> <a href="https://osmcode.org/osmium-tool/" target="_blank" rel="noopener">osmium-tool</a> &amp; <a href="https://gdal.org/" target="_blank" rel="noopener">GDAL</a></span>
-  <a id="github-link" href="https://github.com/MartinHoblisch/pbf-forge" target="_blank" rel="noopener" data-i18n-title="github_title" title="Open the project on GitHub"><svg class="icon icon-solid"><use href="#i-github"/></svg></a>
 </footer>
 
 <!-- ── Onboarding overlay ── -->
@@ -1079,9 +1081,9 @@ const TRANSLATIONS = {
     paused_meta: (pct, have, total) => `${pct}% · ${have} von ${total} geladen`,
     status_error: 'Fehler',
     status_unknown: 'Unbekannt',
-    ws_connecting: 'Verbinde …',
-    ws_connected: 'Verbunden',
-    ws_disconnected: 'Getrennt – verbinde neu …',
+    ws_connecting: 'verbinde …',
+    ws_connected: 'verbunden',
+    ws_disconnected: 'getrennt – verbinde neu …',
     ws_error: 'Verbindungsfehler',
     eta_lt1min: 'Noch <1 Min',
     eta_hr: (h, m) => `Noch ~${h} Std ${m} Min`,
@@ -1263,10 +1265,10 @@ const TRANSLATIONS = {
     paused_meta: (pct, have, total) => `${pct}% · ${have} of ${total} downloaded`,
     status_error: 'Error',
     status_unknown: 'Unknown',
-    ws_connecting: 'Connecting…',
-    ws_connected: 'Connected',
-    ws_disconnected: 'Disconnected – reconnecting…',
-    ws_error: 'Connection error',
+    ws_connecting: 'connecting…',
+    ws_connected: 'connected',
+    ws_disconnected: 'disconnected – reconnecting…',
+    ws_error: 'connection error',
     eta_lt1min: '<1 min left',
     eta_hr: (h, m) => `~${h} hr ${m} min left`,
     eta_min: m => `~${m} min left`,
