@@ -17,6 +17,7 @@ slow-retry that never ends, is invisible to the existing tests.
 
 from __future__ import annotations
 
+import os
 import threading
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -414,3 +415,119 @@ def test_slow_retry_bubbles_other_exception(tmp_data_dir):
     with dm._lock:
         assert dm._files[filename].status == "error"
         assert "unexpected programming error" in dm._files[filename].error
+
+
+# ── Resuming across a rebuild of the extract ─────────────────────────────────
+#
+# A Range request is answered from whatever the URL serves at that moment. The
+# slow loop waits for the network to return for as long as it takes, so a retry
+# can land days after the transfer began, on a build that has been rebuilt in
+# between. Appending to the old partial then splices two files into one.
+
+_NEWER = datetime(2020, 6, 1, tzinfo=timezone.utc)
+_PART_WRITTEN = datetime(2020, 3, 1, tzinfo=timezone.utc)  # between _OLD and _NEWER
+
+
+def _partial_from_the_current_build(tmp_data_dir, filename: str, size: int = 500):
+    """Write a .part that is newer than _OLD but older than _NEWER."""
+    part = tmp_data_dir / (filename + ".part")
+    part.write_bytes(b"x" * size)
+    ts = _PART_WRITTEN.timestamp()
+    os.utime(part, (ts, ts))
+    return part
+
+
+def _worker_with_rotation(dm, filename, first_failure):
+    """Run the worker so the first attempt fails and the server rotates before the retry."""
+    offsets: list[int] = []
+
+    def fake_do_download(url, dest, start_byte, size, tracker, state, cancel, session):
+        offsets.append(start_byte)
+        if len(offsets) == 1:
+            raise first_failure
+        dest.write_bytes(b"y" * 100)  # the retry writes the new build
+
+    # First HEAD: the build the transfer started from. Every later HEAD: rotated.
+    heads = [(1000, _OLD), (1200, _NEWER), (1200, _NEWER), (1200, _NEWER)]
+
+    with patch.object(dm, "_head", side_effect=heads):
+        with patch.object(dm, "_do_download", side_effect=fake_do_download):
+            with patch.object(dm, "_verify_checksum"):
+                with patch.object(dm_module.time, "sleep"):
+                    cancel = threading.Event()
+                    with patch.object(cancel, "wait", return_value=False):
+                        dm._download_worker(filename, cancel)
+    return offsets
+
+
+def _rotating_dm(tmp_data_dir, filename):
+    dm = _make_dm(tmp_data_dir)
+    dm._url_mapping[filename] = "https://example.com/test.osm.pbf"
+    with dm._lock:
+        dm._files[filename] = FileState(
+            filename=filename, url=dm._url_mapping[filename], status="downloading"
+        )
+    return dm
+
+
+def test_slow_retry_restarts_when_the_extract_was_rebuilt(tmp_data_dir):
+    filename = "test.osm.pbf"
+    part = _partial_from_the_current_build(tmp_data_dir, filename)
+    dm = _rotating_dm(tmp_data_dir, filename)
+
+    offsets = _worker_with_rotation(dm, filename, requests.ConnectionError("offline"))
+
+    assert offsets[0] == 500, "the first attempt resumes the partial it started from"
+    assert offsets[1] == 0, "the retry must not append to a partial from the previous build"
+    assert not part.exists(), "the superseded partial is discarded, not left to be appended to"
+
+
+def test_fast_retry_restarts_when_the_extract_was_rebuilt(tmp_data_dir):
+    filename = "test.osm.pbf"
+    _partial_from_the_current_build(tmp_data_dir, filename)
+    dm = _rotating_dm(tmp_data_dir, filename)
+
+    response = MagicMock(status_code=503, reason="Service Unavailable", headers={})
+    offsets = _worker_with_rotation(dm, filename, requests.HTTPError(response=response))
+
+    assert offsets == [500, 0]
+
+
+def test_retry_keeps_resuming_when_the_extract_is_unchanged(tmp_data_dir):
+    """The refresh must not throw away a valid partial — that is a full re-download."""
+    filename = "test.osm.pbf"
+    _partial_from_the_current_build(tmp_data_dir, filename)
+    dm = _rotating_dm(tmp_data_dir, filename)
+
+    offsets: list[int] = []
+
+    def fake_do_download(url, dest, start_byte, size, tracker, state, cancel, session):
+        offsets.append(start_byte)
+        if len(offsets) == 1:
+            raise requests.ConnectionError("offline")
+
+    with patch.object(dm, "_head", return_value=(1000, _OLD)):
+        with patch.object(dm, "_do_download", side_effect=fake_do_download):
+            with patch.object(dm, "_verify_checksum"):
+                cancel = threading.Event()
+                with patch.object(cancel, "wait", return_value=False):
+                    dm._download_worker(filename, cancel)
+
+    assert offsets == [500, 500]
+
+
+def test_refresh_server_state_keeps_the_known_figures_when_the_server_is_unreachable(
+    tmp_data_dir,
+):
+    """A retry runs into the same outage — an unreachable server is no reason to fail."""
+    dm = _make_dm(tmp_data_dir)
+    state = _state("test.osm.pbf")
+
+    with patch.object(dm, "_head", side_effect=requests.ConnectionError("offline")):
+        assert dm._refresh_server_state(
+            "https://example.com/x.osm.pbf", MagicMock(), state, (1000, _OLD)
+        ) == (1000, _OLD)
+
+
+def test_resume_offset_ignores_a_missing_partial(tmp_data_dir):
+    assert DownloadManager._resume_offset(tmp_data_dir / "absent.osm.pbf.part", _NEWER) == 0

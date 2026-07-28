@@ -546,6 +546,52 @@ class DownloadManager:
             _log.warning("Could not resolve %s to its final URL: %s", url, exc)
             return url
 
+    @staticmethod
+    def _resume_offset(part: Path, server_mtime: Optional[datetime]) -> int:
+        """Bytes of *part* a resume may build on, discarding it if it is outdated.
+
+        Hosts rebuild their extracts daily. A Range request is answered from
+        whatever the URL serves at that moment, so resuming a partial that was
+        started before the current build splices bytes from two different files
+        together. When the published timestamp is newer than the last write to
+        the .part, the partial belongs to an older build and is dropped.
+        """
+        st = _stat_or_none(part)
+        if st is None:
+            return 0
+        part_mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
+        if server_mtime is not None and server_mtime > part_mtime:
+            part.unlink(missing_ok=True)
+            return 0
+        return st.st_size
+
+    def _refresh_server_state(
+        self,
+        url: str,
+        session: requests.Session,
+        state: FileState,
+        fallback: tuple[int, Optional[datetime]],
+    ) -> tuple[int, Optional[datetime]]:
+        """Re-read the published size and timestamp before resuming a transfer.
+
+        A retry can happen minutes or days after the transfer began — the slow
+        loop waits for the network to come back for as long as it takes — so
+        the figures taken when the worker started may describe a build that is
+        no longer being served.
+
+        Keeps *fallback* when the server cannot be reached: the retry is about
+        to run into the same outage, and the checksum still has the last word.
+        """
+        try:
+            size, mtime = self._head(url, session=session)
+        except Exception as exc:
+            _log.warning("Could not refresh server state for %s: %s", url, exc)
+            return fallback
+        with self._lock:
+            state.server_size = size
+            state.server_mtime = mtime.isoformat() if mtime else None
+        return size, mtime
+
     def _download_worker(self, filename: str, cancel: threading.Event) -> None:
         with self._lock:
             state = self._files[filename]
@@ -569,18 +615,7 @@ class DownloadManager:
                         f"(cap is {MAX_DOWNLOAD_SIZE / 1e9:.0f} GB)"
                     )
 
-                # Resume from .part — but discard partials older than the server
-                # file. Geofabrik rebuilds its extracts daily, so appending to a
-                # partial from yesterday would splice together bytes from two
-                # different files and fail the MD5 check at the end.
-                start_byte = 0
-                if part.exists():
-                    st = part.stat()
-                    part_mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
-                    if mtime is not None and mtime > part_mtime:
-                        part.unlink(missing_ok=True)
-                    else:
-                        start_byte = st.st_size
+                start_byte = self._resume_offset(part, mtime)
 
                 # Disk-space pre-check (avoid filling /data and crashing the host)
                 needed = max(0, size - start_byte) + MIN_FREE_DISK_BUFFER
@@ -617,7 +652,8 @@ class DownloadManager:
                                 f"HTTP {code} {reason} — failed after {MAX_RETRIES} retries"
                             ) from exc
                         time.sleep(_retry_delay(exc.response, attempt))
-                        start_byte = part.stat().st_size if part.exists() else start_byte
+                        size, mtime = self._refresh_server_state(url, session, state, (size, mtime))
+                        start_byte = self._resume_offset(part, mtime)
                     except requests.exceptions.SSLError as exc:
                         raise RuntimeError(f"SSL error — not retrying: {exc}") from exc
                     except (
@@ -641,7 +677,10 @@ class DownloadManager:
                             cancel.wait(timeout=SLOW_RETRY_INTERVAL_SECONDS)
                             if cancel.is_set():
                                 break
-                            start_byte = part.stat().st_size if part.exists() else start_byte
+                            size, mtime = self._refresh_server_state(
+                                url, session, state, (size, mtime)
+                            )
+                            start_byte = self._resume_offset(part, mtime)
                             with self._lock:
                                 state.status = "downloading"
                                 state.retry_at = None
