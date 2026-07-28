@@ -66,6 +66,11 @@ def _stat_or_none(path: Path) -> Optional[os.stat_result]:
         return None
 
 
+def _basename(url: str) -> str:
+    """Last path segment of a URL — the name of the file it serves."""
+    return url.rstrip("/").split("/")[-1]
+
+
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     """Return seconds to wait before next fast retry.
 
@@ -128,8 +133,7 @@ def url_to_filename(url: str) -> str:
     """
     import re
 
-    last = url.rstrip("/").split("/")[-1]
-    return re.sub(r"-latest(?=\.osm\.pbf$)", "", last)
+    return re.sub(r"-latest(?=\.osm\.pbf$)", "", _basename(url))
 
 
 @dataclass
@@ -526,6 +530,22 @@ class DownloadManager:
         with self._new_session() as s:
             return _do(s)
 
+    def _effective_url(self, url: str, session: requests.Session) -> str:
+        """Resolve redirects to the concrete build an alias points at.
+
+        Falls back to *url* when the redirect cannot be resolved, leaving the
+        caller with what it already had.
+        """
+        try:
+            resp = session.head(
+                url, allow_redirects=True, timeout=30, headers={"Cache-Control": "no-cache"}
+            )
+            resp.raise_for_status()
+            return resp.url or url
+        except Exception as exc:
+            _log.warning("Could not resolve %s to its final URL: %s", url, exc)
+            return url
+
     def _download_worker(self, filename: str, cancel: threading.Event) -> None:
         with self._lock:
             state = self._files[filename]
@@ -692,25 +712,54 @@ class DownloadManager:
 
         self._broadcast({"type": "file_update", "file": state.to_dict()})
 
-    def _verify_checksum(self, url: str, dest: Path, session: requests.Session) -> None:
-        """Fetch <url>.md5 from Geofabrik and verify the local file matches.
+    @staticmethod
+    def _fetch_checksum(md5_url: str, session: requests.Session) -> tuple[str, Optional[str]]:
+        """Return (hex digest, name of the file it describes) from a .md5 sidecar.
 
-        Fails closed: any error (network, parse, mismatch) raises RuntimeError
-        so the download is marked error and osmium is never invoked on the file.
-        Caller must ensure *dest* exists.
+        Sidecar format: "<hex>  <filename>\\n". The filename is optional —
+        only the digest has to be there.
         """
-        md5_url = url + ".md5"
         try:
             resp = session.get(md5_url, timeout=30)
             resp.raise_for_status()
         except Exception as exc:
             raise RuntimeError(f"Could not fetch checksum from {md5_url}: {exc}") from exc
 
-        # Geofabrik .md5 format: "<hex>  <filename>\n"
-        raw = resp.text.strip()
-        expected_hex = raw.split()[0] if raw else ""
+        fields = resp.text.strip().split()
+        expected_hex = fields[0] if fields else ""
         if len(expected_hex) != 32:
-            raise RuntimeError(f"Unexpected .md5 content from {md5_url}: {raw!r}")
+            raise RuntimeError(f"Unexpected .md5 content from {md5_url}: {resp.text.strip()!r}")
+        return expected_hex, fields[1] if len(fields) > 1 else None
+
+    def _verify_checksum(self, url: str, dest: Path, session: requests.Session) -> None:
+        """Fetch <url>.md5 and verify the local file matches.
+
+        Fails closed: any error (network, parse, mismatch) raises RuntimeError
+        so the download is marked error and osmium is never invoked on the file.
+        Caller must ensure *dest* exists.
+        """
+        md5_url = url + ".md5"
+        expected_hex, listed_name = self._fetch_checksum(md5_url, session)
+        remote_name = _basename(url)
+
+        # A sidecar names the build it describes. Hosts publish
+        # <region>-latest.osm.pbf as a redirect to a dated build and keep a
+        # .md5 beside both, but the one next to the alias is not always in
+        # step: it can lag months behind, or run ahead of the redirect while
+        # the nightly rotation is in progress. When the names disagree, follow
+        # the alias and take the checksum from the build that was served.
+        if listed_name and listed_name != remote_name:
+            resolved = self._effective_url(url, session)
+            if resolved != url:
+                md5_url = resolved + ".md5"
+                expected_hex, listed_name = self._fetch_checksum(md5_url, session)
+                remote_name = _basename(resolved)
+            if listed_name and listed_name != remote_name:
+                raise RuntimeError(
+                    f"Checksum at {md5_url} describes {listed_name}, not {remote_name} — "
+                    f"the published checksum belongs to a different build. "
+                    f"{dest.name} was kept; try again later."
+                )
 
         h = hashlib.md5()
         with open(dest, "rb") as f:

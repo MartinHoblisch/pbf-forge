@@ -404,6 +404,128 @@ def test_verify_checksum_bad_md5_content_raises(tmp_data_dir):
         dm._verify_checksum("https://example.com/test.osm.pbf", dest, session)
 
 
+# ── Checksum sidecars that describe another build ─────────────────────────────
+#
+# Hosts serve <region>-latest.osm.pbf as a redirect to a dated build and keep a
+# .md5 next to both. The sidecar beside the alias can be months out of date, or
+# a rotation ahead of the redirect, so its digest may belong to a build that was
+# never downloaded. Taking it at face value reports an intact file as corrupt.
+
+_LATEST_URL = "https://example.com/germany-latest.osm.pbf"
+_DATED_URL = "https://example.com/germany-260727.osm.pbf"
+
+
+def _md5_response(hex_str: str, filename: str | None) -> MagicMock:
+    resp = MagicMock()
+    resp.text = f"{hex_str}  {filename}\n" if filename else f"{hex_str}\n"
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+def _head_response(url: str) -> MagicMock:
+    resp = MagicMock()
+    resp.url = url
+    resp.raise_for_status = MagicMock()
+    return resp
+
+
+def test_verify_checksum_follows_redirect_when_sidecar_names_another_build(tmp_data_dir):
+    """A stale sidecar beside the alias must not condemn an intact download."""
+    content = b"intact download"
+    dest = tmp_data_dir / "germany.osm.pbf"
+    dest.write_bytes(content)
+
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.get.side_effect = [
+        _md5_response("b" * 32, "germany-260524.osm.pbf"),  # stale, months behind
+        _md5_response(hashlib.md5(content).hexdigest(), "germany-260727.osm.pbf"),
+    ]
+    session.head.return_value = _head_response(_DATED_URL)
+
+    dm._verify_checksum(_LATEST_URL, dest, session)  # must not raise
+
+    assert [call.args[0] for call in session.get.call_args_list] == [
+        _LATEST_URL + ".md5",
+        _DATED_URL + ".md5",
+    ]
+    assert dest.exists()
+
+
+def test_verify_checksum_still_detects_corruption_behind_a_redirect(tmp_data_dir):
+    """Resolving the alias must not weaken the check — a bad file is still bad."""
+    dest = tmp_data_dir / "germany.osm.pbf"
+    dest.write_bytes(b"corrupt content")
+
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.get.side_effect = [
+        _md5_response("b" * 32, "germany-260524.osm.pbf"),
+        _md5_response("c" * 32, "germany-260727.osm.pbf"),
+    ]
+    session.head.return_value = _head_response(_DATED_URL)
+
+    with pytest.raises(RuntimeError, match="MD5 mismatch"):
+        dm._verify_checksum(_LATEST_URL, dest, session)
+
+    assert (tmp_data_dir / "germany.osm.pbf.corrupt").exists()
+
+
+def test_verify_checksum_reports_version_skew_instead_of_corruption(tmp_data_dir):
+    """No redirect to follow: say the checksum is for another build, keep the file."""
+    dest = tmp_data_dir / "germany.osm.pbf"
+    dest.write_bytes(b"intact download")
+
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.get.return_value = _md5_response("b" * 32, "germany-260524.osm.pbf")
+    session.head.return_value = _head_response(_LATEST_URL)  # alias resolves to itself
+
+    with pytest.raises(RuntimeError, match="belongs to a different build"):
+        dm._verify_checksum(_LATEST_URL, dest, session)
+
+    # Unverifiable is not corrupt: the file stays where it is.
+    assert dest.exists()
+    assert not (tmp_data_dir / "germany.osm.pbf.corrupt").exists()
+
+
+def test_verify_checksum_accepts_sidecar_without_a_filename(tmp_data_dir):
+    content = b"intact download"
+    dest = tmp_data_dir / "germany.osm.pbf"
+    dest.write_bytes(content)
+
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.get.return_value = _md5_response(hashlib.md5(content).hexdigest(), None)
+
+    dm._verify_checksum(_LATEST_URL, dest, session)  # must not raise
+    session.head.assert_not_called()
+
+
+def test_verify_checksum_skips_the_redirect_when_the_sidecar_agrees(tmp_data_dir):
+    """The extra HEAD is only paid for when the names actually disagree."""
+    content = b"intact download"
+    dest = tmp_data_dir / "germany.osm.pbf"
+    dest.write_bytes(content)
+
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.get.return_value = _md5_response(
+        hashlib.md5(content).hexdigest(), "germany-latest.osm.pbf"
+    )
+
+    dm._verify_checksum(_LATEST_URL, dest, session)
+    session.head.assert_not_called()
+
+
+def test_effective_url_falls_back_when_the_redirect_cannot_be_resolved(tmp_data_dir):
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.head.side_effect = requests.ConnectionError("refused")
+
+    assert dm._effective_url(_LATEST_URL, session) == _LATEST_URL
+
+
 def test_download_worker_checksum_failure_marks_error(tmp_data_dir):
     """Checksum mismatch after download → status error, not up_to_date."""
     filename = "test.osm.pbf"
