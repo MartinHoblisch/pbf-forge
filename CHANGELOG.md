@@ -11,7 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **Exclusion filtering** — a second tag set ("OSM-Tags zum Ausschließen") runs as an inverted `osmium tags-filter --invert-match` pass after the include pass, producing the set difference. Example: include `railway=rail`, exclude `railway:traffic_mode=passenger` to extract a freight-usable rail network. Empty exclude field skips the second pass entirely (backwards compatible).
+- **Exclusion filtering** — a second tag set ("OSM tags to exclude") runs as an inverted `osmium tags-filter --invert-match` pass after the include pass, producing the set difference. Example: include `railway=rail`, exclude `railway:traffic_mode=passenger` to extract a freight-usable rail network. Empty exclude field skips the second pass entirely (backwards compatible).
 - Exclude tags embedded in GeoPackage and GeoJSON provenance metadata for reproducibility.
 - **Output report** — every finished output file gets a plain-text sidecar next to it, named after the file itself (`berlin_barge.gpkg.txt`). It records the source extract and its size, every include and exclude tag, the geometry types and attribute mode, the completion timestamp, the job duration and the per-phase timings, plus the host folder and the job-log filename. A report of the same name is overwritten. Writing it can never fail a finished job.
 - **Quit button** — a power button in the header stops the server and, with it, the container, so a session can be ended from the browser instead of from a second terminal. It asks for confirmation, and names the cost explicitly when downloads or filter jobs are still running. The tab is not closed automatically: browsers only allow that for windows a script opened, and `start.bat` / `start.sh` open an ordinary one. `stop.bat` and `stop.sh` keep working unchanged.
@@ -20,6 +20,14 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **GeoPackage output is one layer, not five.** Up to 1.0.0 the default
+  attribute mode handed the filtered PBF to the GDAL OSM driver, which split
+  it into `points`, `lines`, `multilinestrings`, `multipolygons` and
+  `other_relations`. The export now goes through a GeoJSONSeq intermediate and
+  writes a single table named after the output file (`berlin_rail.gpkg` gets a
+  `berlin_rail` layer), which is what made a real `other_tags` column possible
+  in that mode. Anything that addressed an output layer by the old fixed names
+  has to be pointed at the new one.
 - The footer no longer scrolls away — it is sticky, like the header and the tab bar already were.
 - **The Geofabrik credit is gone, from the footer and from every output file.** It claimed unconditionally what is only a default: the download URL is unrestricted, and any host publishing a PBF beside an `.md5` works — [planet.openstreetmap.org](https://planet.openstreetmap.org/pbf/) and [BBBike](https://download.bbbike.org/osm/) both do. An extract built from either of those still carried "Data sourced via Geofabrik" in its GeoPackage metadata and GeoJSON `attribution` key, which is a false provenance claim in a file users pass on. ODbL credits the contributors, not the distributor, so the embedded attribution now reads "© OpenStreetMap contributors (ODbL 1.0)." and nothing more.
 - The output report names the **actual download URL** of each source under `Source URL`, resolved from the stored URL mapping. Files copied into the data directory by hand have no URL and omit the row. This replaces the blanket provider claim with a per-source fact.
@@ -27,7 +35,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - The footer opens with the GitHub link instead of repeating the app name the header already carries.
 - The Quit button moved to the far right of the header, past the connection indicator, and the connection labels are lower-case ("connected", "verbunden") so they read as status rather than as headings.
 - **The container is no longer restarted automatically after a clean exit.** `docker-compose.yml` now sets `restart: on-failure` instead of `restart: unless-stopped`, which is what lets the Quit button work — under the old policy Docker brought the container straight back up. Crashes are still restarted. The container no longer comes up by itself after a Docker Desktop or host restart; use `start.bat` / `start.sh`.
-- Finished filter jobs now list their outputs by **host path** (`H:\pbf-forge\data\gpkg\berlin_barge.gpkg`) instead of the container path (`/data/gpkg/berlin_barge.gpkg`), so the path can be pasted straight into a file manager. Falls back to the container path while the data directory is unconfigured.
+- Finished filter jobs now list their outputs by **host path** (`D:\osm-data\gpkg\berlin_rail.gpkg`) instead of the container path (`/data/gpkg/berlin_rail.gpkg`), so the path can be pasted straight into a file manager. Falls back to the container path while the data directory is unconfigured.
 
 ### Fixed
 
@@ -50,16 +58,34 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [1.0.0] - 2026-05-02
 
+> **Correction, 2026-08-05.** Five statements in this entry did not describe
+> what 1.0.0 shipped. They are corrected in place and marked, rather than
+> silently rewritten, so the record stays readable against the released tag.
+> The tag `v1.0.0` itself is unchanged.
+
 ### Added
 
 - PBF download with MD5 checksum verification (fail-closed on mismatch).
-- Tag filtering via `osmium tags-filter` (full `n/`, `w/`, `r/`, `nwr/` expression syntax).
+- Tag filtering via `osmium tags-filter`. **Corrected:** the original entry
+  claimed "full `n/`, `w/`, `r/`, `nwr/` expression syntax". The tool builds
+  the geometry prefix itself from the geometry-type checkboxes and puts it in
+  front of every expression, so an expression typed with its own prefix is
+  prefixed twice and matches nothing.
 - Named filter presets.
-- Export to GeoPackage and GeoJSON.
-  - GeoPackage: multi-layer split, CRS EPSG:4326, ODbL attribution + provenance in `gpkg_metadata`.
-  - GeoJSON: RFC 7946; size guardrail warns at > 500 MB or > 1 M features.
-- Live WebSocket progress for all long-running phases; each phase is cancellable.
-- Size-based ETA hint for large extracts.
+- Export to GeoPackage, GeoJSON and PBF. **Corrected:** the original entry
+  omitted PBF, which 1.0.0 already offered.
+  - GeoPackage: one table per geometry type as produced by the GDAL OSM
+    driver, CRS EPSG:4326, ODbL attribution + provenance in `gpkg_metadata`.
+  - GeoJSON: WGS84. **Corrected:** the original entry claimed RFC 7946
+    conformance, which was never requested from `ogr2ogr`. The guardrail
+    warns when the selected source extract is larger than 200 MB; the
+    original entry named thresholds of 500 MB and 1 M features, neither of
+    which appears in the code.
+- Live WebSocket progress for all long-running phases; a running job is
+  cancellable.
+- A warning for source extracts over 1 GB that filtering may take hours
+  depending on hardware. **Corrected:** the original entry called this a
+  "size-based ETA hint". It estimates nothing.
 - Bilingual UI: English and German.
 - Localhost-only bind (`127.0.0.1`); no telemetry, no CDN fetches.
 - Docker Compose single-command startup.

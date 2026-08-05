@@ -4,7 +4,7 @@
 
 # PBF Forge
 
-> Self-hosted web UI for downloading OSM PBF extracts — from Geofabrik or any other PBF host — and filtering them by tag. Docker-only. Exports GeoPackage and GeoJSON.
+> Self-hosted web UI for downloading OSM PBF extracts, from Geofabrik or any other PBF host, and filtering them by tag. Docker-only. Exports GeoPackage, GeoJSON and filtered PBF.
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/hero.gif" alt="PBF Forge — download a Geofabrik extract, filter by tag, export GeoPackage in under a minute" width="90%">
+  <img src="docs/assets/hero.gif" alt="Downloading a PBF extract, filtering it by tag, and exporting a GeoPackage" width="90%">
 </p>
 
 <details>
@@ -28,7 +28,7 @@
   <img src="docs/assets/screenshots/filtermanager.PNG" alt="Tag filter expression editor" width="48%">
 </p>
 <p align="center">
-  <img src="docs/assets/screenshots/downloadmanager.PNG" alt="Download progress and regional PBF browser" width="48%">
+  <img src="docs/assets/screenshots/downloadmanager.PNG" alt="Download list with per-file progress" width="48%">
 </p>
 
 </details>
@@ -76,68 +76,75 @@ The container binds to `127.0.0.1` only and ships without authentication. **Do n
 ## Features
 
 - **Direct downloads** — the eight continental extracts are built in; paste any other PBF URL to add it. File size and update check shown before download. Geofabrik is the default host, not a requirement: [planet.openstreetmap.org](https://planet.openstreetmap.org/pbf/) and [BBBike](https://download.bbbike.org/osm/) work the same way.
-- **MD5 checksum verification** — every PBF is verified against the `<file>.osm.pbf.md5` published next to it before any filter step. Mismatch fails closed, and so does a missing checksum file — a host that publishes no `.md5` cannot be used.
-- **Tag filtering via `osmium tags-filter`** — full expression syntax (`n/`, `w/`, `r/`, `nwr/`, multi-tag, negation).
+- **MD5 checksum verification** — every download is verified against the `<file>.osm.pbf.md5` published next to it, before the file counts as complete. Mismatch fails closed, and so does a missing checksum file: a host that publishes no `.md5` cannot be used. A PBF copied into the data directory by hand is picked up as a source but has no checksum to verify against.
+- **Tag filtering via `osmium tags-filter`** — tag expressions (`highway`, `railway=rail`, `highway=footway,pedestrian`), applied to the geometry types selected by checkbox. A second tag set removes matches in an inverted pass.
 - **Named presets** — save canned filters for reuse.
 - **Export formats**
-  - **GeoPackage** (`.gpkg`) — recommended. Multi-layer (`points`, `lines`, `multilinestrings`, `multipolygons`, `other_relations`), CRS EPSG:4326, embedded ODbL attribution + provenance metadata in `gpkg_metadata`.
-  - **GeoJSON** (`.geojson`) — RFC 7946 (WGS84). A size guardrail warns when output would exceed 500 MB or 1 M features and steers you to GeoPackage.
-- **Live progress** — WebSocket streaming for download, checksum, filter, and export phases. Each long-running step is cancellable, with a size-based ETA hint (filtering a 30 GB Europe extract takes hours — the UI is honest about it).
+  - **GeoPackage** (`.gpkg`) — recommended. One layer, named after the output file, CRS EPSG:4326, embedded ODbL attribution + provenance metadata in `gpkg_metadata`.
+  - **GeoJSON** (`.geojson`) — WGS84. A guardrail warns when the source extract is larger than 200 MB and steers you to GeoPackage.
+  - **PBF** (`.osm.pbf`) — the filtered extract itself, for further processing with osmium or another PBF tool.
+- **Live progress** — WebSocket streaming for downloads and for every filter and export phase. A running download or filter job can be cancelled. Source extracts over 1 GB carry a warning that filtering may take hours depending on hardware.
 - **Bilingual UI** — English and German.
-- **Localhost-only by design** — no telemetry, no analytics, no update checks, no font/CDN fetches at runtime. The only outbound network traffic is to `download.geofabrik.de` for PBF and checksum files.
+- **Localhost-only by design** — no telemetry, no analytics, no update checks, no font/CDN fetches at runtime. Outbound traffic goes to the PBF and `.md5` URLs you supply, and nowhere else. At startup the tool checks each host already on the list for a newer build, without being asked.
 
 ---
 
 ## Use-case examples
 
-PBF Forge runs the same `osmium tags-filter` syntax you would type by hand. The expression goes into the **Filter** field; everything else is point-and-click. Three concrete scenarios:
+PBF Forge passes your tag expressions to `osmium tags-filter`. Type each expression on its own line, without a `n/`, `w/` or `r/` prefix: the tool takes those from the **Geometry types** checkboxes and puts one in front of every expression, once per checked type. Pasting `w/highway=footway` with **Ways** checked produces `w/w/highway=footway`, which matches nothing.
+
+The Downloads tab lists the eight continental extracts. Anything smaller is added by pasting its URL, which is also how a host other than Geofabrik is used.
 
 ### 1. Pedestrian-only routing graph for Liechtenstein
 
 Goal: GeoPackage of footways and pedestrian areas only.
 
-1. Region: **Europe → Liechtenstein** (`liechtenstein-latest.osm.pbf`, ~2 MB).
+1. Source: paste `https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf`, then download it.
 2. Filter expression:
    ```
-   w/highway=footway,pedestrian,path,steps
+   highway=footway,pedestrian,path,steps
    ```
-3. Export: **GeoPackage**.
+3. Geometry types: **Ways** only.
+4. Export: **GeoPackage**.
 
-Output: ~5 k features, opens in QGIS as the `lines` layer with CRS EPSG:4326.
+Output: one layer named after the output file, CRS EPSG:4326.
 
 ### 2. EV charging stations for an entire country
 
-Goal: every `amenity=charging_station` node in Germany, as a single point layer for analytics.
+Goal: every `amenity=charging_station` node in Germany, as a point layer for analytics.
 
-1. Region: **Europe → Germany** (`germany-latest.osm.pbf`, ~4 GB).
+1. Source: paste `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (about 4.5 GB).
 2. Filter expression:
    ```
-   n/amenity=charging_station
+   amenity=charging_station
    ```
-3. Export: **GeoPackage** (not GeoJSON — that would produce a multi-hundred-MB JSON file).
+3. Geometry types: **Nodes** only.
+4. Export: **GeoPackage**. GeoJSON of the same result is a single large text file.
 
-Output: a few tens of thousands of points with all `socket:*`, `capacity`, and `operator` tags preserved.
+Output on the extract of 2026-07-27: 43,252 points in one layer, 14.0 MB, with `socket:*`, `capacity` and `operator` tags carried through.
 
 ### 3. Cycling network with named relations for a federal state
 
-Goal: bike routes plus their hierarchical relations for Bavaria.
+Goal: bike routes plus their relations for Bavaria.
 
-1. Region: **Europe → Germany → Bavaria**.
-2. Filter expression:
+1. Source: paste `https://download.geofabrik.de/europe/germany/bayern-latest.osm.pbf`.
+2. Filter expressions, one per line:
    ```
-   nwr/route=bicycle nwr/network=lcn,rcn,ncn,icn
+   route=bicycle
+   network=lcn,rcn,ncn,icn
    ```
-3. Export: **GeoPackage**.
+3. Geometry types: **Nodes**, **Ways** and **Relations**.
+4. Export: **GeoPackage**.
 
-Output: multi-layer GeoPackage where the `lines` and `other_relations` layers carry the route-segment geometries and the relation membership respectively.
+Output: one layer named after the output file, holding the route segments and the relations together.
 
 ### 4. Rail freight routing network for Europe
 
-Goal: GeoJSON of European rail lines usable for freight routing — passenger-only tracks excluded.
+Goal: GeoJSON of European rail lines usable for freight routing, with passenger-only tracks excluded.
 
-Freight trains are not permitted on tracks tagged `railway:traffic_mode=passenger`. A single include expression would return those tracks too; the **OSM-Tags zum Ausschließen** field removes them in a second pass.
+Freight trains are not permitted on tracks tagged `railway:traffic_mode=passenger`. A single include expression would return those tracks too; the **OSM tags to exclude** field removes them in a second, inverted pass.
 
-1. Region: **Europe** (`europe-latest.osm.pbf`, ~30 GB — use the progress bar, this takes time).
+1. Source: **Europe**, one of the built-in extracts (about 33 GB, expect hours).
 2. Include expression:
    ```
    railway=rail
@@ -149,19 +156,21 @@ Freight trains are not permitted on tracks tagged `railway:traffic_mode=passenge
 4. Geometry types: **Ways** only.
 5. Export: **GeoJSON** or **GeoPackage**.
 
-Output: a line layer containing only mixed-use and freight-dedicated tracks. Load into a routing engine (e.g. pgRouting, Valhalla) to compute freight-feasible paths. The provenance metadata embedded in the output records both the include and exclude expressions so the filter is reproducible.
+Output: one layer holding the mixed-use and freight-dedicated tracks. Load into a routing engine (e.g. pgRouting, Valhalla) to compute freight-feasible paths. The provenance metadata embedded in the GeoPackage and the GeoJSON records both the include and exclude expressions, so the filter is reproducible. A PBF output carries no such metadata.
+
+Expect points in that layer even though only **Ways** is checked. `osmium tags-filter` keeps the nodes a matched way refers to, and the export writes out every node that carries tags of its own, so switches, signals and level crossings arrive alongside the tracks. Measured on the German extract of 2026-07-27 with **Ways** and **Relations** checked: 220,696 lines, 465,402 points and 8 polygons in one layer. Filter the layer by geometry type after loading it if you only want the lines.
 
 ---
 
 ## Roadmap
 
-User-facing features under consideration are tracked in [docs/ROADMAP.md](docs/ROADMAP.md). Open an Issue or start a Discussion if a missing feature is blocking you.
+User-facing features under consideration are tracked in [docs/ROADMAP.md](docs/ROADMAP.md). Open an Issue if a missing feature is blocking you.
 
 ---
 
 ## Privacy & commercial use
 
-**Privacy.** PBF Forge does not collect telemetry, analytics, crash reports, or usage statistics. It does not phone home for update checks. The HTML/CSS/JS are served locally from the container — no Google Fonts, no CDN scripts, no third-party trackers. The only outbound network calls at runtime are to `download.geofabrik.de` for the PBF you requested and its `.md5` checksum file. Container logs (uvicorn access log, application stderr) stay inside the container; nothing is shipped off the host.
+**Privacy.** PBF Forge does not collect telemetry, analytics, crash reports, or usage statistics. It does not phone home for update checks. The HTML/CSS/JS are served locally from the container: no Google Fonts, no CDN scripts, no third-party trackers. Outbound network calls at runtime go to the PBF and `.md5` URLs on your list, and nowhere else. That list starts with the eight continental Geofabrik extracts and grows with every URL you add. At startup the tool contacts each host on it once to check for a newer build. Container logs (uvicorn access log, application stderr) stay inside the container; nothing is shipped off the host.
 
 **Commercial use.** OpenStreetMap data is licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright). PBF Forge embeds ODbL attribution in every GeoPackage and GeoJSON it produces — you must keep that attribution intact in any downstream product. **The terms of the server you download from apply on top of that, and they differ per host.** The built-in continental extracts come from Geofabrik, whose downloads are free for non-commercial use — commercial users should review <https://www.geofabrik.de/geofabrik/agb.html>. If you point PBF Forge at another host, check that host's terms instead.
 
@@ -169,13 +178,13 @@ User-facing features under consideration are tracked in [docs/ROADMAP.md](docs/R
 
 ## Security
 
-CI verifies builds on Ubuntu and runs the full test suite on Windows; all images are CVE-scanned via Trivy on every push.
+CI runs the full test suite with coverage on Ubuntu. On Windows it runs the part that does not need osmium, ogr2ogr or POSIX-only behaviour. Every push is CVE-scanned with Trivy.
 
 | What | How |
 |---|---|
 | Static analysis (SAST) | [CodeQL](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml) runs on every push and pull request |
-| Dependency vulnerabilities | [Dependabot](https://github.com/MartinHoblisch/pbf-forge/security/dependabot) watches pip packages and GitHub Actions |
-| Docker image CVEs | [Trivy](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml) scans the image on every push — build fails on CRITICAL or HIGH findings |
+| Dependency vulnerabilities | [Dependabot](https://github.com/MartinHoblisch/pbf-forge/security/dependabot) watches pip packages, GitHub Actions, Docker base images and pre-commit hooks |
+| Docker image CVEs | [Trivy](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml) scans the image on every push; the build fails on CRITICAL or HIGH findings for which a fix is available |
 | Supply-chain posture | [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge) runs weekly |
 | Secret leak prevention | GitHub Push Protection is active on this repository |
 
