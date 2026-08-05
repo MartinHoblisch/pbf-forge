@@ -135,7 +135,7 @@ The [OSM wiki on map features](https://wiki.openstreetmap.org/wiki/Map_features)
 | [docs/tour.md](docs/tour.md) | More screenshots |
 | [CHANGELOG.md](CHANGELOG.md) | What changed, per release |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is planned, and what is explicitly not |
-| [DEVELOPMENT.md](DEVELOPMENT.md) · [SECURITY.md](SECURITY.md) | Development setup, security policy |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [DEVELOPMENT.md](DEVELOPMENT.md) · [SECURITY.md](SECURITY.md) | Contributing, development setup, security policy |
 
 ## Licensing and attribution
 

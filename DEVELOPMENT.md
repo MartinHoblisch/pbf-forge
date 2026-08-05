@@ -27,6 +27,23 @@ cd backend
 pytest
 ```
 
+607 tests as of this writing. The `cd` is not optional: the pytest
+configuration lives in `backend/pyproject.toml`, and there is none at the
+repository root.
+
+Some tests need real binaries or POSIX behaviour and are marked accordingly.
+To run what a Windows machine can run:
+
+```bash
+pytest tests/ -m "not docker and not posix and not integration"
+```
+
+Coverage, as CI measures it on Ubuntu:
+
+```bash
+pytest tests/ --cov=. --cov-report=term-missing
+```
+
 ## Linting
 
 ```bash
