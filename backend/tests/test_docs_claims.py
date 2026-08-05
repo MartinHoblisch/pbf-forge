@@ -65,30 +65,57 @@ def _code_blocks(text: str) -> list[str]:
 _PREFIXED_EXPR = re.compile(r"^\s*(?:n|w|r|nwr)/\S*=", re.MULTILINE)
 
 
+def prefixed_expression_offenders(text: str) -> list[str]:
+    """Lines in fenced code blocks that offer an already-prefixed expression.
+
+    Shell commands are exempt: they show what the tool builds, not what a user
+    types. Line continuations are joined first, so the tail of a wrapped osmium
+    invocation is not mistaken for an input line.
+    """
+    offenders = []
+    for block in _code_blocks(text):
+        for line in re.sub(r"\\\n\s*", " ", block).splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("osmium", "$", "#", "docker", "git", "pip", "pytest")):
+                continue
+            if _PREFIXED_EXPR.match(line):
+                offenders.append(stripped)
+    return offenders
+
+
 def test_no_prefixed_expression_offered_as_input():
     """Docs must not present a prefixed expression as something to type.
 
     _build_expressions() in filter_manager.py derives the n/, w/ and r/ prefix
     from job.geometry_types and prepends it to every expression, so an
     expression that already carries one is prefixed twice and matches nothing.
-    Lines that are shell commands are exempt: they show what the tool builds.
     """
-    offenders = []
-    for path in _existing(CLAIM_DOCS):
-        for block in _code_blocks(_read(path)):
-            # Join shell line continuations first: the tail of a wrapped
-            # osmium invocation is not something a user types into the form.
-            joined = re.sub(r"\\\n\s*", " ", block)
-            for line in joined.splitlines():
-                stripped = line.strip()
-                if stripped.startswith(("osmium", "$", "#", "docker", "git", "pip", "pytest")):
-                    continue
-                if _PREFIXED_EXPR.match(line):
-                    offenders.append(f"{path.name}: {stripped}")
+    offenders = [
+        f"{path.name}: {bad}"
+        for path in _existing(CLAIM_DOCS)
+        for bad in prefixed_expression_offenders(_read(path))
+    ]
     assert not offenders, (
         "code blocks offer a prefixed expression as user input; the tool adds "
         "the prefix itself (filter_manager.py _build_expressions): " + "; ".join(offenders)
     )
+
+
+def test_prefix_detector_catches_a_reintroduced_claim():
+    """The guard above, watched failing. A guard never seen to fail is not one."""
+    violating = "Type this:\n\n```\nw/highway=footway\n```\n"
+    assert prefixed_expression_offenders(violating) == ["w/highway=footway"]
+
+    # The same expression as part of a command is what the tool builds, not
+    # what a user types, and must not be reported.
+    command = "```\nosmium tags-filter in.pbf w/highway=footway -o out.pbf\n```\n"
+    assert prefixed_expression_offenders(command) == []
+
+    # Indented inside a numbered list, which is where the docs show input.
+    indented = "1. Type this:\n\n   ```\n   r/route=bicycle\n   ```\n"
+    assert prefixed_expression_offenders(indented) == ["r/route=bicycle"]
+
+    assert prefixed_expression_offenders("```\nhighway=footway\n```\n") == []
 
 
 def test_filter_manager_still_builds_the_prefix():
@@ -103,26 +130,50 @@ def test_filter_manager_still_builds_the_prefix():
 # --------------------------------------------------------------------------
 
 
+def multi_layer_offenders(text: str) -> list[str]:
+    """Paragraphs presenting the GDAL OSM driver's layer split as current.
+
+    Paragraph granularity, not line: prose wraps, so a disclaimer and the names
+    it disclaims are rarely on the same line. A paragraph saying the split is
+    gone may name it.
+    """
+    banned = ("multilinestrings", "other_relations")
+    historical = ("no longer", "up to version", "used to", "before ")
+    offenders = []
+    for para in re.split(r"\n\s*\n", text):
+        if not any(word in para for word in banned):
+            continue
+        if any(marker in para.lower() for marker in historical):
+            continue
+        offenders.append(" ".join(para.split())[:90])
+    return offenders
+
+
+def test_multi_layer_detector_distinguishes_claim_from_history():
+    current = "Output is split into points, lines, multilinestrings and other_relations."
+    assert multi_layer_offenders(current)
+
+    historical = (
+        "Up to version 1.0.0 the output was split into points, lines,\n"
+        "multilinestrings, multipolygons and other_relations; that is no\n"
+        "longer the case."
+    )
+    assert multi_layer_offenders(historical) == []
+
+    assert multi_layer_offenders("One layer, named after the output file.") == []
+
+
 def test_no_multi_layer_geopackage_claim():
     """One layer named after the output file, not the GDAL OSM driver's five.
 
     filter_manager.py passes -nln out_file.stem. The old layer names must not
     reappear in documentation while that is what the code does.
     """
-    banned = ("multilinestrings", "other_relations")
-    # A line that says the split is gone may name it. A line that presents it
-    # as current may not.
-    historical = ("no longer", "up to version", "used to", "before ")
-    offenders = []
-    for path in _existing(CLAIM_DOCS):
-        # Paragraph granularity: prose wraps, so the disclaimer and the names
-        # it disclaims are rarely on the same line.
-        for para in re.split(r"\n\s*\n", _read(path)):
-            if not any(word in para for word in banned):
-                continue
-            if any(marker in para.lower() for marker in historical):
-                continue
-            offenders.append(f"{path.name}: {' '.join(para.split())[:90]}")
+    offenders = [
+        f"{path.name}: {bad}"
+        for path in _existing(CLAIM_DOCS)
+        for bad in multi_layer_offenders(_read(path))
+    ]
     assert not offenders, (
         "docs name the GDAL OSM driver's layer split, but the export writes a "
         "single layer via -nln: " + "; ".join(offenders)
