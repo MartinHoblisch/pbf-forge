@@ -293,8 +293,6 @@ def test_relative_links_resolve():
         for target in link.findall(_read(path)):
             if target.startswith(("http://", "https://", "#", "mailto:")):
                 continue
-            if target.startswith("../../"):  # GitHub-relative, e.g. ../../security
-                continue
             resolved = (path.parent / target.split("#")[0]).resolve()
             if not resolved.exists():
                 broken.append(f"{path.name} -> {target}")

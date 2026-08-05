@@ -7,10 +7,58 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.1.0] - 2026-08-05
+
+Highlights: exclusion filtering as a second, inverted pass; a job queue that
+runs several filters at once and adapts to the machine; jobs and their logs
+survive a crash and report why they died; a plain-text report beside every
+output that makes a run reproducible; a Quit button that ends the session from
+the browser; and a documentation pass that removed every claim the code did
+not support.
 
 ### Added
 
+- **Job queue with adaptive parallelism.** Several filter jobs can be started
+  at once. How many run in parallel is derived from the machine rather than
+  fixed, and the rest wait rather than competing for memory.
+- **Resource limits.** Two presets: full power uses every core at normal
+  priority, background halves the thread count and runs at nice 10 so a long
+  filter leaves the machine usable. Thread count and nice value can also be set
+  explicitly, and the explicit value wins.
+- **Jobs and their logs survive a crash.** State is written to
+  `config/jobs/manifest.json` as it changes, so a container that is killed or
+  restarted comes back with its job list intact. A job killed by the
+  out-of-memory killer is now reported as that, instead of as an unexplained
+  failure.
+- **Gate 0, a risk check before any work starts.** A job whose sources look too
+  large for the machine's memory raises a confirmation dialog rather than
+  running for twenty minutes and then dying.
+- **Disk-space checks** before and during a job, so a full disk is reported as
+  a full disk.
+- **A real `other_tags` column in Standard mode.** Tags outside the curated set
+  are folded into one JSON column through a streaming pass over the export,
+  rather than being dropped or expanded into thousands of columns.
+- **PBF tag reduction in Manual mode.** Choosing specific keys with a PBF
+  output now strips the rest from the PBF as well, instead of quietly keeping
+  everything.
+- **Completion sound** when the last download or filter job in a batch
+  finishes, with a separate tone for failure. Off by default, toggled in the
+  header.
+- **Two-tier download retry.** Short interruptions are retried immediately;
+  longer outages fall back to a slow loop with a visible countdown, so a
+  transfer survives a network that comes back in an hour.
+- **`CONFIG_DIR`, separate from `DATA_DIR`.** Presets, custom URLs and filter
+  history are user-global state and no longer live in the data directory,
+  which is a place users repoint. Existing files are migrated on first load, so
+  nothing has to be moved by hand.
+- **The log file path is shown in the interface**, and named in the error when
+  a job cannot be recovered.
+- **Richer job logs**: timestamps, phase markers, and an inventory of what was
+  written.
+- **Throughput while a job runs**, in place of the countdown that used to be
+  shown.
+- **The browser opens by itself on Linux and macOS** once the server answers,
+  which `start.bat` already did on Windows.
 - **Exclusion filtering** — a second tag set ("OSM tags to exclude") runs as an inverted `osmium tags-filter --invert-match` pass after the include pass, producing the set difference. Example: include `railway=rail`, exclude `railway:traffic_mode=passenger` to extract a freight-usable rail network. Empty exclude field skips the second pass entirely (backwards compatible).
 - Exclude tags embedded in GeoPackage and GeoJSON provenance metadata for reproducibility.
 - **Output report** — every finished output file gets a plain-text sidecar next to it, named after the file itself (`berlin_barge.gpkg.txt`). It records the source extract and its size, every include and exclude tag, the geometry types and attribute mode, the completion timestamp, the job duration and the per-phase timings, plus the host folder and the job-log filename. A report of the same name is overwritten. Writing it can never fail a finished job.
@@ -20,6 +68,14 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The size countdown is gone.** It was derived from file size alone, which
+  does not predict a filter: the same extract takes minutes or hours depending
+  on whether ways and relations have to be resolved. Measured throughput is
+  shown instead, and extracts over 1 GB carry a plain warning that this may
+  take hours.
+- **Preset suffixes are English.** Presets saved with German suffixes by an
+  earlier version are migrated on load, including ones a partial earlier
+  migration had already touched.
 - **GeoPackage output is one layer, not five.** Up to 1.0.0 the default
   attribute mode handed the filtered PBF to the GDAL OSM driver, which split
   it into `points`, `lines`, `multilinestrings`, `multipolygons` and
@@ -39,6 +95,23 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A filter asking for more tag keys than GeoPackage can hold now fails before
+  it starts.** SQLite caps a table at 2000 columns. Manual mode counts the
+  columns it would need and reports the number, instead of failing partway
+  through an export that has already run for minutes.
+- **Cleared filter jobs no longer reappear** when a preset is applied.
+- **Manual columns that do not exist in the data are skipped** rather than
+  breaking the `ogr2ogr` query.
+- **A download is verified before its timestamp is set, and a corrupt file is
+  quarantined** instead of being left where a filter could pick it up.
+- **Interrupted downloads write to a `.part` file** and are renamed into place
+  only after verification, so a partial transfer can never be mistaken for a
+  finished one.
+- **The update check bypasses CDN caches**, and a missing `Last-Modified`
+  header no longer falls back to the current time, which made every file look
+  current.
+- **The folder browser handles Docker Desktop's nested drive mount** on
+  Windows.
 - **Reading a source extract's data timestamp no longer streams the whole file.** The report states how current the source data is, read from the PBF header. The reader was opened for the default entity types, so it began decoding the data blocks in the background as soon as it was constructed — asking a 4.8 GB extract for its header alone streamed all of it. The first read in a process still returned in milliseconds, every later one paid for the traffic the earlier ones had started: measured against `germany.osm.pbf`, 0.03 s, then 107 s, then 139 s. Since this runs once per published output and the server is a long-lived process, a job writing two formats spent minutes there. With no entity types selected, only the header block is read: 0.05 s, then 0.002 s, unchanged however often it is called.
 - **The work after the last phase is a phase of its own.** Writing the reports ran outside the phase list, so the step counter went one past the end and the interface showed "Step 3 of 2" with no name against it, and the time it took appeared in no report. It is now a phase named *write reports*, counted and timed like the others, and listed in every report. Embedding the metadata and moving a finished file into place have moved into the export phase that produces that file, where their cost belongs. The step counter can no longer run past the number of phases.
 - **Cancelling no longer rings the completion sound.** The bell fires when the last active transfer or filter job leaves its running state, and a cancel does exactly that — so stopping a download played the *finished* chime, as if it had succeeded. Cancelling a filter job played the failure chime, since a cancelled job is recorded in the same error state as one that failed on its own. Stopping something is not finishing it: cancelled members no longer count towards the batch that rings, and a batch in which everything was cancelled stays silent. If something else in the same batch did run to an end, that still rings. Jobs now carry whether they were cancelled, which is what lets the two kinds of error be told apart.
@@ -89,3 +162,6 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - Bilingual UI: English and German.
 - Localhost-only bind (`127.0.0.1`); no telemetry, no CDN fetches.
 - Docker Compose single-command startup.
+
+[1.1.0]: https://github.com/MartinHoblisch/pbf-forge/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/MartinHoblisch/pbf-forge/releases/tag/v1.0.0

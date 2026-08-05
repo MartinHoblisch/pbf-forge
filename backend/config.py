@@ -41,7 +41,7 @@ MAX_DOWNLOAD_SIZE = int(os.getenv("MAX_DOWNLOAD_SIZE", str(100 * 1024 * 1024 * 1
 MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB
 
 # Sent on all outbound HTTP requests so Geofabrik can identify traffic source.
-USER_AGENT = "pbf-forge/1.0.0 (+https://github.com/MartinHoblisch/pbf-forge)"
+USER_AGENT = "pbf-forge/1.1.0 (+https://github.com/MartinHoblisch/pbf-forge)"
 
 # Continental extracts offered out of the box. Each continent is keyed twice:
 # under Geofabrik's own "-latest" filename and under the shortened name this

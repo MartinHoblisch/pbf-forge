@@ -53,4 +53,4 @@ The following scans run automatically on every push and weekly:
 | [Dependabot](https://docs.github.com/en/code-security/dependabot) | Dependency updates for pip, GitHub Actions, Docker base image digests and pre-commit hooks | [dependabot.yml](.github/dependabot.yml) |
 | Secret scanning | Push protection is active: a push containing a recognized secret is blocked | Repository setting |
 
-Results are visible in the [Security tab](../../security) of this repository.
+Results are visible in the [Security tab](https://github.com/MartinHoblisch/pbf-forge/security) of this repository.
