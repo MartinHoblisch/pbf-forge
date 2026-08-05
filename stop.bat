@@ -1,5 +1,5 @@
 @echo off
-echo OSM Tool wird gestoppt...
+echo Stopping PBF Forge...
 docker compose down
-echo Gestoppt.
+echo Stopped.
 pause

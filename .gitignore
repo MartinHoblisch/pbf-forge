@@ -117,9 +117,6 @@ config/jobs/
 # === GeoParquet ===
 *.parquet
 
-# === Local-only / personal ===
+# === Scratch space ===
+# Anything under local/ is a working file and is never part of a release.
 local/
-.scan-patterns.local
-CLAUDE.md
-.claude/
-docs/superpowers/

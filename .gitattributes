@@ -7,3 +7,13 @@
 *.md text eol=lf
 *.txt text eol=lf
 *.html text eol=lf
+
+# start.bat drives control flow with goto and labels. cmd.exe seeks by byte
+# offset through a batch file, so LF-only line endings make it jump into the
+# middle of a line and the script fails in ways that do not name the cause.
+*.bat text eol=crlf
+
+# Binary, so Git never applies the eol=lf rule from line 1 to them.
+*.png binary
+*.gif binary
+*.ico binary

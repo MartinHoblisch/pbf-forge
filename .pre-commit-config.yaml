@@ -8,6 +8,20 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  - repo: local
+    hooks:
+      # Ignore rules live outside the repository on purpose, so the public
+      # tree does not list the names of files it deliberately does not carry.
+      # That protection does not survive a fresh clone; this hook does, and it
+      # fails the commit rather than relying on anything being configured.
+      - id: block-local-only-files
+        name: block local-only files from being committed
+        entry: >-
+          These files are local-only and must not be committed.
+          Unstage them with: git rm --cached <path>
+        language: fail
+        files: '(^|/)(CLAUDE\.md|AGENTS\.md|GEMINI\.md|\.scan-patterns\.local)$|^(\.claude|\.impeccable|local|docs/superpowers)/'
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
