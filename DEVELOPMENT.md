@@ -27,7 +27,7 @@ cd backend
 pytest
 ```
 
-607 tests as of this writing. The `cd` is not optional: the pytest
+625 tests as of this writing. The `cd` is not optional: the pytest
 configuration lives in `backend/pyproject.toml`, and there is none at the
 repository root.
 

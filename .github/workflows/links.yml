@@ -1,0 +1,44 @@
+# Link checking, split by cost.
+#
+# On a pull request: offline only. Relative links are the ones a change can
+# break, and they can be checked without touching the network, so the result
+# is deterministic and cannot fail because somebody else's server is down.
+#
+# Weekly: the full check, external URLs included. Rot in a third-party link is
+# real, but it is not the pull request's fault and must not block it.
+name: Links
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - .github/workflows/links.yml
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Relative links
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8  # v2.9.0
+        with:
+          args: --offline --no-progress --include-fragments '**/*.md'
+          fail: true
+
+  online:
+    name: All links
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8  # v2.9.0
+        with:
+          args: --no-progress --max-retries 2 '**/*.md'
+          fail: true

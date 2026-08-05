@@ -60,6 +60,14 @@ filter produced. Up to version 1.0.0 the default mode split the output into
 that is no longer the case, and anything addressing those names has to be
 pointed at the new one.
 
+## GeoJSON gets unwieldy before it gets impossible
+
+The export streams, so there is no hard ceiling beyond disk. What there is: a
+warning when the selected source extract is larger than 200 MB and GeoJSON is
+checked. That threshold is on the input, not the output, because the output
+size is not known before the filter runs. GeoPackage opens faster, indexes,
+and is the default for a reason.
+
 ## No negation inside an expression
 
 An expression beginning with `-` would reach osmium as a command-line flag, so
