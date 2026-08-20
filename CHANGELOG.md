@@ -7,7 +7,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.1.0] - 2026-08-05
+## [1.1.0] - 2026-08-20
 
 Highlights: exclusion filtering as a second, inverted pass; a job queue that
 runs several filters at once and adapts to the machine; jobs and their logs
@@ -131,7 +131,7 @@ not support.
 
 ## [1.0.0] - 2026-05-02
 
-> **Correction, 2026-08-05.** Five statements in this entry did not describe
+> **Correction, 2026-08-20.** Five statements in this entry did not describe
 > what 1.0.0 shipped. They are corrected in place and marked, rather than
 > silently rewritten, so the record stays readable against the released tag.
 > The tag `v1.0.0` itself is unchanged.
