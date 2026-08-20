@@ -58,10 +58,10 @@ way and relation members over a country-sized extract has been measured at
 around 2 GB peak, so the cap has headroom for that case but is not unlimited.
 Raise `mem_limit` there if a job is killed.
 
-The Resources section in the interface has two presets. Full power uses every
-core at normal priority. Background halves the thread count and runs at nice
-10, so a long filter leaves the machine usable. Thread count and nice value
-can also be set explicitly, and the explicit value wins over the preset.
+The Resource limits section in the interface has two presets. Full power uses
+every core at normal priority. Background halves the thread count and runs at
+nice 10, so a long filter leaves the machine usable. Thread count and nice
+value can also be set explicitly, and the explicit value wins over the preset.
 
 ## Updating
 

@@ -679,7 +679,7 @@ footer .credits-sep { color: var(--border); }
         </div>
 
         <div class="form-group">
-          <label class="field-label">OSM-Tags <span class="info" data-i18n="osm_tags_hint">(one per line)</span></label>
+          <label class="field-label"><span data-i18n="label_tags">OSM tags</span> <span class="info" data-i18n="osm_tags_hint">(one per line)</span></label>
           <textarea id="filter-tags" placeholder="railway=rail&#10;highway=motorway&#10;building"></textarea>
         </div>
 
@@ -716,7 +716,7 @@ footer .credits-sep { color: var(--border); }
         <div id="geojson-size-warn" style="display:none;margin-bottom:.5rem;padding:.4rem .75rem;background:var(--orange-lt);color:var(--orange);border:1px solid var(--orange);border-radius:var(--radius);font-size:.8rem"></div>
 
         <div class="form-group">
-          <label class="field-label" data-i18n="label_osm_attrs">OSM Attributes</label>
+          <label class="field-label" data-i18n="label_osm_attrs">OSM attributes</label>
           <div class="radio-group">
             <div style="display:flex;align-items:center;gap:.4rem">
               <label style="margin:0"><input type="radio" name="cols" value="other_tags" checked> <span data-i18n="radio_standard">Standard</span></label>
@@ -823,7 +823,7 @@ footer .credits-sep { color: var(--border); }
           </div>
         </div>
         <div class="form-group">
-          <label class="field-label" data-i18n="label_osm_attrs">OSM Attributes</label>
+          <label class="field-label" data-i18n="label_osm_attrs">OSM attributes</label>
           <div class="radio-group">
             <label><input type="radio" name="np-cols" value="other_tags" checked> <span data-i18n="radio_standard">Standard</span></label>
             <label><input type="radio" name="np-cols" value="all"> <span data-i18n="radio_all">Expand all</span></label>
@@ -861,9 +861,9 @@ footer .credits-sep { color: var(--border); }
 <div id="overlay-onboarding" class="overlay" style="display:none">
   <div class="overlay-box">
     <h2 data-i18n="onboard_title">Set up working directory</h2>
-    <p data-i18n="onboard_p">PBF Forge stores all map files (downloads and export results) in one folder on your computer. Enter its full path here — the folder is created if it does not exist yet. This is where you will find your results later.</p>
+    <p data-i18n="onboard_p">PBF Forge keeps every map file (downloads and export results) in one folder on your computer. Enter its full path here; the folder is created if it does not exist yet. That folder is where you will find your results later.</p>
     <div class="form-group">
-      <label class="field-label" data-i18n="onboard_label">Directory (Windows path)</label>
+      <label class="field-label" data-i18n="onboard_label">Directory (full path)</label>
       <div class="path-input-wrap">
         <input type="text" id="onboarding-path" data-i18n-placeholder="ph_data_dir" placeholder="e.g. C:\Users\yourname\osm-data">
         <button class="btn btn-secondary" id="btn-browse-onboarding" type="button" data-i18n-title="fb_title" title="Choose folder"><svg class="icon"><use href="#i-folder-open"/></svg> <span data-i18n="onboard_browse">Browse</span></button>
@@ -882,7 +882,7 @@ footer .credits-sep { color: var(--border); }
     <div class="lock-path-badge" id="lock-path"></div>
     <div class="lock-spinner-wrap">
       <div class="spinner-lg"></div>
-      <span style="font-size:.85rem;color:var(--gray)" data-i18n="lock_waiting">Waiting for restart — this page will refresh automatically …</span>
+      <span style="font-size:.85rem;color:var(--gray)" data-i18n="lock_waiting">Waiting for the restart. This page refreshes itself once it happens …</span>
     </div>
   </div>
 </div>
@@ -904,7 +904,7 @@ footer .credits-sep { color: var(--border); }
     <h2 data-i18n="cd_title">Change directory</h2>
     <p id="cd-p">After saving, <strong>start.bat</strong> must be run again for the change to take effect.</p>
     <div class="form-group">
-      <label class="field-label" data-i18n="cd_label">New directory (Windows path)</label>
+      <label class="field-label" data-i18n="cd_label">New directory (full path)</label>
       <div class="path-input-wrap">
         <input type="text" id="change-dir-input" data-i18n-placeholder="ph_data_dir" placeholder="e.g. C:\Users\yourname\osm-data">
         <button class="btn btn-secondary" id="btn-browse-changedir" type="button" data-i18n-title="fb_title" title="Choose folder"><svg class="icon"><use href="#i-folder-open"/></svg> <span data-i18n="onboard_browse">Browse</span></button>
@@ -921,15 +921,15 @@ footer .credits-sep { color: var(--border); }
 <!-- ── Resource limits modal ── -->
 <div id="modal-resource-limits" class="overlay" style="display:none">
   <div class="overlay-box" style="max-width:420px">
-    <h2 data-i18n="resource_title">Resource Limits</h2>
+    <h2 data-i18n="resource_title">Resource limits</h2>
     <p style="font-size:.85rem;color:var(--gray);margin-bottom:.75rem" data-i18n="resource_desc">Takes effect on the next job start. No restart needed.</p>
     <div class="resource-presets">
-      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')"><svg class="icon"><use href="#i-bolt"/></svg> <span data-i18n="resource_preset_full">Full Power</span></button>
+      <button class="resource-preset-btn" id="btn-preset-full" onclick="setResourcePreset('full')"><svg class="icon"><use href="#i-bolt"/></svg> <span data-i18n="resource_preset_full">Full power</span></button>
       <button class="resource-preset-btn" id="btn-preset-background" onclick="setResourcePreset('background')"><svg class="icon"><use href="#i-moon"/></svg> <span data-i18n="resource_preset_background">Background</span></button>
     </div>
     <div class="resource-hint" id="resource-hint"></div>
     <details class="resource-advanced" style="margin-top:.75rem">
-      <summary data-i18n="resource_advanced">Advanced (Override)</summary>
+      <summary data-i18n="resource_advanced">Advanced (override)</summary>
       <div class="form-group">
         <label class="field-label"><span data-i18n="resource_label_threads">Threads</span> <span style="font-weight:400;color:var(--gray)" id="resource-threads-range"></span></label>
         <input type="number" id="resource-threads-input" class="form-control" min="1" placeholder="Auto">
@@ -1032,9 +1032,9 @@ const TRANSLATIONS = {
     radio_manual: 'Manuell auswählen',
     geojson_mode_hint: 'Für GeoJSON sind <strong>Standard</strong> und <strong>Alles expandieren</strong> identisch.',
     pbf_mode_hint: 'Für PBF wird der Attribut-Modus ignoriert. QGIS/GDAL zeigt immer sein eigenes Schema.',
-    tooltip_standard: 'Ausgabe mit den Standardeinstellungen von GDAL (GeoJSON/GeoPackage) bzw. Osmium (PBF) für das jeweilige Format. Tags außerhalb der definierten Schlüssel landen in einer kompakten other_tags-Spalte.',
-    tooltip_expand_all: 'Jeder OSM-Tag wird als eigene Spalte ausgegeben. Ideal für detaillierte Analysen, kann bei vielen Tags hunderte Spalten erzeugen. Vorsicht bei großen Quelldaten: Ausgabedatei und Bearbeitungszeit steigen erheblich an. Funktioniert nicht für PBF.',
-    tooltip_manual: 'Nur die eingetragenen Spaltennamen werden extrahiert. Gut für gezielte Abfragen mit schlanken Ausgaben.',
+    tooltip_standard: 'Schreibt jedes Format mit den Standardeinstellungen von GDAL (GeoJSON/GeoPackage) bzw. osmium (PBF). Tags außerhalb der Standardschlüssel landen gesammelt in einer kompakten other_tags-Spalte.',
+    tooltip_expand_all: 'Jeder OSM-Tag wird zu einer eigenen Spalte. Nützlich für detaillierte Analysen, bei vielen Tags entstehen daraus aber hunderte Spalten, die bei großen Quelldaten Ausgabegröße und Laufzeit in die Höhe treiben. Für PBF nicht verfügbar.',
+    tooltip_manual: 'Nur die eingetragenen Spaltennamen werden extrahiert. Hält die Ausgabe schlank, wenn klar ist, welche Schlüssel gebraucht werden.',
     tooltip_pbf: 'PBF ist ein binäres OSM-Graphformat ohne festes Spaltenkonzept. QGIS/GDAL zeigt immer sein eigenes Schema (osm_id, name, highway ...) unabhängig vom gewählten Attribut-Modus.',
     label_col_names: 'Spaltennamen',
     col_names_hint: '(Komma-getrennt)',
@@ -1083,7 +1083,7 @@ const TRANSLATIONS = {
     status_unknown: 'Unbekannt',
     ws_connecting: 'verbinde …',
     ws_connected: 'verbunden',
-    ws_disconnected: 'getrennt – verbinde neu …',
+    ws_disconnected: 'getrennt, verbinde neu …',
     ws_error: 'Verbindungsfehler',
     eta_lt1min: 'Noch <1 Min',
     eta_hr: (h, m) => `Noch ~${h} Std ${m} Min`,
@@ -1091,17 +1091,17 @@ const TRANSLATIONS = {
     eta_remaining: s => `noch ca. ${s}`,
     err_no_source: 'Bitte mindestens eine Quelldatei auswählen.',
     err_no_tags: 'Bitte mindestens einen OSM-Tag eingeben.',
-    err_no_suffix: 'Bitte einen Suffix eingeben.',
+    err_no_suffix: 'Bitte ein Suffix eingeben.',
     err_no_geo: 'Bitte mindestens einen Geometrietyp auswählen.',
     err_no_format: 'Bitte mindestens ein Ausgabeformat auswählen.',
     btn_cancel_job: 'Job abbrechen',
-    warn_geojson_large: 'Hinweis: GeoJSON kann bei großen Quelldateien sehr groß werden (>500 MB). GeoPackage ist effizienter.',
+    warn_geojson_large: 'Hinweis: GeoJSON wird bei einer Quelldatei dieser Größe unhandlich. GeoPackage bleibt kleiner und öffnet schneller.',
     eta_large_file_hint: 'Hinweis: Sehr große Quelldatei. Filterung kann je nach Hardware mehrere Stunden dauern.',
     err_url_not_pbf: 'URL muss auf .osm.pbf enden.',
     job_step: (i, n) => `Schritt ${i} von ${n}:`,
     job_written: w => `${w} geschrieben`,
     job_read: r => `${r} gelesen`,
-    job_stall_warn: d => `Kein beobachtbarer Fortschritt seit ${d} — Job läuft weiter (kein Auto-Abbruch); bei Verdacht manuell abbrechen.`,
+    job_stall_warn: d => `Seit ${d} hat sich nichts bewegt. Der Job läuft weiter, automatisch abgebrochen wird er nicht. Bei Verdacht selbst abbrechen.`,
     err_server: 'Serverfehler',
     err_conn: msg => 'Verbindungsfehler: ' + msg,
     err_preset_name: 'Bitte einen Namen eingeben.',
@@ -1124,19 +1124,19 @@ const TRANSLATIONS = {
     fb_confirm: 'Diesen Ordner wählen',
     fb_err_conn: 'Verbindungsfehler',
     onboard_title: 'Arbeitsverzeichnis einrichten',
-    onboard_p: 'PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf deinem Computer. Gib hier den vollständigen Pfad an — der Ordner wird angelegt, falls er noch nicht existiert. Dort findest du später deine Ergebnisse.',
-    onboard_label: 'Verzeichnis (Windows-Pfad)',
+    onboard_p: 'PBF Forge speichert alle Karten-Dateien (Downloads und Export-Ergebnisse) in einem Ordner auf dem Computer. Hier den vollständigen Pfad angeben; der Ordner wird angelegt, falls er noch nicht existiert. Dort liegen später die Ergebnisse.',
+    onboard_label: 'Verzeichnis (vollständiger Pfad)',
     onboard_browse: 'Durchsuchen',
     onboard_save: 'Speichern &amp; Neustart vorbereiten',
     onboard_err_path: 'Bitte einen Pfad eingeben.',
     onboard_err_server: 'Serverfehler beim Speichern.',
     onboard_err_conn: msg => 'Verbindungsfehler: ' + msg,
     lock_title: 'Neustart erforderlich',
-    lock_p: 'Das Datenverzeichnis wurde gesetzt. Bitte führe jetzt <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) erneut aus. Diese Seite erkennt den Neustart automatisch und lädt sich neu.',
-    lock_waiting: 'Warte auf Neustart — Seite aktualisiert sich danach automatisch …',
+    lock_p: 'Das Datenverzeichnis ist gesetzt. Jetzt bitte <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) erneut ausführen. Diese Seite erkennt den Neustart automatisch und lädt sich neu.',
+    lock_waiting: 'Warte auf den Neustart, danach aktualisiert sich die Seite automatisch …',
     cd_title: 'Verzeichnis ändern',
     cd_p: 'Nach dem Speichern muss <strong>start.bat</strong> neu ausgeführt werden, damit die Änderung wirksam wird.',
-    cd_label: 'Neues Verzeichnis (Windows-Pfad)',
+    cd_label: 'Neues Verzeichnis (vollständiger Pfad)',
     cd_cancel: 'Abbrechen',
     cd_save: 'Speichern',
     cd_err_path: 'Bitte einen Pfad eingeben.',
@@ -1148,7 +1148,7 @@ const TRANSLATIONS = {
     risk_desc: (srcGb, ramGb, fmts) =>
       `Quelldaten ${srcGb} GB, Format ${fmts}, System-RAM ${ramGb} GB: ` +
       `Diese Kombination kann den Arbeitsspeicher sprengen und nach langer Laufzeit abbrechen. ` +
-      `Empfehlung: engerer Filter, kleinerer Extrakt, oder Format PBF (immer speichersicher).`,
+      `Ein engerer Filter, ein kleinerer Extrakt oder das Format PBF (immer speichersicher) vermeiden das.`,
     risk_cancel: 'Abbrechen (empfohlen)',
     risk_confirm: 'Trotzdem starten',
     resource_title: 'Ressourcen-Limits',
@@ -1161,8 +1161,8 @@ const TRANSLATIONS = {
     resource_threads_range: n => `(1–${n}, leer = Auto)`,
     resource_hint_effective: (n, nice) => `Effektiv: ${n} Thread${n !== 1 ? 's' : ''}, Nice ${nice}`,
     btn_resource_limits: 'Ressourcen-Limits',
-    sound_on: 'Signalton an — klingelt, wenn alle Downloads bzw. alle Filter-Jobs fertig sind',
-    sound_off: 'Signalton aus — zum Aktivieren klicken',
+    sound_on: 'Signalton an: klingelt, wenn alle Downloads bzw. alle Filter-Jobs fertig sind',
+    sound_off: 'Signalton aus. Zum Einschalten klicken.',
     // The button is labelled with the language it switches to, so each block
     // only ever needs to name the other one.
     lang_switch: 'Auf Englisch umschalten',
@@ -1171,7 +1171,7 @@ const TRANSLATIONS = {
     quit_confirm_busy: 'Es laufen noch Downloads oder Filter-Jobs. Beim Beenden werden sie abgebrochen. Trotzdem beenden?',
     quit_done_title: 'PBF Forge wurde beendet',
     quit_done_body: 'Der Container ist gestoppt. Dieser Tab kann geschlossen werden. Zum Neustarten <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) ausführen.',
-    quit_failed: 'Beenden fehlgeschlagen. Der Server läuft weiter — mit stop.bat bzw. ./stop.sh stoppen.',
+    quit_failed: 'Beenden fehlgeschlagen. Der Server läuft weiter; mit stop.bat bzw. ./stop.sh stoppen.',
     github_title: 'Projekt auf GitHub öffnen',
     credits_built_with: 'Gebaut mit',
   },
@@ -1209,15 +1209,15 @@ const TRANSLATIONS = {
     ph_filter_suffix: 'e.g. railway',
     ph_data_dir: 'e.g. C:\\Users\\yourname\\osm-data',
     label_output_format: 'Output format',
-    label_osm_attrs: 'OSM Attributes',
+    label_osm_attrs: 'OSM attributes',
     radio_standard: 'Standard',
     radio_all: 'Expand all',
     radio_manual: 'Select manually',
     geojson_mode_hint: 'For GeoJSON, <strong>Standard</strong> and <strong>Expand all</strong> are identical.',
     pbf_mode_hint: 'For PBF, the attribute mode is ignored. QGIS/GDAL always shows its own schema.',
-    tooltip_standard: 'Output using the default settings of GDAL (GeoJSON/GeoPackage) or Osmium (PBF) for the respective format. Tags outside defined keys end up in a compact other_tags column.',
-    tooltip_expand_all: 'Every OSM tag is output as its own column. Ideal for detailed analysis, but can produce hundreds of columns with many tags. Be careful with large source data: output size and processing time can increase significantly. Does not work for PBF.',
-    tooltip_manual: 'Only the specified column names are extracted. Good for targeted queries with slim outputs.',
+    tooltip_standard: 'Writes each format with the default settings of GDAL (GeoJSON/GeoPackage) or osmium (PBF). Tags outside the curated keys are folded into one compact other_tags column.',
+    tooltip_expand_all: 'Every OSM tag becomes a column of its own. Useful for detailed analysis, but tag-rich data runs to hundreds of columns, and on a large extract that costs both output size and run time. Not available for PBF.',
+    tooltip_manual: 'Only the column names you list are extracted. Keeps the output slim when you already know which keys you need.',
     tooltip_pbf: 'PBF is a binary OSM graph format without a fixed column concept. QGIS/GDAL always shows its own schema (osm_id, name, highway ...) regardless of the selected attribute mode.',
     label_col_names: 'Column names',
     col_names_hint: '(comma-separated)',
@@ -1241,7 +1241,7 @@ const TRANSLATIONS = {
     no_presets: 'No presets available.',
     card_new_preset: 'Create new preset',
     label_name: 'Name',
-    label_tags: 'OSM Tags',
+    label_tags: 'OSM tags',
     label_cols: 'Columns',
     cols_standard: 'Standard',
     cols_all: 'All',
@@ -1266,7 +1266,7 @@ const TRANSLATIONS = {
     status_unknown: 'Unknown',
     ws_connecting: 'connecting…',
     ws_connected: 'connected',
-    ws_disconnected: 'disconnected – reconnecting…',
+    ws_disconnected: 'disconnected, reconnecting…',
     ws_error: 'connection error',
     eta_lt1min: '<1 min left',
     eta_hr: (h, m) => `~${h} hr ${m} min left`,
@@ -1278,13 +1278,13 @@ const TRANSLATIONS = {
     err_no_geo: 'Please select at least one geometry type.',
     err_no_format: 'Please select at least one output format.',
     btn_cancel_job: 'Cancel job',
-    warn_geojson_large: 'Note: GeoJSON output from large source files can exceed 500 MB. GeoPackage is more efficient.',
+    warn_geojson_large: 'Note: GeoJSON from a source file this large gets unwieldy. GeoPackage stays smaller and opens faster.',
     eta_large_file_hint: 'Note: Very large source file. Filtering may take several hours depending on hardware.',
     err_url_not_pbf: 'URL must end with .osm.pbf.',
     job_step: (i, n) => `Step ${i} of ${n}:`,
     job_written: w => `${w} written`,
     job_read: r => `${r} read`,
-    job_stall_warn: d => `No observable progress for ${d} — the job keeps running (no auto-kill); cancel manually if you think it is stuck.`,
+    job_stall_warn: d => `Nothing has moved for ${d}. The job keeps running, and nothing will stop it automatically. Cancel it yourself if you think it is stuck.`,
     err_server: 'Server error',
     err_conn: msg => 'Connection error: ' + msg,
     err_preset_name: 'Please enter a name.',
@@ -1296,7 +1296,7 @@ const TRANSLATIONS = {
     btn_close: 'Close',
     btn_check: 'Check',
     alert_no_updates: 'No outdated or missing files with known URL.',
-    no_files: 'No PBF files found in data directory.',
+    no_files: 'No PBF files found in the data directory.',
     no_source_files: 'No PBF files available.',
     loading: 'Loading …',
     fb_title: 'Choose folder',
@@ -1307,8 +1307,8 @@ const TRANSLATIONS = {
     fb_confirm: 'Select this folder',
     fb_err_conn: 'Connection error',
     onboard_title: 'Set up working directory',
-    onboard_p: 'PBF Forge stores all map files (downloads and export results) in one folder on your computer. Enter its full path here — the folder is created if it does not exist yet. This is where you will find your results later.',
-    onboard_label: 'Directory (Windows path)',
+    onboard_p: 'PBF Forge keeps every map file (downloads and export results) in one folder on your computer. Enter its full path here; the folder is created if it does not exist yet. That folder is where you will find your results later.',
+    onboard_label: 'Directory (full path)',
     onboard_browse: 'Browse',
     onboard_save: 'Save &amp; prepare restart',
     onboard_err_path: 'Please enter a path.',
@@ -1316,10 +1316,10 @@ const TRANSLATIONS = {
     onboard_err_conn: msg => 'Connection error: ' + msg,
     lock_title: 'Restart required',
     lock_p: 'The data directory has been set. Now run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux) again. This page detects the restart automatically and reloads itself.',
-    lock_waiting: 'Waiting for restart — this page will refresh automatically …',
+    lock_waiting: 'Waiting for the restart. This page refreshes itself once it happens …',
     cd_title: 'Change directory',
     cd_p: 'After saving, <strong>start.bat</strong> must be run again for the change to take effect.',
-    cd_label: 'New directory (Windows path)',
+    cd_label: 'New directory (full path)',
     cd_cancel: 'Cancel',
     cd_save: 'Save',
     cd_err_path: 'Please enter a path.',
@@ -1330,30 +1330,30 @@ const TRANSLATIONS = {
     risk_title: 'This job is likely to fail',
     risk_desc: (srcGb, ramGb, fmts) =>
       `Source data ${srcGb} GB, format ${fmts}, system RAM ${ramGb} GB: ` +
-      `this combination can exhaust memory and die after a long run. ` +
-      `Recommendation: a narrower filter, a smaller extract, or PBF output (always memory-safe).`,
+      `this combination can run the machine out of memory and fail after a long run. ` +
+      `A narrower filter, a smaller extract or PBF output (which is always memory-safe) avoids that.`,
     risk_cancel: 'Cancel (recommended)',
     risk_confirm: 'Start anyway',
     label_suffix: 'Suffix',
-    resource_title: 'Resource Limits',
+    resource_title: 'Resource limits',
     resource_desc: 'Takes effect on the next job start. No restart needed.',
-    resource_preset_full: 'Full Power',
+    resource_preset_full: 'Full power',
     resource_preset_background: 'Background',
-    resource_advanced: 'Advanced (Override)',
+    resource_advanced: 'Advanced (override)',
     resource_label_threads: 'Threads',
     resource_label_nice: 'Priority (nice)',
     resource_threads_range: n => `(1–${n}, empty = Auto)`,
     resource_hint_effective: (n, nice) => `Effective: ${n} thread${n !== 1 ? 's' : ''}, nice ${nice}`,
-    btn_resource_limits: 'Resource Limits',
-    sound_on: 'Completion sound on — chimes when all downloads or all filter jobs are finished',
-    sound_off: 'Completion sound off — click to enable',
+    btn_resource_limits: 'Resource limits',
+    sound_on: 'Completion sound on: it chimes when all downloads or all filter jobs have finished',
+    sound_off: 'Completion sound off. Click to switch it on.',
     lang_switch: 'Switch to German',
     quit_title: 'Quit PBF Forge (stops the container)',
     quit_confirm: 'Quit PBF Forge? This stops the Docker container.',
     quit_confirm_busy: 'Downloads or filter jobs are still running. Quitting cancels them. Quit anyway?',
     quit_done_title: 'PBF Forge has stopped',
     quit_done_body: 'The container has been shut down. You can close this tab. To start again, run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux).',
-    quit_failed: 'Could not quit. The server is still running — stop it with stop.bat or ./stop.sh.',
+    quit_failed: 'Could not quit. The server is still running; stop it with stop.bat or ./stop.sh.',
     github_title: 'Open the project on GitHub',
     credits_built_with: 'Built with',
   }
