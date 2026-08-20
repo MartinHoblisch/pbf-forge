@@ -6,3 +6,9 @@ markers = [
     "docker: tests requiring Docker daemon or external binaries unavailable on Windows runners",
     "posix: tests using POSIX-only features (symlinks, fork, signals, chmod modes)",
 ]
+
+[tool.coverage.run]
+# Measure the application, not the test suite. `pytest --cov=.` from this
+# directory would otherwise count tests/ as covered code, where the only
+# unreached lines are the failure branches that fire when a test finds a bug.
+omit = ["tests/*"]
