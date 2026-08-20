@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -625,7 +625,7 @@ footer .credits-sep { color: var(--border); }
           </tr>
         </thead>
         <tbody id="files-tbody">
-          <tr><td colspan="6" style="color:var(--gray);text-align:center;padding:2rem" data-i18n="loading">Loading …</td></tr>
+          <tr><td colspan="6" style="color:var(--gray);text-align:center;padding:2rem" data-i18n="loading">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -882,7 +882,7 @@ footer .credits-sep { color: var(--border); }
     <div class="lock-path-badge" id="lock-path"></div>
     <div class="lock-spinner-wrap">
       <div class="spinner-lg"></div>
-      <span style="font-size:.85rem;color:var(--gray)" data-i18n="lock_waiting">Waiting for the restart. This page refreshes itself once it happens …</span>
+      <span style="font-size:.85rem;color:var(--gray)" data-i18n="lock_waiting">Waiting for the restart. This page refreshes itself once it happens…</span>
     </div>
   </div>
 </div>
@@ -1035,7 +1035,7 @@ const TRANSLATIONS = {
     tooltip_standard: 'Schreibt jedes Format mit den Standardeinstellungen von GDAL (GeoJSON/GeoPackage) bzw. osmium (PBF). Tags außerhalb der Standardschlüssel landen gesammelt in einer kompakten other_tags-Spalte.',
     tooltip_expand_all: 'Jeder OSM-Tag wird zu einer eigenen Spalte. Nützlich für detaillierte Analysen, bei vielen Tags entstehen daraus aber hunderte Spalten, die bei großen Quelldaten Ausgabegröße und Laufzeit in die Höhe treiben. Für PBF nicht verfügbar.',
     tooltip_manual: 'Nur die eingetragenen Spaltennamen werden extrahiert. Hält die Ausgabe schlank, wenn klar ist, welche Schlüssel gebraucht werden.',
-    tooltip_pbf: 'PBF ist ein binäres OSM-Graphformat ohne festes Spaltenkonzept. QGIS/GDAL zeigt immer sein eigenes Schema (osm_id, name, highway ...) unabhängig vom gewählten Attribut-Modus.',
+    tooltip_pbf: 'PBF ist ein binäres OSM-Graphformat ohne festes Spaltenkonzept. QGIS/GDAL zeigt immer sein eigenes Schema (osm_id, name, highway …) unabhängig vom gewählten Attribut-Modus.',
     label_col_names: 'Spaltennamen',
     col_names_hint: '(Komma-getrennt)',
     btn_run_filter: 'Filter ausführen',
@@ -1218,7 +1218,7 @@ const TRANSLATIONS = {
     tooltip_standard: 'Writes each format with the default settings of GDAL (GeoJSON/GeoPackage) or osmium (PBF). Tags outside the curated keys are folded into one compact other_tags column.',
     tooltip_expand_all: 'Every OSM tag becomes a column of its own. Useful for detailed analysis, but tag-rich data runs to hundreds of columns, and on a large extract that costs both output size and run time. Not available for PBF.',
     tooltip_manual: 'Only the column names you list are extracted. Keeps the output slim when you already know which keys you need.',
-    tooltip_pbf: 'PBF is a binary OSM graph format without a fixed column concept. QGIS/GDAL always shows its own schema (osm_id, name, highway ...) regardless of the selected attribute mode.',
+    tooltip_pbf: 'PBF is a binary OSM graph format without a fixed column concept. QGIS/GDAL always shows its own schema (osm_id, name, highway …) regardless of the selected attribute mode.',
     label_col_names: 'Column names',
     col_names_hint: '(comma-separated)',
     btn_run_filter: 'Run filter',
@@ -1298,7 +1298,7 @@ const TRANSLATIONS = {
     alert_no_updates: 'No outdated or missing files with known URL.',
     no_files: 'No PBF files found in the data directory.',
     no_source_files: 'No PBF files available.',
-    loading: 'Loading …',
+    loading: 'Loading…',
     fb_title: 'Choose folder',
     fb_drives: 'Drives',
     fb_parent: 'Parent folder',
@@ -1316,7 +1316,7 @@ const TRANSLATIONS = {
     onboard_err_conn: msg => 'Connection error: ' + msg,
     lock_title: 'Restart required',
     lock_p: 'The data directory has been set. Now run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux) again. This page detects the restart automatically and reloads itself.',
-    lock_waiting: 'Waiting for the restart. This page refreshes itself once it happens …',
+    lock_waiting: 'Waiting for the restart. This page refreshes itself once it happens…',
     cd_title: 'Change directory',
     cd_p: 'After saving, <strong>start.bat</strong> must be run again for the change to take effect.',
     cd_label: 'New directory (full path)',
