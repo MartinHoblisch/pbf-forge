@@ -5,7 +5,11 @@ Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a
 [Quickstart](#quickstart) · [Your first filter](#your-first-filter) · [Limits](#limits) · [Alternatives](#alternatives) · [Documentation](#documentation)
 
 [![CI](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml)
+[![Security](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml)
+[![Coverage](https://codecov.io/gh/MartinHoblisch/pbf-forge/branch/main/graph/badge.svg)](https://codecov.io/gh/MartinHoblisch/pbf-forge)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/MartinHoblisch/pbf-forge/badge)](https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge)
 [![Release](https://img.shields.io/github/v/release/MartinHoblisch/pbf-forge)](https://github.com/MartinHoblisch/pbf-forge/releases/latest)
+[![Platform: Windows | Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)](docs/install.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## The problem
