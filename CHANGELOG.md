@@ -11,6 +11,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Queue sizing and the memory warning read the host's RAM, not the
+  container's limit.** Both took the total from `/proc/meminfo`, which inside a
+  container reports the host. A 4 GB container on a 32 GB machine therefore
+  believed it had 32 GB: the pre-flight warning almost never fired, and the
+  queue could start several jobs whose combined peak exceeded the cap. Measured
+  on a container capped at 4 GB, the old figure was 7.7 GB. Both now use the
+  cgroup limit where one applies and fall back to `MemTotal` otherwise.
 - **The exclude field did nothing for ways a surviving relation referenced.**
   The exclude pass runs `osmium tags-filter --invert-match`, which keeps every
   object that does not match and then completes the references of the
@@ -35,8 +42,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ### Documentation
 
 - Corrected claims that did not match the code: job history survives a restart
-  but running jobs are marked failed rather than resumed; the memory warning
-  reads the host's RAM and cannot see the container's cap; `mem_limit` has to
+  but running jobs are marked failed rather than resumed; `mem_limit` has to
   be raised together with `memswap_limit`; there is no built-in Europe source;
   Standard mode's columns are `name` plus the keys of the include expressions,
   not a project-curated list; and ODbL attribution is embedded on a best-effort

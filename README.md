@@ -57,7 +57,7 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 - **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
 - **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
 - Queues jobs, keeps the job history across a restart, and has an English and a German interface. A job that was running when the backend stopped is marked failed, not resumed.
-- **Warns** before a filter whose sources are large relative to the machine's RAM. The check reads the host's total memory, so it does not know the container's own 4 GB cap; see [docs/install.md](docs/install.md).
+- **Warns** before a filter whose sources are large relative to the memory the container may use, which is the cgroup limit rather than the host's total.
 
 ## Your first filter
 
