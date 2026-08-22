@@ -120,3 +120,11 @@ config/jobs/
 # === Scratch space ===
 # Anything under local/ is a working file and is never part of a release.
 local/
+
+# === Editor and AI assistant rule files ===
+# Generated locally per developer; not part of the project.
+.cursor/
+.windsurf/
+.clinerules/
+.opencode/
+.github/copilot-instructions.md
