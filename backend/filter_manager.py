@@ -384,7 +384,12 @@ def _compute_max_parallel() -> int:
     ram = _detect_memory_limit_bytes()
     ram_gb = ram // (1024**3) if ram else 0
     cap = max(1, cpu // 4)
-    if ram_gb >= 8:
+    if ram_gb:
+        # Below 8 GB this floors to 0 and the max() below lifts it to 1, which
+        # is the intended answer: a single filter can peak at 2 GB, so a 4 GB
+        # container runs one job at a time however many cores it has. Skipping
+        # the cap under 8 GB instead would leave the shipped container sized by
+        # CPU alone.
         cap = min(cap, ram_gb // 8)
     return max(1, cap)
 
