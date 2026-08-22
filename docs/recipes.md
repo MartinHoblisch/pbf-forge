@@ -77,8 +77,8 @@ line.
 Europe at 33 GB is past the container's default 4 GB memory cap. Raise the cap
 first; see [install.md](install.md).
 
-Both expressions land in the output's provenance metadata, so the file says
-what produced it.
+Both expressions are listed in the report beside the output, so the run stays
+traceable.
 
 For scale: the same filter without the exclude pass, run against the 4.5 GB
 German extract with Ways and Relations checked, took 17m 27s and peaked at

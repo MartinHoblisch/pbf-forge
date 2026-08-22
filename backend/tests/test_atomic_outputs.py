@@ -79,9 +79,7 @@ async def test_failed_export_leaves_no_final_file(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "error"
     # The failing export must not leave a file at the final gpkg path.
@@ -172,9 +170,7 @@ async def test_successful_job_publishes_outputs(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done", f"Expected done, got {job.status!r}: {job.error}"
 

@@ -69,9 +69,7 @@ async def test_osmium_export_runs_once_for_multiple_formats(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done"
     assert export_call_count["n"] == 1, "osmium export must run exactly once per source"
@@ -129,9 +127,7 @@ async def test_gpkg_export_path_includes_perf_flags(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     ogr_cmd = next(c for c in captured_cmds if c[0] == "ogr2ogr")
     assert "-gt" in ogr_cmd
@@ -170,9 +166,7 @@ async def test_gpkg_plus_geojson_reuses_shared_geojson_for_gpkg(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done"
     # osmium export must run (creates shared geojson)
@@ -220,9 +214,7 @@ async def test_gpkg_only_uses_osmium_export_path(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done"
     export_cmds = [c for c in captured_cmds if c[0] == "osmium" and "export" in c]
@@ -286,9 +278,7 @@ async def test_gpkg_column_guard_ignores_geojson(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=many_fields)):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done"
 
@@ -315,9 +305,7 @@ async def test_gpkg_column_guard_counts_manual_selection(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=many_fields)):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done"
 
@@ -344,9 +332,7 @@ async def test_standard_mode_folds_to_other_tags(tmp_data_dir):
     get_fields = AsyncMock(return_value=["should_not_be_used"])
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", get_fields):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done", job.error
     # osmium export must use the REAL flag: --format=X prefix-matches the
@@ -412,9 +398,7 @@ async def test_manual_mode_still_scans_fields_from_seq(tmp_data_dir):
     get_fields = AsyncMock(return_value=["name", "waterway"])
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", get_fields):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done", job.error
     get_fields.assert_awaited()

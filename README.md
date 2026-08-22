@@ -51,7 +51,7 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 - **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
 - **Verifies** every download against the `.md5` published beside it. If the checksum does not match, the download is rejected. A missing checksum file is rejected the same way. A PBF you copy into the data directory yourself is usable but has nothing to verify against.
 - **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
-- **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
+- **Exports** GeoPackage, GeoJSON or the filtered PBF. The output holds your data and nothing else: no metadata is written into it. The report beside it records how it was produced.
 - **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
 - Queues jobs, keeps the job history across a restart, and has an English and a German interface. A job that was running when the backend stopped is marked failed, not resumed.
 - **Warns** before a filter whose sources are large relative to the memory the container may use, which is the cgroup limit rather than the host's total.
@@ -100,7 +100,9 @@ The result is one layer named after the output file, in EPSG:4326, next to a pla
 
 PBF Forge is MIT licensed. See [LICENSE](LICENSE).
 
-The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases. PBF Forge writes "© OpenStreetMap contributors (ODbL 1.0)." into every GeoPackage and GeoJSON it produces: a row in the GeoPackage's `gpkg_metadata` table, and a top-level member in the GeoJSON. Embedding is best effort. If it fails the file is still written and the failure is logged. The GeoPackage row is not registered through the metadata extension, so most clients will not show it; read it with ogrinfo or a SQLite client. Keep the notice with any file you share, and add it yourself if it is missing.
+The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases.
+
+That obligation is yours, and it applies when you publish or hand on a result, not while you work with it locally. PBF Forge writes nothing into your output files, so add the notice yourself where your work is seen: "© OpenStreetMap contributors (ODbL 1.0)." The report beside every output names the source extract and its OSM timestamp if you need to trace where a file came from.
 
 The terms of the host you download from apply on top, and they differ. The examples in this documentation point at Geofabrik, whose downloads are free for non-commercial use; commercial users should read <https://www.geofabrik.de/geofabrik/agb.html>. Point PBF Forge somewhere else and that host's terms apply instead.
 

@@ -7,6 +7,30 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Removed
+
+- **Nothing is written into output files any more.** GeoPackage and GeoJSON
+  outputs used to carry an ODbL notice and a JSON block describing the run.
+  Neither is written now.
+
+  The ODbL notice was never required of this tool. The licence binds whoever
+  publicly uses the data, which is you when you publish a result, not a
+  converter running on your own machine. osmium and GDAL embed nothing either.
+  Stamping a notice into every file was a decision made on the user's behalf.
+
+  The run description went into the same GeoPackage table, which was never
+  registered through the metadata extension, so no ordinary client displayed
+  it. The report beside every output holds the same facts, in a form people can
+  read, and it is unchanged.
+
+  `README.md` now states the ODbL obligation as the user's own, and
+  `docs/filtering.md` says plainly that no format carries metadata about the
+  run.
+
+---
+
 ## [1.1.0] - 2026-08-22
 
 Highlights: exclusion filtering as a second, inverted pass; a job queue that

@@ -15,13 +15,11 @@ import logging
 import os
 import re
 import shutil
-import sqlite3
 import sys
 import tempfile
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -135,8 +133,8 @@ def _fmt_duration(seconds: float) -> str:
 
 # ── Output report ─────────────────────────────────────────────────────────────
 # Every finished output file gets a plain-text sidecar describing how it was
-# made. Laid out for reading, not parsing: the machine-readable copy of the same
-# facts is embedded in the file itself by _embed_provenance().
+# made. It is the only record of how an output was produced: nothing is written
+# into the output file itself.
 
 _REPORT_WIDTH = 80
 _REPORT_KEY_WIDTH = 18
@@ -957,30 +955,16 @@ class FilterManager:
 
                         if rc != 0:
                             raise RuntimeError(f"Conversion exited with code {rc}")
-                        loop = asyncio.get_running_loop()
-                        await loop.run_in_executor(None, self._embed_attribution, work_file, fmt)
-                        await loop.run_in_executor(
-                            None,
-                            self._embed_provenance,
-                            work_file,
-                            fmt,
-                            source,
-                            job.tags,
-                            job.exclude_tags,
-                            job.geometry_types,
-                        )
-                        # Conversion and metadata embedding both succeeded, so
-                        # the finished file can take the final path. A failure
-                        # anywhere above leaves that path untouched.
+                        # Conversion succeeded, so the finished file can take
+                        # the final path. A failure above leaves it untouched.
                         out_file.unlink(missing_ok=True)
                         shutil.move(str(work_file), str(out_file))
                         job.output_files.append(str(out_file))
                         published.append((out_file, source, fmt))
                         gc.collect()
-                        # Closed only here: embedding the metadata and moving
-                        # the file into place is part of producing this output,
-                        # so its cost belongs to this phase rather than to an
-                        # unnamed stretch after the last one.
+                        # Closed only here: moving the file into place is part
+                        # of producing this output, so its cost belongs to this
+                        # phase rather than to an unnamed stretch after it.
                         await self._finish_phase(job)
 
                     # Eager cleanup: free disk space from shared export temp.
@@ -1315,161 +1299,6 @@ class FilterManager:
             job.append_log(f"ERROR in tag reduction: {exc}\n")
             tmp_out.unlink(missing_ok=True)
             return 1
-
-    def _embed_attribution(self, path: Path, fmt: str) -> None:
-        if fmt == "gpkg":
-            self._embed_attribution_gpkg(path)
-        elif fmt == "geojson":
-            self._embed_attribution_geojson(path)
-
-    def _embed_attribution_gpkg(self, path: Path) -> None:
-        try:
-            # closing() around connect(): the connection's own context manager
-            # commits the transaction but does not close the handle, leaving it
-            # to the garbage collector.
-            with closing(sqlite3.connect(str(path))) as conn, conn:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS gpkg_metadata (
-                        id INTEGER PRIMARY KEY ASC NOT NULL,
-                        md_scope TEXT NOT NULL DEFAULT 'dataset',
-                        md_standard_uri TEXT NOT NULL,
-                        mime_type TEXT NOT NULL DEFAULT 'text/xml',
-                        metadata TEXT NOT NULL DEFAULT ''
-                    )
-                """
-                )
-                conn.execute(
-                    "INSERT INTO gpkg_metadata (md_scope, md_standard_uri, mime_type, metadata)"
-                    " VALUES (?, ?, ?, ?)",
-                    (
-                        "dataset",
-                        "http://www.opengis.net/spec/GeoPackage/1.0/opt/metadata/1.0",
-                        "text/plain",
-                        ATTRIBUTION,
-                    ),
-                )
-        except Exception as exc:
-            _log.warning("Failed to embed attribution in GPkg: %s", exc)
-
-    def _embed_attribution_geojson(self, path: Path) -> None:
-        try:
-            self._stream_inject_geojson_keys(path, {"attribution": ATTRIBUTION})
-        except Exception as exc:
-            _log.warning("Failed to embed attribution in GeoJSON: %s", exc)
-
-    def _stream_inject_geojson_keys(self, path: Path, extras: dict) -> None:
-        """Insert top-level keys before the `"features"` array.
-
-        Streams 64-KB chunks to a sibling tmp file then atomically replaces the
-        original. Peak RAM ~128 KB regardless of file size — critical for
-        multi-GB GeoJSON outputs where json.loads() blows the heap.
-        """
-        if not extras:
-            return
-        fragment = json.dumps(extras, ensure_ascii=False)[1:-1].encode("utf-8") + b","
-        target = b'"features"'
-        tmp_path = path.with_suffix(path.suffix + ".tmp")
-        chunk_size = 64 * 1024
-        try:
-            with open(path, "rb") as src, open(tmp_path, "wb") as dst:
-                injected = False
-                carry = b""
-                while True:
-                    chunk = src.read(chunk_size)
-                    if not chunk:
-                        break
-                    buf = carry + chunk
-                    if not injected:
-                        idx = buf.find(target)
-                        if idx >= 0:
-                            dst.write(buf[:idx])
-                            dst.write(fragment)
-                            dst.write(buf[idx:])
-                            injected = True
-                            carry = b""
-                        else:
-                            keep = len(target) - 1
-                            if len(buf) > keep:
-                                dst.write(buf[:-keep])
-                                carry = buf[-keep:]
-                            else:
-                                carry = buf
-                    else:
-                        dst.write(chunk)
-                if carry:
-                    dst.write(carry)
-                if not injected:
-                    raise ValueError(f'"features" key not found in {path}')
-            os.replace(tmp_path, path)
-        except Exception:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise
-
-    def _embed_provenance(
-        self,
-        path: Path,
-        fmt: str,
-        source_file: str,
-        tags: list[str],
-        exclude_tags: list[str],
-        geometry_types: list[str],
-    ) -> None:
-        """Embed provenance metadata (source, filter params, timestamp) into output files.
-
-        GPKG: second row in gpkg_metadata with JSON payload.
-        GeoJSON: top-level 'provenance' key on the FeatureCollection.
-        PBF: no-op (binary format, no metadata container).
-        """
-        provenance = {
-            "generated_by": f"PBF Forge v{VERSION}",
-            "source": source_file,
-            "tags": tags,
-            "exclude_tags": exclude_tags,
-            "geometry_types": geometry_types,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        if fmt == "gpkg":
-            self._embed_provenance_gpkg(path, provenance)
-        elif fmt == "geojson":
-            self._embed_provenance_geojson(path, provenance)
-
-    def _embed_provenance_gpkg(self, path: Path, provenance: dict) -> None:
-        try:
-            # See _embed_attribution_gpkg: connect() alone never closes.
-            with closing(sqlite3.connect(str(path))) as conn, conn:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS gpkg_metadata (
-                        id INTEGER PRIMARY KEY ASC NOT NULL,
-                        md_scope TEXT NOT NULL DEFAULT 'dataset',
-                        md_standard_uri TEXT NOT NULL,
-                        mime_type TEXT NOT NULL DEFAULT 'text/xml',
-                        metadata TEXT NOT NULL DEFAULT ''
-                    )
-                """
-                )
-                conn.execute(
-                    "INSERT INTO gpkg_metadata (md_scope, md_standard_uri, mime_type, metadata)"
-                    " VALUES (?, ?, ?, ?)",
-                    (
-                        "dataset",
-                        "http://www.opengis.net/spec/GeoPackage/1.0/opt/metadata/1.0",
-                        "application/json",
-                        json.dumps(provenance, ensure_ascii=False),
-                    ),
-                )
-        except Exception as exc:
-            _log.warning("Failed to embed provenance in GPkg: %s", exc)
-
-    def _embed_provenance_geojson(self, path: Path, provenance: dict) -> None:
-        try:
-            self._stream_inject_geojson_keys(path, {"provenance": provenance})
-        except Exception as exc:
-            _log.warning("Failed to embed provenance in GeoJSON: %s", exc)
 
     def _write_output_reports(
         self,

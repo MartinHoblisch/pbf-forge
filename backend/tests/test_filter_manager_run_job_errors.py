@@ -12,7 +12,6 @@ orchestration error paths:
   - non-pbf-only path (intermediate filter into tmp)
   - exclude on non-pbf path
   - manual column-mode dispatch
-  - attribution + provenance embedded after success
   - phase_started_at cleared on error so the FE elapsed-ticker stops
   - an export with no features stops before ogr2ogr
 """
@@ -229,9 +228,7 @@ async def test_run_job_geojson_only_filters_to_temp_then_exports(tmp_data_dir):
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     assert job.status == "done"
     # No PBF output file (only geojson was requested)
@@ -265,9 +262,7 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
     # filter + invert-match + osmium export + ogr2ogr = 4 _run_cmd calls
     filter_cmds = [c for c in captured_cmds if c[0] == "osmium" and c[1] == "tags-filter"]
@@ -275,43 +270,10 @@ async def test_run_job_geojson_with_exclude_runs_two_filter_passes(tmp_data_dir)
     assert job.status == "done"
 
 
-# ── attribution + provenance embedded after success ──────────────────────────
-
-
-async def test_run_job_embeds_attribution_and_provenance(tmp_data_dir):
-    _ensure_source(tmp_data_dir)
-    fm = _fm()
-    job = _job(tmp_data_dir, output_formats=["geojson"])
-
-    async def fake_run_cmd(cmd, _job, **_):
-        if cmd[0] == "osmium" and "export" in cmd:
-            out_path = Path(cmd[cmd.index("-o") + 1])
-            out_path.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
-        if cmd[0] == "ogr2ogr":
-            out = Path(cmd[cmd.index("-f") + 2])
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
-        return 0
-
-    with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
-        with patch.object(fm, "_get_fields", AsyncMock(return_value=["name"])):
-            with patch.object(fm, "_embed_attribution") as embed_a:
-                with patch.object(fm, "_embed_provenance") as embed_p:
-                    await fm.run_job(job)
-
-    embed_a.assert_called_once()
-    embed_p.assert_called_once()
-    # Verify call shape: (path, fmt, source, tags, exclude_tags, geometry_types)
-    args = embed_p.call_args.args
-    assert args[1] == "geojson"
-    assert args[2] == "berlin.osm.pbf"
-    assert args[3] == ["amenity"]
-
-
 # ── PBF-only path: no export, no embed ───────────────────────────────────────
 
 
-async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
+async def test_run_job_pbf_only_runs_no_export_or_conversion(tmp_data_dir):
     _ensure_source(tmp_data_dir)
     fm = _fm()
     job = _job(tmp_data_dir, output_formats=["pbf"])
@@ -327,16 +289,13 @@ async def test_run_job_pbf_only_no_export_or_embed(tmp_data_dir):
         return 0
 
     with patch.object(fm, "_run_cmd", side_effect=fake_run_cmd):
-        with patch.object(fm, "_embed_attribution") as embed_a:
-            with patch.object(fm, "_embed_provenance") as embed_p:
-                await fm.run_job(job)
+        await fm.run_job(job)
 
     assert job.status == "done"
-    # PBF-only: no osmium export, no ogr2ogr, no embed
+    # PBF-only: the filtered extract is the output, so neither osmium export
+    # nor ogr2ogr should run.
     assert not any(c[0] == "osmium" and "export" in c for c in captured_cmds)
     assert not any(c[0] == "ogr2ogr" for c in captured_cmds)
-    embed_a.assert_not_called()
-    embed_p.assert_not_called()
 
 
 # ── zero matches ─────────────────────────────────────────────────────────────

@@ -78,9 +78,7 @@ async def _fake_run_cmd(cmd, _job, **_):
 async def _run(fm: FilterManager, job: FilterJob) -> None:
     with patch.object(fm, "_run_cmd", side_effect=_fake_run_cmd):
         with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
-            with patch.object(fm, "_embed_attribution"):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
+            await fm.run_job(job)
 
 
 # ── Reports are written next to every output ──────────────────────────────────
@@ -384,27 +382,6 @@ async def test_writing_the_reports_is_a_counted_phase(tmp_data_dir):
     n = len(job.phases)
     assert f"Phase {n}/{n}: write reports" in job.log
     assert f"Phase {n}/{n} done in" in job.log
-
-
-async def test_publishing_an_output_counts_towards_its_export_phase(tmp_data_dir):
-    """Embedding the metadata and moving the file into place produce that output,
-    so the phase named after it must still be open while they run."""
-    _ensure_source(tmp_data_dir)
-    fm = _fm()
-    job = _job(tmp_data_dir, output_formats=["gpkg"])
-    seen = {}
-
-    def _record_index(*_args, **_kwargs):
-        seen["at_embed"] = job.current_phase_index
-
-    with patch.object(fm, "_run_cmd", side_effect=_fake_run_cmd):
-        with patch.object(fm, "_get_fields", AsyncMock(return_value=[])):
-            with patch.object(fm, "_embed_attribution", side_effect=_record_index):
-                with patch.object(fm, "_embed_provenance"):
-                    await fm.run_job(job)
-
-    export_index = next(i for i, p in enumerate(job.phases) if p.step == "export_convert")
-    assert seen["at_embed"] == export_index
 
 
 async def test_the_report_phase_records_no_filter_history(tmp_data_dir):

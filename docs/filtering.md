@@ -70,9 +70,12 @@ as a join key on its own.
 
 | Format | What you get |
 |---|---|
-| GeoPackage | The default. One layer named after the output file, EPSG:4326, ODbL attribution and the full filter provenance embedded in `gpkg_metadata`. |
+| GeoPackage | The default. One layer named after the output file, EPSG:4326. Opens faster than GeoJSON and supports spatial indexes. |
 | GeoJSON | Same content as text. Written through a streaming intermediate, so the only size limit is your free disk space, but large files quickly become hard to handle. Above a 200 MB source extract the interface says so. |
-| PBF | The filtered extract itself, for feeding into osmium or anything else that reads PBF. Carries no provenance metadata: the format has nowhere to put it. |
+| PBF | The filtered extract itself, for feeding into osmium or anything else that reads PBF. |
+
+No format carries metadata about the run. What produced a file is recorded in
+the report beside it, not inside it.
 
 Several formats can be selected at once. They share one filter pass, so
 picking two costs one export, not two filters.
