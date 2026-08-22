@@ -1,8 +1,6 @@
 # PBF Forge
 
-Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine.
-
-**Docker is the only thing you install.** osmium, GDAL and the rest of the pipeline stay inside the container.
+Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine; Docker is all you install, osmium and GDAL stay inside it.
 
 [![CI](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml)
 [![Security](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml)
