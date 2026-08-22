@@ -1,7 +1,7 @@
 # Ubuntu 24.04 LTS (Noble Numbat), pinned by digest so builds are reproducible.
 # Dependabot refreshes the digest weekly; the tag stays put, because moving to
 # the next LTS also moves osmium-tool, GDAL and python3 (tracked in issue #44).
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
 # Avoid interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
