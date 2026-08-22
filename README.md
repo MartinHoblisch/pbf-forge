@@ -1,4 +1,8 @@
-# PBF Forge
+<p align="center">
+  <img src="docs/assets/logo-mark.png" alt="" width="180">
+</p>
+
+<h1 align="center">PBF Forge</h1>
 
 Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine; Docker is all you install, osmium and GDAL stay inside it.
 
