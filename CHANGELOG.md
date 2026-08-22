@@ -9,6 +9,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **An `osm_type` column beside `osm_id`.** OSM ids are unique only per object
+  type, and the export puts every type in one layer, so a node and a way could
+  both arrive as `osm_id` 1. Using it as a primary key raised a constraint
+  violation; joining on it returned wrong rows and said nothing. `osm_type`
+  holds `n`, `w` or `r`, so `(osm_type, osm_id)` identifies a feature. `osm_id`
+  keeps its integer type and its meaning, so queries that never needed
+  uniqueness are unaffected.
+
 ### Removed
 
 - **Nothing is written into output files any more.** GeoPackage and GeoJSON

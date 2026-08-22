@@ -393,6 +393,10 @@ def _compute_max_parallel() -> int:
 
 
 class FilterManager:
+    # Selected explicitly by _build_export_sql; discovering them again would
+    # put duplicate columns in every output.
+    _EXCLUDED_EXPORT_FIELDS = {"@id", "id"}
+
     def __init__(self, ws_manager) -> None:
         self._ws = ws_manager
         self._jobs: dict[str, FilterJob] = {}
@@ -849,6 +853,12 @@ class FilterManager:
                                     "--output-format=geojsonseq",
                                     "--attributes",
                                     "id",
+                                    # -u type_id adds a top-level GeoJSON id
+                                    # holding n1 / w1 / r1. @id stays the bare
+                                    # integer, which is unique only per object
+                                    # type, and every type shares one layer.
+                                    "-u",
+                                    "type_id",
                                     "--index-type=sparse_file_array,sparse_file_array",
                                     "-o",
                                     str(shared_geojson),
@@ -1245,7 +1255,7 @@ class FilterManager:
         fields = []
         for line in stdout.decode().splitlines():
             m = _gdal_type.match(line)
-            if m and m.group(1) != "@id":
+            if m and m.group(1) not in self._EXCLUDED_EXPORT_FIELDS:
                 fields.append(m.group(1))
         return fields
 
@@ -1274,7 +1284,7 @@ class FilterManager:
             col_list = ", ".join(q(f) for f in fields)
 
         suffix = f", {col_list}" if col_list else ""
-        return f'SELECT "@id" AS osm_id{suffix} FROM {q(layer)}'
+        return f'SELECT "@id" AS osm_id, substr("id",1,1) AS osm_type{suffix} FROM {q(layer)}'
 
     async def _reduce_pbf_tags(self, pbf_path: Path, job: FilterJob) -> int:
         """Use pyosmium to strip all tags not in job.manual_keys from a PBF file in-place."""
