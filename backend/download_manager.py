@@ -311,7 +311,12 @@ class DownloadManager:
                 _log.warning("URL mapping could not be loaded: %s", exc)
 
     def _save_url_mapping(self) -> None:
-        custom = {k: v for k, v in self._url_mapping.items() if k not in CONTINENTAL_URLS}
+        # A default is re-seeded on load and does not need storing. A URL the
+        # user chose does, including one whose filename a default also covers:
+        # "europe.osm.pbf" is an ordinary name and more than one host serves it.
+        # Comparing values rather than keys keeps the file small without
+        # overwriting a choice on the next start.
+        custom = {k: v for k, v in self._url_mapping.items() if CONTINENTAL_URLS.get(k) != v}
         try:
             URLS_FILE.write_text(json.dumps(custom, indent=2), encoding="utf-8")
         except Exception as exc:

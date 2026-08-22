@@ -100,3 +100,24 @@ def test_resolve_url_priority_direct_beats_stripped(tmp_data_dir):
     dm._url_mapping["africa-260427.osm.pbf"] = "https://example.com/exact.osm.pbf"
     dm._url_mapping["africa.osm.pbf"] = "https://example.com/stripped.osm.pbf"
     assert dm._resolve_url("africa-260427.osm.pbf") == "https://example.com/exact.osm.pbf"
+
+
+# ── Persistence of a chosen host ─────────────────────────────────────────────
+
+
+def test_a_chosen_host_survives_a_restart_for_a_built_in_filename(tmp_data_dir):
+    """A URL the user picked outranks the built-in default, permanently.
+
+    The built-in mapping exists so a file that arrives without a recorded URL
+    can still be checked. The eight names it covers are ordinary filenames, and
+    nothing stops another host from serving one, so a source the user chose has
+    to be stored rather than silently replaced on the next start.
+    """
+    chosen = "https://planet.openstreetmap.org/pbf/europe-latest.osm.pbf"
+
+    dm = _dm()
+    dm.register_url(chosen, "europe.osm.pbf")
+    assert dm._resolve_url("europe.osm.pbf") == chosen
+
+    restarted = _dm()  # reads the stored mapping back from disk
+    assert restarted._resolve_url("europe.osm.pbf") == chosen
