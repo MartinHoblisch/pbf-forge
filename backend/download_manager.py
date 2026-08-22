@@ -72,6 +72,15 @@ def _basename(url: str) -> str:
     return url.rstrip("/").split("/")[-1]
 
 
+def _md5_of(path: Path) -> str:
+    """Hex MD5 of a file, read in blocks so a multi-GB extract fits in memory."""
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8 * 1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def _is_superseded(server_mtime: Optional[datetime], written_at: Optional[datetime]) -> bool:
     """True when the server published a build after *written_at*.
 
@@ -834,45 +843,51 @@ class DownloadManager:
         so the download is marked error and osmium is never invoked on the file.
         Caller must ensure *dest* exists.
         """
+        actual_hex = _md5_of(dest)
+
         md5_url = url + ".md5"
         expected_hex, listed_name = self._fetch_checksum(md5_url, session)
         remote_name = _basename(url)
+        if actual_hex == expected_hex:
+            return
 
-        # A sidecar names the build it describes. Hosts publish
-        # <region>-latest.osm.pbf as a redirect to a dated build and keep a
-        # .md5 beside both, but the one next to the alias is not always in
-        # step: it can lag months behind, or run ahead of the redirect while
-        # the nightly rotation is in progress. When the names disagree, follow
-        # the alias and take the checksum from the build that was served.
-        if listed_name and listed_name != remote_name:
+        # The digest decides, and a sidecar names the build it describes. Hosts
+        # serve <region>-latest.osm.pbf as a redirect to a dated build and keep
+        # a .md5 beside both, but the one next to the alias is not always in
+        # step: it can lag months behind, or run ahead of the redirect while the
+        # nightly rotation is in progress. A digest that disagrees while the
+        # names already disagree is a sidecar for another build, not a bad
+        # download — follow the alias and try the checksum published beside the
+        # build that was actually served.
+        describes_other_build = listed_name is not None and listed_name != remote_name
+        if describes_other_build:
             resolved = self._effective_url(url, session)
             if resolved != url:
                 md5_url = resolved + ".md5"
                 expected_hex, listed_name = self._fetch_checksum(md5_url, session)
                 remote_name = _basename(resolved)
-            if listed_name and listed_name != remote_name:
-                raise RuntimeError(
-                    f"Checksum at {md5_url} describes {listed_name}, not {remote_name} — "
-                    f"the published checksum belongs to a different build. "
-                    f"{dest.name} was kept; try again later."
-                )
+                if actual_hex == expected_hex:
+                    return
+                # Aliases can redirect to a mirror that keeps the alias name, so
+                # the resolved sidecar may still name a dated build.
+                describes_other_build = listed_name is not None and listed_name != remote_name
 
-        h = hashlib.md5()
-        with open(dest, "rb") as f:
-            for chunk in iter(lambda: f.read(8 * 1024 * 1024), b""):
-                h.update(chunk)
-        actual_hex = h.hexdigest()
-
-        if actual_hex != expected_hex:
-            quarantine = dest.with_name(dest.name + ".corrupt")
-            try:
-                dest.replace(quarantine)
-                hint = f"File quarantined as {quarantine.name}."
-            except OSError:
-                hint = "File left in place — delete it manually."
+        if describes_other_build:
             raise RuntimeError(
-                f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}. {hint}"
+                f"Checksum at {md5_url} describes {listed_name}, not {remote_name} — "
+                f"the published checksum belongs to a different build. "
+                f"{dest.name} was kept; try again later."
             )
+
+        quarantine = dest.with_name(dest.name + ".corrupt")
+        try:
+            dest.replace(quarantine)
+            hint = f"File quarantined as {quarantine.name}."
+        except OSError:
+            hint = "File left in place — delete it manually."
+        raise RuntimeError(
+            f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}. {hint}"
+        )
 
     def _do_download(
         self,

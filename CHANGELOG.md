@@ -7,6 +7,23 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Intact downloads from mirrored hosts were reported as checksum failures.**
+  Large extracts are redirected to a mirror that serves the same
+  `<region>-latest.osm.pbf` name, so the resolved URL never carries a dated
+  filename while the sidecar beside it names the build it describes. Comparing
+  those names rejected every such download, even when the file was byte-perfect
+  — Geofabrik's Germany extract failed on every attempt. Verification now lets
+  the digest decide: the file is hashed once, checked against the sidecar beside
+  the alias, and against the one beside the resolved build when the first
+  describes another build. A mismatch against a sidecar that names the served
+  file is still a corrupt download and is still quarantined.
+
+---
+
 ## [1.1.0] - 2026-08-20
 
 Highlights: exclusion filtering as a second, inverted pass; a job queue that
