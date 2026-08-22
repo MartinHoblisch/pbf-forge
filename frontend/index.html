@@ -695,6 +695,7 @@ footer .credits-sep { color: var(--border); }
             <label><input type="checkbox" id="geo-ways"> Ways</label>
             <label><input type="checkbox" id="geo-relations"> Relations</label>
           </div>
+          <p class="info" style="margin-top:.35rem" data-i18n="relations_hint">Relations change what the filter matches, not what is exported. Only multipolygon and boundary relations have a geometry; the rest contribute their member ways.</p>
         </div>
 
         <div class="form-group">
@@ -1031,6 +1032,7 @@ const TRANSLATIONS = {
     radio_all: 'Alles expandieren',
     radio_manual: 'Manuell auswählen',
     geojson_mode_hint: 'Für GeoJSON sind <strong>Standard</strong> und <strong>Alles expandieren</strong> identisch.',
+    relations_hint: 'Relationen ändern, was der Filter trifft, nicht was exportiert wird. Nur Multipolygon- und Boundary-Relationen haben eine Geometrie; die übrigen steuern ihre Member-Ways bei.',
     pbf_mode_hint: 'Für PBF wird der Attribut-Modus ignoriert. QGIS/GDAL zeigt immer sein eigenes Schema.',
     tooltip_standard: 'Schreibt jedes Format mit den Standardeinstellungen von GDAL (GeoJSON/GeoPackage) bzw. osmium (PBF). Tags außerhalb der Standardschlüssel landen gesammelt in einer kompakten other_tags-Spalte.',
     tooltip_expand_all: 'Jeder OSM-Tag wird zu einer eigenen Spalte. Nützlich für detaillierte Analysen, bei vielen Tags entstehen daraus aber hunderte Spalten, die bei großen Quelldaten Ausgabegröße und Laufzeit in die Höhe treiben. Für PBF nicht verfügbar.',
@@ -1216,6 +1218,7 @@ const TRANSLATIONS = {
     radio_all: 'Expand all',
     radio_manual: 'Select manually',
     geojson_mode_hint: 'For GeoJSON, <strong>Standard</strong> and <strong>Expand all</strong> are identical.',
+    relations_hint: 'Relations change what the filter matches, not what is exported. Only multipolygon and boundary relations have a geometry; the rest contribute their member ways.',
     pbf_mode_hint: 'For PBF, the attribute mode is ignored. QGIS/GDAL always shows its own schema.',
     tooltip_standard: 'Writes each format with the default settings of GDAL (GeoJSON/GeoPackage) or osmium (PBF). Tags outside the curated keys are folded into one compact other_tags column.',
     tooltip_expand_all: 'Every OSM tag becomes a column of its own. Useful for detailed analysis, but tag-rich data runs to hundreds of columns, and on a large extract that costs both output size and run time. Not available for PBF.',
