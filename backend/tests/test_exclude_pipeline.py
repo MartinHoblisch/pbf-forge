@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from unittest.mock import AsyncMock
 
@@ -219,6 +220,10 @@ _BOUNDARY_CUT_OSM = """\
 
 @pytest.mark.integration
 @pytest.mark.docker
+@pytest.mark.skipif(
+    shutil.which("ogr2ogr") is None,
+    reason="GeoPackage output needs ogr2ogr; the count itself comes from osmium export",
+)
 async def test_a_boundary_cut_way_is_counted_not_swallowed(tmp_data_dir):
     """Way 20 references a node outside the file, so it has no geometry.
 
