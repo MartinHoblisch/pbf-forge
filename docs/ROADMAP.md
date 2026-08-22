@@ -15,7 +15,7 @@ Features under consideration for future releases. Open an [Issue](https://github
 - **FlatGeobuf export.** A streamable binary vector format, and a better fit than GeoJSON for web viewers.
 - **Tag histogram.** Count tag values across the current extract before filtering, so you can explore the data without running a full filter and export cycle. This would be a local histogram over the downloaded PBF, not a wrapper around taginfo.
 - **Merge tool.** Combine two filtered PBFs before export, for example a roads layer with a POI layer.
-- **Incremental PBF updates.** Keep a downloaded PBF current by applying daily Geofabrik `.osc.gz` osmChange diffs instead of re-downloading the whole file.
+- **Incremental PBF updates.** Keep a downloaded PBF current by applying `.osc.gz` osmChange diffs instead of re-downloading the whole file, wherever the host publishes them.
 
 ## Explicit non-goals
 
