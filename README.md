@@ -20,30 +20,15 @@ PBF Forge is that pipeline with a form in front of it. It downloads the extract,
 
 It grew out of needing reproducible tag-filtered extracts for small GIS jobs often enough that assembling the pipeline by hand each time stopped being reasonable.
 
-<img src="docs/assets/screenshots/filtermanager.PNG" alt="The filter form: include tags, exclude tags, geometry types, attribute mode and output formats" width="100%">
+<img src="docs/assets/gif/pbf-forge-demo.gif" alt="A Geofabrik download URL is pasted into PBF Forge, the extract downloads, the filter form runs a highway filter over it, and the resulting GeoPackage opens in QGIS" width="100%">
 
-## Use this if
-
-- You want country-sized or continent-sized extracts, where Overpass is the wrong tool.
-- You want the same filter to be repeatable next month, with a record of what produced each file.
-- You would rather click checkboxes than remember `--index-type=sparse_file_array`.
-- You are handing the job to somebody who does not use a terminal.
-
-## Do not use this if
-
-- You need a live query against current OSM data. Extracts are snapshots, hours to days old.
-- You need spatial predicates, a bounding box, or anything geometric. Filtering is by tag only.
-- You want a hosted service. This runs on your machine, and only on your machine.
-- You already know osmium and only ever run one filter. The container buys you nothing.
-
-> [!NOTE]
-> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
+<sub>Paste a download URL, pick the tags, open the GeoPackage in QGIS.</sub>
 
 ## Quickstart
 
 Needs Docker Desktop or Docker Engine 24 or newer. Works on Windows and Linux.
 
-Linux and macOS:
+Linux:
 
 ```bash
 git clone https://github.com/MartinHoblisch/pbf-forge.git
@@ -62,6 +47,23 @@ start.bat
 Either way the browser opens at `http://localhost:8000` once the container is ready. The first start builds the image, which takes a few minutes. Stop with the Quit button in the header, or with `stop.sh` / `stop.bat`.
 
 Use the launchers rather than `docker compose up`: they create the config file and the data directory that a bare compose run skips.
+
+## Use this if
+
+- You want country-sized or continent-sized extracts, where Overpass is the wrong tool.
+- You want the same filter to be repeatable next month, with a record of what produced each file.
+- You would rather click checkboxes than remember `--index-type=sparse_file_array`.
+- You are handing the job to somebody who does not use a terminal.
+
+## Do not use this if
+
+- You need a live query against current OSM data. Extracts are snapshots, hours to days old.
+- You need spatial predicates, a bounding box, or anything geometric. Filtering is by tag only.
+- You want a hosted service. This runs on your machine, and only on your machine.
+- You already know osmium and only ever run one filter. The container buys you nothing.
+
+> [!NOTE]
+> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
 
 ## Your first filter
 

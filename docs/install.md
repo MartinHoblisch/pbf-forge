@@ -25,7 +25,7 @@ offer your drive letters. If you would rather not hand the container that
 view, start it with `docker compose up` instead; the data directory still
 works, the picker just has nothing to list.
 
-## Linux and macOS
+## Linux
 
 ```bash
 git clone https://github.com/MartinHoblisch/pbf-forge.git

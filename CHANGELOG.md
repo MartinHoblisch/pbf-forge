@@ -74,7 +74,7 @@ not support.
   written.
 - **Throughput while a job runs**, in place of the countdown that used to be
   shown.
-- **The browser opens by itself on Linux and macOS** once the server answers,
+- **The browser opens by itself on Linux** once the server answers,
   which `start.bat` already did on Windows.
 - **Exclusion filtering.** A second tag set ("OSM tags to exclude") runs as an inverted `osmium tags-filter --invert-match` pass after the include pass, producing the set difference. Example: include `railway=rail`, exclude `railway:traffic_mode=passenger` to extract a freight-usable rail network. Empty exclude field skips the second pass entirely (backwards compatible).
 - Exclude tags embedded in GeoPackage and GeoJSON provenance metadata for reproducibility.

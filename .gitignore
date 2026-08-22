@@ -128,3 +128,8 @@ local/
 .clinerules/
 .opencode/
 .github/copilot-instructions.md
+
+# === Screen recording sources ===
+# ScreenToGif project files. The exported GIF is committed, the editable
+# project behind it is not.
+*.stg
