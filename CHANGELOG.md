@@ -18,6 +18,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
   holds `n`, `w` or `r`, so `(osm_type, osm_id)` identifies a feature. `osm_id`
   keeps its integer type and its meaning, so queries that never needed
   uniqueness are unaffected.
+- **A count of features dropped for geometry errors.** A way whose nodes are
+  cut off at the edge of the extract has no coordinates to build a line from,
+  so `osmium export` skips it. It always has; nothing said so, and a run that
+  quietly wrote fewer rows than expected looked exactly like a run that did
+  not. osmium reports the number under `--verbose`, which the pipeline already
+  passed, so the figure existed and reached nobody. The report beside every
+  output now carries a "Dropped features" line whenever the count is not zero.
+  `-e` is deliberately not passed: on a country-sized extract it can emit tens
+  of thousands of lines.
 
 ### Removed
 

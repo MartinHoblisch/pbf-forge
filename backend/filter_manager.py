@@ -254,6 +254,7 @@ class FilterJob:
     job_started_at: float | None = None
     timeout_seconds: float | None = None
     queue_position: int | None = None
+    geometry_errors: int | None = None
     output_bytes: int | None = None
     bytes_read: int | None = None
     progress_line: str | None = None
@@ -331,6 +332,21 @@ class FilterJob:
         d.pop("log", None)
         d.pop("output_files_host", None)  # derived from current config, never stored
         return d
+
+
+_GEOMETRY_ERRORS_RE = re.compile(r"Encountered (\d+) errors\.")
+
+
+def _parse_geometry_errors(line: str) -> int | None:
+    """Return the count from osmium's verbose summary, or None for other lines.
+
+    osmium export prints "Encountered N errors." once per run under --verbose.
+    Each error is a feature it could not build a geometry for, most often a way
+    whose nodes are cut off at the edge of the extract. The feature is skipped,
+    and nothing else says so.
+    """
+    m = _GEOMETRY_ERRORS_RE.search(line)
+    return int(m.group(1)) if m else None
 
 
 def _detect_memory_limit_bytes() -> int | None:
@@ -1379,6 +1395,17 @@ class FilterManager:
         data_timestamp = self._source_data_timestamp(source)
         if data_timestamp:
             lines += _report_row("Data timestamp", [data_timestamp])
+        # Truthiness, not "is not None": a run that dropped nothing should not
+        # carry a row saying so.
+        if job.geometry_errors:
+            lines += _report_row(
+                "Dropped features",
+                [
+                    f"{job.geometry_errors:,} had no usable geometry and are "
+                    "not in this file (most often ways cut at the extract "
+                    "boundary)"
+                ],
+            )
         lines.append("")
 
         lines.append("FILTER")
@@ -1563,6 +1590,9 @@ class FilterManager:
                         job.progress_line = text
                     else:
                         job.append_log(text + "\n")
+                        errors = _parse_geometry_errors(text)
+                        if errors is not None:
+                            job.geometry_errors = errors
                 now = loop.time()
                 if now - last_broadcast >= 0.5:
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})

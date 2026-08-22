@@ -392,3 +392,21 @@ def test_presets_file_shape_is_json_if_present():
     presets = REPO / "config" / ".osm_tool_presets.json"
     if presets.is_file() and presets.stat().st_size:
         json.loads(_read(presets))
+
+
+def test_dropped_feature_count_is_documented_and_written():
+    """limits.md promises a "Dropped features" line in the report.
+
+    The count comes from osmium's verbose summary, parsed by
+    _parse_geometry_errors() and written by the report builder. If either goes,
+    the promise in limits.md is empty.
+    """
+    docs = _read(REPO / "docs" / "limits.md")
+    src = _read(REPO / "backend" / "filter_manager.py")
+    assert "Dropped features" in docs, "limits.md no longer describes the count"
+    assert '"Dropped features"' in src, (
+        "limits.md promises a Dropped features line that the report no longer writes"
+    )
+    assert "_parse_geometry_errors" in src, (
+        "nothing parses osmium's error count, so the report line can never fire"
+    )

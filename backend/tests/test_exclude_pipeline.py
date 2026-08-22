@@ -198,3 +198,59 @@ async def test_exclude_survives_a_relation_that_references_the_excluded_way(
     assert not _way_present(out_pbf, 102), (
         "passenger way 102 must not come back through relation 201"
     )
+
+
+_BOUNDARY_CUT_OSM = """\
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version='0.6' generator='test'>
+  <node id='1' lat='52.000' lon='13.000' version='1'/>
+  <node id='2' lat='52.010' lon='13.010' version='1'/>
+  <way id='10' version='1'>
+    <nd ref='1'/><nd ref='2'/>
+    <tag k='highway' v='primary'/>
+  </way>
+  <way id='20' version='1'>
+    <nd ref='1'/><nd ref='999'/>
+    <tag k='highway' v='primary'/>
+  </way>
+</osm>
+"""
+
+
+@pytest.mark.integration
+@pytest.mark.docker
+async def test_a_boundary_cut_way_is_counted_not_swallowed(tmp_data_dir):
+    """Way 20 references a node outside the file, so it has no geometry.
+
+    osmium export skips it and writes nothing about it anywhere the user
+    looks. Without the count there is no way to notice a row is missing.
+    """
+    osm_file = tmp_data_dir / "cut.osm"
+    osm_file.write_text(_BOUNDARY_CUT_OSM, encoding="utf-8")
+    pbf_file = tmp_data_dir / "cut.osm.pbf"
+    subprocess.run(
+        ["osmium", "cat", str(osm_file), "-o", str(pbf_file), "--overwrite"],
+        capture_output=True,
+        check=True,
+    )
+
+    fm = FilterManager(ws_manager=AsyncMock())
+    job = fm.create_job(
+        source_files=["cut.osm.pbf"],
+        tags=["highway=primary"],
+        exclude_tags=[],
+        geometry_types=["ways"],
+        suffix="cut",
+        output_formats=["gpkg"],
+        output_dir=str(tmp_data_dir),
+        columns_mode="other_tags",
+        manual_keys=[],
+    )
+    await fm.run_job(job)
+
+    assert job.status == "done", f"Job failed: {job.error}"
+    assert job.geometry_errors == 1
+
+    reports = list((tmp_data_dir / "gpkg").glob("*.txt"))
+    assert reports, "expected a report beside the output"
+    assert "Dropped features" in reports[0].read_text(encoding="utf-8")
