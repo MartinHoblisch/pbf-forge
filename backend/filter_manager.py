@@ -689,6 +689,14 @@ class FilterManager:
                                 str(pbf_work),
                                 *excl_exprs,
                                 "--invert-match",
+                                # -R: without it, --invert-match completes the
+                                # references of every surviving object, so a
+                                # relation still in the file re-adds the member
+                                # ways the exclude pass just removed. Nodes that
+                                # surviving ways need are kept on their own
+                                # merit: an untagged node never matches a tag
+                                # expression, so inversion keeps it anyway.
+                                "-R",
                                 "-o",
                                 str(excl_tmp),
                                 "--overwrite",
@@ -748,6 +756,14 @@ class FilterManager:
                                 str(intermediate),
                                 *excl_exprs,
                                 "--invert-match",
+                                # -R: without it, --invert-match completes the
+                                # references of every surviving object, so a
+                                # relation still in the file re-adds the member
+                                # ways the exclude pass just removed. Nodes that
+                                # surviving ways need are kept on their own
+                                # merit: an untagged node never matches a tag
+                                # expression, so inversion keeps it anyway.
+                                "-R",
                                 "-o",
                                 str(excl_tmp),
                                 "--overwrite",
