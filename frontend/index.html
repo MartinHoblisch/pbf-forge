@@ -1071,6 +1071,7 @@ const TRANSLATIONS = {
     preset_delete: 'Löschen',
     status_up_to_date: 'Aktuell',
     status_update_available: 'Update verfügbar',
+    age_day: 'Tag', age_week: 'Woche', age_month: 'Monat', age_year: 'Jahr',
     age_days: 'Tage', age_weeks: 'Wochen', age_months: 'Monate', age_years: 'Jahre', age_lt1day: '< 1 Tag', age_old: 'veraltet',
     status_not_downloaded: 'Nicht vorhanden',
     status_downloading: 'Lädt …',
@@ -1254,6 +1255,7 @@ const TRANSLATIONS = {
     preset_delete: 'Delete',
     status_up_to_date: 'Up to date',
     status_update_available: 'Update available',
+    age_day: 'day', age_week: 'week', age_month: 'month', age_year: 'year',
     age_days: 'days', age_weeks: 'weeks', age_months: 'months', age_years: 'years', age_lt1day: '< 1 day', age_old: 'outdated',
     status_not_downloaded: 'Not downloaded',
     status_downloading: 'Downloading…',
@@ -1624,14 +1626,19 @@ function fmtSpeed(bps) {
   if (bps >= 1e6) return (bps / 1e6).toFixed(1) + ' MB/s';
   return (bps / 1e3).toFixed(0) + ' KB/s';
 }
+// English and German both distinguish only one from many, so a comparison
+// covers every unit used here.
+function ageUnit(n, one, many) {
+  return n + '\u00a0' + t(n === 1 ? one : many);
+}
 function fmtAge(serverMtime, localMtime) {
   if (!serverMtime || !localMtime) return '';
   const days = Math.floor((new Date(serverMtime) - new Date(localMtime)) / 86400000);
   if (days < 1)   return t('age_lt1day');
-  if (days < 7)   return days + '\u00a0' + t('age_days');
-  if (days < 30)  return Math.floor(days / 7) + '\u00a0' + t('age_weeks');
-  if (days < 365) return Math.floor(days / 30) + '\u00a0' + t('age_months');
-  return Math.floor(days / 365) + '\u00a0' + t('age_years');
+  if (days < 7)   return ageUnit(days, 'age_day', 'age_days');
+  if (days < 30)  return ageUnit(Math.floor(days / 7), 'age_week', 'age_weeks');
+  if (days < 365) return ageUnit(Math.floor(days / 30), 'age_month', 'age_months');
+  return ageUnit(Math.floor(days / 365), 'age_year', 'age_years');
 }
 function fmtEta(sec) {
   if (!sec || sec <= 0) return '';
