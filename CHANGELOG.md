@@ -131,22 +131,29 @@ not support.
 
 ## [1.0.0] - 2026-05-02
 
-> **Correction, 2026-08-20.** Five statements in this entry did not describe
+> **Correction, 2026-08-20.** Nine statements in this entry did not describe
 > what 1.0.0 shipped. They are corrected in place and marked, rather than
 > silently rewritten, so the record stays readable against the released tag.
 > The tag `v1.0.0` itself is unchanged.
 
 ### Added
 
+- Source selection by PBF URL. **Corrected:** the original entry listed a
+  "Geofabrik region browser with continent → country → sub-region tree and
+  file sizes". No browser was built. 1.0.0 took a download URL typed into a
+  single field, with Geofabrik as the suggested source.
 - PBF download with MD5 checksum verification (fail-closed on mismatch).
 - Tag filtering via `osmium tags-filter`. **Corrected:** the original entry
   claimed "full `n/`, `w/`, `r/`, `nwr/` expression syntax". The tool builds
   the geometry prefix itself from the geometry-type checkboxes and puts it in
   front of every expression, so an expression typed with its own prefix is
   prefixed twice and matches nothing.
-- Named filter presets.
+- Filter history and named presets. **Corrected:** the original entry said the
+  history kept the last 50 expressions. The store keeps 200.
 - Export to GeoPackage, GeoJSON and PBF. **Corrected:** the original entry
-  omitted PBF, which 1.0.0 already offered.
+  omitted PBF, which 1.0.0 already offered, and listed GeoParquet, which it did
+  not. GeoParquet appeared only in a hint suggesting it as the more efficient
+  format.
   - GeoPackage: one table per geometry type as produced by the GDAL OSM
     driver, CRS EPSG:4326, ODbL attribution + provenance in `gpkg_metadata`.
   - GeoJSON: WGS84. **Corrected:** the original entry claimed RFC 7946
@@ -155,7 +162,8 @@ not support.
     original entry named thresholds of 500 MB and 1 M features, neither of
     which appears in the code.
 - Live WebSocket progress for all long-running phases; a running job is
-  cancellable.
+  cancellable. **Corrected:** the original entry said each phase was
+  cancellable. Cancellation applies to the job.
 - A warning for source extracts over 1 GB that filtering may take hours
   depending on hardware. **Corrected:** the original entry called this a
   "size-based ETA hint". It estimates nothing.
