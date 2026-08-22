@@ -16,9 +16,9 @@ Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a
 
 ## The problem
 
-You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass times out on that area. The osmium and GDAL route works, but it takes four commands with flags you look up every time. The important one is the tag expression, and its syntax has to be exactly right or you get no result at all.
+You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass is built for queries, not for pulling a whole country, and public instances enforce that with time limits. The osmium and GDAL route works, but it takes four commands with flags you look up every time. The important one is the tag expression, and its syntax has to be exactly right or you get no result at all.
 
-PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with ogr2ogr, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself, so the result is the same result.
+PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with ogr2ogr, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself. The pipeline makes a handful of choices on top: one layer per file, the OSM id as the only attribute, and tags you did not name folded into a JSON column. [docs/filtering.md](docs/filtering.md) lists them.
 
 <img src="docs/assets/gif/pbf-forge-demo.gif" alt="A Geofabrik download URL is pasted into PBF Forge, the extract downloads, the filter form runs a highway filter over it, and the resulting GeoPackage opens in QGIS" width="100%">
 
@@ -55,6 +55,7 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 - **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
 - Queues jobs, keeps the job history across a restart, and has an English and a German interface. A job that was running when the backend stopped is marked failed, not resumed.
 - **Warns** before a filter whose sources are large relative to the memory the container may use, which is the cgroup limit rather than the host's total.
+- The load-bearing claims in this README and in `docs/` are bound to the code that makes them true by [backend/tests/test_docs_claims.py](backend/tests/test_docs_claims.py). A change that invalidates one fails CI instead of quietly shipping.
 
 ## Your first filter
 
