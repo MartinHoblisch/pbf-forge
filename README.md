@@ -46,6 +46,9 @@ Either way the browser opens at `http://localhost:8000` once the container is re
 
 Use the launchers rather than `docker compose up`: they create the config file and the data directory that a bare compose run skips.
 
+> [!NOTE]
+> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
+
 ## What it does
 
 - **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
@@ -71,23 +74,6 @@ So, all footpaths in Liechtenstein:
 5. Output format: GeoPackage.
 
 The result is one layer named after the output file, in EPSG:4326, next to a `.txt` report describing the run. [docs/filtering.md](docs/filtering.md) covers the expression syntax, the exclude pass and the three attribute modes.
-
-## Use this if
-
-- You want country-sized or continent-sized extracts, where Overpass is the wrong tool.
-- You want the same filter to be repeatable next month, with a record of what produced each file.
-- You would rather click checkboxes than remember `--index-type=sparse_file_array`.
-- You are handing the job to somebody who does not use a terminal.
-
-## Do not use this if
-
-- You need a live query against current OSM data. Extracts are snapshots, hours to days old.
-- You need spatial predicates, a bounding box, or anything geometric. Filtering is by tag only.
-- You want a hosted service. This runs on your machine, and only on your machine.
-- You already know osmium and only ever run one filter. The container buys you nothing.
-
-> [!NOTE]
-> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
 
 ## Limits
 
