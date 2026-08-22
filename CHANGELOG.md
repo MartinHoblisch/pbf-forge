@@ -9,7 +9,29 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The filter form starts with nothing preselected.** Ways, Relations and
+  GeoPackage were checked when the form opened. The Relations default was the
+  costly one: checking it changes what the filter matches but not what the
+  export writes, because `osmium export` produces points, linestrings and
+  polygons and drops relations that carry no geometry. A user who never touched
+  the box paid for matching relations and saw nothing for it. Every box now
+  starts empty, so a run states which geometry types and which formats were
+  actually asked for.
+
 ### Fixed
+
+- **A small memory limit did not cap the job queue.** `_compute_max_parallel`
+  documents its result as `max(1, min(cpu//4, ram_gb//8))` but skipped the
+  memory term entirely below 8 GB, and the shipped container is capped at 4 GB.
+  On a machine with many cores the queue sized itself from cores alone and
+  would start several filters, each able to peak at 2 GB, inside that 4 GB. A
+  container under 8 GB now runs one job at a time.
+- **The preset form accepted a preset that could not match anything.** It sent
+  an empty geometry list to the API and silently substituted GeoPackage for a
+  missing output format. It now refuses both, with the same messages the filter
+  form already used.
 
 - **Queue sizing and the memory warning read the host's RAM, not the
   container's limit.** Both took the total from `/proc/meminfo`, which inside a
@@ -27,7 +49,6 @@ Versioning: [Semantic Versioning](https://semver.org/).
   is the configuration the rail-network recipe recommends. Both exclude passes
   now run with `-R`. Nodes are unaffected: an untagged node never matches a tag
   expression, so inversion keeps it without reference completion.
-
 - **Intact downloads from mirrored hosts were reported as checksum failures.**
   Large extracts are redirected to a mirror that serves the same
   `<region>-latest.osm.pbf` name, so the resolved URL never carries a dated
@@ -52,6 +73,12 @@ Versioning: [Semantic Versioning](https://semver.org/).
   and that `other_tags` holds JSON rather than the HSTORE of GDAL's OSM driver.
 - Replaced idiomatic and inverted phrasing throughout the README and `docs/`
   with plain wording, for readers whose English is not native.
+- Reworked the README: a demo recording in place of the static screenshot, the
+  logo above the title, Quickstart directly after the problem statement, and
+  the audience, benchmark and alternatives sections removed or moved into
+  `docs/`. The interface tour follows the order the tabs are used in.
+- Inline code is now reserved for strings that have to be reproduced exactly.
+  Tool names, format names and quoted text are set as ordinary prose.
 
 ---
 
