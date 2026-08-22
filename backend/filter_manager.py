@@ -33,6 +33,7 @@ from config import (
     DATA_DIR,
     TEMP_DIR,
     USER_CONFIG_FILE,
+    VERSION,
 )
 from download_manager import source_url
 from filter_history import FilterHistory
@@ -334,6 +335,45 @@ class FilterJob:
         return d
 
 
+def _detect_memory_limit_bytes() -> int | None:
+    """Memory this process may actually use, in bytes.
+
+    Inside a container /proc/meminfo reports the host's memory, so a 4 GB
+    container on a 32 GB machine reads 32 GB and is then killed at 4. The
+    cgroup limit is the figure the kernel enforces. Both are structural,
+    load-independent bounds, so the smaller of the two is the honest ceiling
+    and keeps queue sizing and the pre-flight warning consistent.
+
+    Returns None when neither source can be read.
+    """
+    values: list[int] = []
+    for path in (
+        Path("/sys/fs/cgroup/memory.max"),  # cgroup v2
+        Path("/sys/fs/cgroup/memory/memory.limit_in_bytes"),  # cgroup v1
+    ):
+        try:
+            raw = path.read_text().strip()
+        except OSError:
+            continue
+        if raw == "max":  # v2 spelling for "no limit"
+            continue
+        try:
+            limit = int(raw)
+        except ValueError:
+            continue
+        # v1 spells "no limit" as a sentinel just under 2**63.
+        if 0 < limit < 2**62:
+            values.append(limit)
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                values.append(int(line.split()[1]) * 1024)
+                break
+    except (OSError, ValueError, IndexError):
+        pass
+    return min(values) if values else None
+
+
 def _compute_max_parallel() -> int:
     """Return max parallel jobs: max(1, min(cpu//4, ram_gb//8))."""
     try:
@@ -341,17 +381,15 @@ def _compute_max_parallel() -> int:
         cpu = os.cpu_count() or 1 if quota == "max" else max(1, int(int(quota) / int(period)))
     except Exception:
         cpu = os.cpu_count() or 1
-    try:
-        for line in Path("/proc/meminfo").read_text().splitlines():
-            if line.startswith("MemTotal:"):
-                ram_gb = int(line.split()[1]) // (1024 * 1024)
-                break
-        else:
-            ram_gb = 0
-    except Exception:
-        ram_gb = 0
+    ram = _detect_memory_limit_bytes()
+    ram_gb = ram // (1024**3) if ram else 0
     cap = max(1, cpu // 4)
-    if ram_gb >= 8:
+    if ram_gb:
+        # Below 8 GB this floors to 0 and the max() below lifts it to 1, which
+        # is the intended answer: a single filter can peak at 2 GB, so a 4 GB
+        # container runs one job at a time however many cores it has. Skipping
+        # the cap under 8 GB instead would leave the shipped container sized by
+        # CPU alone.
         cap = min(cap, ram_gb // 8)
     return max(1, cap)
 
@@ -522,17 +560,20 @@ class FilterManager:
         non-PBF format on a small-RAM machine is the combination that OOMs in
         practice. PBF-only jobs stream end-to-end and are always safe.
 
-        RAM is measured as MemTotal (not MemAvailable) — a deliberate choice.
-        Using MemTotal gives a deterministic, load-independent structural bound
-        that makes the pre-flight warning reproducible regardless of current
-        system load. This is consistent with how _compute_max_parallel() sizes
-        the job queue. The key is therefore named total_ram_bytes, not
-        available_ram_bytes.
+        RAM is measured as a total, not as what is free right now — a
+        deliberate choice. A total is a deterministic, load-independent
+        structural bound, which makes the pre-flight warning reproducible
+        regardless of current system load. This is consistent with how
+        _compute_max_parallel() sizes the job queue. The key is therefore
+        named total_ram_bytes, not available_ram_bytes.
+
+        The total is the cgroup limit where one applies, because that is the
+        figure the container is killed at; see _detect_memory_limit_bytes.
         """
         non_pbf = [f for f in output_formats if f != "pbf"]
         if not non_pbf:
             return None
-        ram = self._meminfo_total_bytes()
+        ram = self._memory_limit_bytes()
         if ram is None:
             return None
         total = sum(self._source_size(s) for s in source_files)
@@ -546,14 +587,8 @@ class FilterManager:
         return None
 
     @staticmethod
-    def _meminfo_total_bytes() -> int | None:
-        try:
-            for line in Path("/proc/meminfo").read_text().splitlines():
-                if line.startswith("MemTotal:"):
-                    return int(line.split()[1]) * 1024
-        except (OSError, ValueError, IndexError):
-            return None
-        return None
+    def _memory_limit_bytes() -> int | None:
+        return _detect_memory_limit_bytes()
 
     async def run_job(self, job: FilterJob) -> None:
         if self._running_count >= self._max_parallel:
@@ -688,6 +723,14 @@ class FilterManager:
                                 str(pbf_work),
                                 *excl_exprs,
                                 "--invert-match",
+                                # -R: without it, --invert-match completes the
+                                # references of every surviving object, so a
+                                # relation still in the file re-adds the member
+                                # ways the exclude pass just removed. Nodes that
+                                # surviving ways need are kept on their own
+                                # merit: an untagged node never matches a tag
+                                # expression, so inversion keeps it anyway.
+                                "-R",
                                 "-o",
                                 str(excl_tmp),
                                 "--overwrite",
@@ -747,6 +790,14 @@ class FilterManager:
                                 str(intermediate),
                                 *excl_exprs,
                                 "--invert-match",
+                                # -R: without it, --invert-match completes the
+                                # references of every surviving object, so a
+                                # relation still in the file re-adds the member
+                                # ways the exclude pass just removed. Nodes that
+                                # surviving ways need are kept on their own
+                                # merit: an untagged node never matches a tag
+                                # expression, so inversion keeps it anyway.
+                                "-R",
                                 "-o",
                                 str(excl_tmp),
                                 "--overwrite",
@@ -1005,8 +1056,8 @@ class FilterManager:
         consumer needs and is unrelated to when the file was fetched.
 
         Falls back to the file's mtime, which is not the download time either —
-        DownloadManager stamps the server's Last-Modified onto the file, so for
-        a Geofabrik extract this is its publication time.
+        DownloadManager stamps the server's Last-Modified onto the file, so on
+        a host that sets it truthfully this is the extract's publication time.
         """
         path = DATA_DIR / source
         try:
@@ -1374,7 +1425,7 @@ class FilterManager:
         PBF: no-op (binary format, no metadata container).
         """
         provenance = {
-            "generated_by": "PBF Forge v1.0.0",
+            "generated_by": f"PBF Forge v{VERSION}",
             "source": source_file,
             "tags": tags,
             "exclude_tags": exclude_tags,
@@ -1531,7 +1582,12 @@ class FilterManager:
                 lines.append(f"  {label}".ljust(_REPORT_WIDTH - len(dur)) + dur)
             lines.append("")
 
-        lines += ["-" * _REPORT_WIDTH, "Generated by PBF Forge v1.0.0", ATTRIBUTION, ""]
+        lines += [
+            "-" * _REPORT_WIDTH,
+            f"Generated by PBF Forge v{VERSION}",
+            ATTRIBUTION,
+            "",
+        ]
         return "\n".join(lines)
 
     async def cancel_job(self, job_id: str) -> bool:

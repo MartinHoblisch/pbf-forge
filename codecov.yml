@@ -1,0 +1,29 @@
+# Without this file Codecov uses `target: auto` for the patch check, which
+# fails a pull request for a single uncovered line in the diff. That turns a
+# defensive `except` branch into a red build and rewards tests written to move
+# the number rather than to catch a defect.
+#
+# 85% is the bar for both checks. The suite sits around 95%, so the margin is
+# for changes that legitimately add hard-to-reach lines, not a licence to let
+# coverage drift: a drop below 85% still fails.
+
+coverage:
+  status:
+    project:
+      default:
+        target: 85%
+        threshold: 1%
+        if_ci_failed: error
+    patch:
+      default:
+        target: 85%
+        threshold: 1%
+        if_ci_failed: error
+
+comment:
+  layout: "condensed_header, diff, flags"
+  require_changes: true
+
+ignore:
+  - "backend/tests/**"
+  - "frontend/**" # JavaScript, not covered by the Python suite

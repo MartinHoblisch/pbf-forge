@@ -117,9 +117,19 @@ config/jobs/
 # === GeoParquet ===
 *.parquet
 
-# === Local-only / personal ===
+# === Scratch space ===
+# Anything under local/ is a working file and is never part of a release.
 local/
-.scan-patterns.local
-CLAUDE.md
-.claude/
-docs/superpowers/
+
+# === Editor and AI assistant rule files ===
+# Generated locally per developer; not part of the project.
+.cursor/
+.windsurf/
+.clinerules/
+.opencode/
+.github/copilot-instructions.md
+
+# === Screen recording sources ===
+# ScreenToGif project files. The exported GIF is committed, the editable
+# project behind it is not.
+*.stg

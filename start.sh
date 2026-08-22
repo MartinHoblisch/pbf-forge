@@ -65,7 +65,7 @@ fi
 echo "PBF Forge running at: $URL"
 xdg-open "$URL" >/dev/null 2>&1 \
     || python3 -m webbrowser "$URL" >/dev/null 2>&1 \
-    || echo "Could not open a browser automatically - please open $URL manually."
+    || echo "Could not open a browser automatically. Please open $URL manually."
 
 echo "Press Ctrl+C to stop."
 wait $COMPOSE_PID

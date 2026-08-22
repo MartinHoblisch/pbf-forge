@@ -489,6 +489,39 @@ def test_verify_checksum_reports_version_skew_instead_of_corruption(tmp_data_dir
     assert not (tmp_data_dir / "germany.osm.pbf.corrupt").exists()
 
 
+def test_verify_checksum_accepts_a_mirror_that_keeps_the_alias_name(tmp_data_dir):
+    """The pattern Geofabrik serves for large extracts.
+
+    The alias redirects to a mirror that publishes the same alias name, so the
+    resolved URL never carries a dated filename. The mirror's sidecar names the
+    build it describes, which will never equal "<region>-latest.osm.pbf".
+    Comparing names there condemns an intact download; the digest is what says
+    whether the file is the one the host published.
+    """
+    content = b"intact download"
+    dest = tmp_data_dir / "germany.osm.pbf"
+    dest.write_bytes(content)
+
+    mirror_url = "https://mirror.example.org/pub/osm/germany-latest.osm.pbf"
+
+    dm = _make_dm(tmp_data_dir)
+    session = MagicMock()
+    session.get.side_effect = [
+        _md5_response("b" * 32, "germany-260524.osm.pbf"),  # alias sidecar, months stale
+        _md5_response(hashlib.md5(content).hexdigest(), "germany-260821.osm.pbf"),
+    ]
+    session.head.return_value = _head_response(mirror_url)
+
+    dm._verify_checksum(_LATEST_URL, dest, session)  # must not raise
+
+    assert [call.args[0] for call in session.get.call_args_list] == [
+        _LATEST_URL + ".md5",
+        mirror_url + ".md5",
+    ]
+    assert dest.exists()
+    assert not (tmp_data_dir / "germany.osm.pbf.corrupt").exists()
+
+
 def test_verify_checksum_accepts_sidecar_without_a_filename(tmp_data_dir):
     content = b"intact download"
     dest = tmp_data_dir / "germany.osm.pbf"

@@ -2,8 +2,8 @@
 
 The backend only ever knows `/data`, because that is where the data directory is
 bind-mounted inside the container. The user picked a very different path during
-onboarding — `H:\\pbf-forge\\data` on Windows, `/home/me/osm-data` on Linux — and
-that is the path they need in order to find a result in their file manager.
+onboarding — `D:\\osm-data` on Windows, `/home/me/osm-data` on Linux — and that
+is the path they need in order to find a result in their file manager.
 Everything printed for the user goes through here first.
 """
 
@@ -47,8 +47,8 @@ def to_host_path(container_path: str, host_root: str) -> str:
     """Map a container path below DATA_DIR onto its host equivalent.
 
     `host_root` stays a plain string on purpose: on Linux a `Path` treats
-    "H:\\pbf-forge\\data" as one long filename, so joining it with "/" would
-    produce "H:\\pbf-forge\\data/gpkg/x.gpkg". Separators are chosen explicitly.
+    "D:\\osm-data" as one long filename, so joining it with "/" would produce
+    "D:\\osm-data/gpkg/x.gpkg". Separators are chosen explicitly.
 
     Returns `container_path` unchanged when the host path is unknown or the path
     lies outside DATA_DIR — a correct container path beats a fabricated host one.

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/MartinHoblisch/pbf-forge/security/advisories/new
+    about: Report privately through a security advisory, not as a public issue.
+  - name: Documentation
+    url: https://github.com/MartinHoblisch/pbf-forge/tree/main/docs
+    about: Installation, filtering and limits before you file.

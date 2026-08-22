@@ -1,0 +1,21 @@
+# Allowlist, not a denylist. The image only ever needs the two trees the
+# Dockerfile copies (backend/, frontend/), so everything else is excluded up
+# front and cannot reach the daemon by accident.
+#
+# This matters because DATA_DIR defaults into the checkout: without this file,
+# a downloaded extract sitting in ./data is sent to the daemon on every build,
+# and start.sh / start.bat rebuild on every start.
+*
+
+!backend
+!frontend
+
+# Build and test residue inside the two allowed trees. None of it is used at
+# runtime, and __pycache__ from the host carries paths and a Python ABI that
+# do not match the image.
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov

@@ -10,6 +10,11 @@ import os
 import time
 from pathlib import Path
 
+# The release this build is. Reaches users through the download user agent, the
+# provenance metadata embedded in every output file, and the report written
+# beside it. Raising it here raises it everywhere.
+VERSION = "1.1.0"
+
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/app/config"))
 TEMP_DIR = Path(os.getenv("TEMP_DIR", str(DATA_DIR / "tmp")))
@@ -40,12 +45,17 @@ MAX_DOWNLOAD_SIZE = int(os.getenv("MAX_DOWNLOAD_SIZE", str(100 * 1024 * 1024 * 1
 # Buffer required free on disk after a download.
 MIN_FREE_DISK_BUFFER = 500 * 1024 * 1024  # 500 MB
 
-# Sent on all outbound HTTP requests so Geofabrik can identify traffic source.
-USER_AGENT = "pbf-forge/1.0.0 (+https://github.com/MartinHoblisch/pbf-forge)"
+# Sent on all outbound HTTP requests, so whichever host is being asked can tell
+# the traffic apart and has somewhere to complain.
+USER_AGENT = f"pbf-forge/{VERSION} (+https://github.com/MartinHoblisch/pbf-forge)"
 
-# Continental extracts offered out of the box. Each continent is keyed twice:
-# under Geofabrik's own "-latest" filename and under the shortened name this
-# tool writes to disk, so a lookup succeeds whichever spelling it starts from.
+# Fallback URLs for eight filenames, never offered as a choice and never shown.
+# They let a file that turns up without a recorded URL still be checked for
+# updates, which happens when one is copied into the data directory by hand.
+# Each name is keyed twice, under the "-latest" spelling the host serves and
+# under the shortened one this tool writes to disk, so a lookup succeeds
+# whichever it starts from. A URL the user set for the same name wins and is
+# stored; see DownloadManager._save_url_mapping.
 CONTINENTAL_URLS: dict[str, str] = {
     "africa.osm.pbf": "https://download.geofabrik.de/africa-latest.osm.pbf",
     "africa-latest.osm.pbf": "https://download.geofabrik.de/africa-latest.osm.pbf",
