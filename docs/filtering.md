@@ -68,7 +68,7 @@ as a join key on its own.
 
 ## Output formats
 
-| | |
+| Format | What you get |
 |---|---|
 | GeoPackage | The default. One layer named after the output file, EPSG:4326, ODbL attribution and the full filter provenance embedded in `gpkg_metadata`. |
 | GeoJSON | Same content as text. Written through a streaming intermediate, so the only size limit is your free disk space, but large files quickly become hard to handle. Above a 200 MB source extract the interface says so. |

@@ -44,7 +44,7 @@ Log out and back in, or run `newgrp docker` in the current shell, then retry.
 
 ## Where things are stored
 
-| | |
+| What | Where |
 |---|---|
 | Downloaded extracts and outputs | The data directory, `DATA_DIR`. Defaults to `./data` inside the checkout. Change it in the interface, then restart the container so the bind mount follows. |
 | Presets, custom URLs, filter history, job state | `./config` in the checkout, mounted at `/app/config`. |

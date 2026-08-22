@@ -13,7 +13,7 @@ deeper for sub-regions.
 
 ## Footpaths for a small country
 
-| | |
+| Field | Value |
 |---|---|
 | Source | `https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf` |
 | Include | `highway=footway,pedestrian,path,steps` |
@@ -25,7 +25,7 @@ tagged nodes those ways use, as points.
 
 ## Charging stations for a whole country
 
-| | |
+| Field | Value |
 |---|---|
 | Source | `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (about 4.5 GB) |
 | Include | `amenity=charging_station` |
@@ -40,7 +40,7 @@ indexes.
 
 ## Cycling network with its relations
 
-| | |
+| Field | Value |
 |---|---|
 | Source | `https://download.geofabrik.de/europe/germany/bayern-latest.osm.pbf` |
 | Include | `route=bicycle`<br>`network=lcn,rcn,ncn,icn` |
@@ -60,7 +60,7 @@ understands relations.
 
 ## Rail network without passenger-only track
 
-| | |
+| Field | Value |
 |---|---|
 | Source | `https://download.geofabrik.de/europe-latest.osm.pbf` (about 33 GB) |
 | Include | `railway=rail` |

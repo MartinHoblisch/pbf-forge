@@ -4,7 +4,7 @@
 
 # PBF Forge
 
-Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine. Docker is all you install.
+Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine. Docker is all you need.
 
 [![CI](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml)
 [![Security](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml)
@@ -85,7 +85,7 @@ The result is one layer named after the output file, in EPSG:4326, next to a `.t
 
 ## Documentation
 
-| | |
+| Document | What is in it |
 |---|---|
 | [docs/install.md](docs/install.md) | First-time setup on Windows and Linux, data directory, resource limits |
 | [docs/filtering.md](docs/filtering.md) | Expression syntax, the exclude pass, attribute modes, the report file |
