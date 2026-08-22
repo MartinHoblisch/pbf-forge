@@ -28,6 +28,18 @@ Versioning: [Semantic Versioning](https://semver.org/).
   `-e` is deliberately not passed: on a country-sized extract it can emit tens
   of thousands of lines.
 
+### Documentation
+
+- Named the facts a reader evaluating the tool looks for and could not find:
+  the REST API under `/api` exists and is internal, with no stability promise;
+  the image carries osmium-tool 1.16 and GDAL 3.8; `MAX_DOWNLOAD_SIZE` caps a
+  download at 100 GB. Guards keep the last two matching the Dockerfile and
+  `config.py`.
+- Gave the peak disk figure a measurement instead of a shrug. Iceland (62 MB),
+  a broad `highway` filter to GeoPackage: 209 MB peak, about 3.4 times the
+  source, because the source, the filtered PBF, the streaming export and the
+  output coexist. A narrow filter needs far less.
+
 ### Removed
 
 - **Nothing is written into output files any more.** GeoPackage and GeoJSON

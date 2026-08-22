@@ -4,8 +4,19 @@
 
 Docker Desktop or Docker Engine 24 or newer, and roughly 1 GB of disk for the
 image. Extracts need their own space on top: a country needs a few GB, a
-continent tens of GB, and filtering needs extra room for temporary files while
-it runs.
+continent tens of GB.
+
+Filtering needs more room than the extract alone. The source, the filtered PBF,
+a streaming export and the finished output can exist at the same time. Measured
+on Iceland (62 MB) with a broad `highway` filter to GeoPackage, the peak was
+209 MB, about 3.4 times the source. A narrow filter that keeps little needs far
+less, because every intermediate shrinks with it. Budget four times the extract
+and a broad filter still fits.
+
+The image carries osmium-tool 1.16 and GDAL 3.8 from the Ubuntu 24.04 archive.
+Which expression forms and export options exist follows from those versions.
+Ask the container directly with
+`docker compose exec pbf-forge osmium --version`.
 
 ## Windows
 
@@ -50,6 +61,7 @@ Log out and back in, or run `newgrp docker` in the current shell, then retry.
 | Presets, custom URLs, filter history, job state | `./config` in the checkout, mounted at `/app/config`. |
 | Reports | Next to each output file, named after it, with a `.txt` suffix. |
 | Job logs | Under `config/jobs/`, one file per job; the interface links to them. |
+| Largest download accepted | 100 GB, from `MAX_DOWNLOAD_SIZE`. Set that environment variable to raise or lower it. A planet file fits inside the default; every regional extract is far below it. |
 
 ## Memory and CPU
 

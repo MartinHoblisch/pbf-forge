@@ -53,6 +53,7 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 - **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
 - **Exports** GeoPackage, GeoJSON or the filtered PBF. The output holds your data and nothing else: no metadata is written into it. The report beside it records how it was produced.
 - **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
+- Serves a REST API under `/api`, which the interface itself uses. It is internal: the endpoints exist, and they change without notice or a deprecation period.
 - Queues jobs, keeps the job history across a restart, and has an English and a German interface. A job that was running when the backend stopped is marked failed, not resumed.
 - **Warns** before a filter whose sources are large relative to the memory the container may use, which is the cgroup limit rather than the host's total.
 - The load-bearing claims in this README and in `docs/` are bound to the code that makes them true by [backend/tests/test_docs_claims.py](backend/tests/test_docs_claims.py). A change that invalidates one fails CI instead of quietly shipping.

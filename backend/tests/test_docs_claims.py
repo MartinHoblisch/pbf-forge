@@ -410,3 +410,35 @@ def test_dropped_feature_count_is_documented_and_written():
     assert "_parse_geometry_errors" in src, (
         "nothing parses osmium's error count, so the report line can never fire"
     )
+
+
+def test_download_cap_is_documented_with_the_value_the_code_uses():
+    """install.md names a 100 GB ceiling; config.py has to still set it."""
+    docs = _read(REPO / "docs" / "install.md")
+    src = _read(REPO / "backend" / "config.py")
+    assert "MAX_DOWNLOAD_SIZE" in docs, "install.md no longer documents the download cap"
+    assert "MAX_DOWNLOAD_SIZE" in src, "install.md documents a cap the code no longer has"
+    m = re.search(r"MAX_DOWNLOAD_SIZE\s*=.*?(\d+)\s*\*\s*1024\s*\*\s*1024\s*\*\s*1024", src)
+    assert m, "could not read the default download cap out of config.py"
+    assert f"{m.group(1)} GB" in docs, (
+        f"install.md must name the default the code uses ({m.group(1)} GB)"
+    )
+
+
+def test_documented_tool_versions_match_the_image():
+    """install.md tells the reader which osmium and GDAL the image carries.
+
+    The Dockerfile comment is the source of that truth. Comparing the two keeps
+    them from drifting apart on the next base image bump.
+    """
+    docs = _read(REPO / "docs" / "install.md")
+    dockerfile = _read(REPO / "Dockerfile")
+    osmium = re.search(r"osmium-tool\s*~\s*([\d.]+)", dockerfile)
+    gdal = re.search(r"gdal-bin\s*~\s*([\d.]+)", dockerfile)
+    assert osmium and gdal, "Dockerfile no longer records the pinned tool versions"
+    assert f"osmium-tool {osmium.group(1)}" in docs, (
+        f"install.md must name the osmium the image carries ({osmium.group(1)})"
+    )
+    assert f"GDAL {gdal.group(1)}" in docs, (
+        f"install.md must name the GDAL the image carries ({gdal.group(1)})"
+    )
