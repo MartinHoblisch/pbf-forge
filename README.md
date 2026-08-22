@@ -44,7 +44,7 @@ start.bat
 
 Either way the browser opens at `http://localhost:8000` once the container is ready. The first start builds the image, which takes a few minutes. Stop with the Quit button in the header, or with `stop.sh` / `stop.bat`.
 
-Use the launchers rather than `docker compose up`: they create the config file and the data directory that a bare compose run skips.
+Prefer the launchers over `docker compose up`: they write the config file, create the data directory, apply the Windows drive mount, and wait for the server before opening the browser. `docker compose up` also works. You then go through the first-run setup in the browser, and the data directory defaults to `./data`. [SECURITY.md](SECURITY.md) suggests that route if you would rather not give the container access to your drives.
 
 > [!NOTE]
 > PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
