@@ -11,7 +11,7 @@ an area cut, do it first with `osmium extract`, then filter the result here.
 way without its nodes has no geometry. Those nodes come through with whatever
 tags they carry, and `osmium export` writes out every feature that has tags.
 
-The effect is not marginal. Filtering the 4.5 GB German extract for
+The effect is large. Filtering the 4.5 GB German extract for
 `railway=rail` with Nodes unchecked, Ways and Relations checked:
 
 | Geometry | Features |
@@ -39,7 +39,7 @@ Measured on a Berlin extract, including `highway` and then excluding
 | After the include pass | 1,348,436 | 469,384 |
 | After the exclude pass | 1,348,436 | 262,760 |
 
-44% of the ways are gone and the node count has not moved. What that means
+44% of the ways are gone and the node count is unchanged. What that means
 depends on the format:
 
 - **PBF output** keeps them. The file contains nodes that belong to nothing.
@@ -60,13 +60,13 @@ filter produced. Up to version 1.0.0 the default mode split the output into
 that is no longer the case, and anything addressing those names has to be
 pointed at the new one.
 
-## GeoJSON gets unwieldy before it gets impossible
+## GeoJSON has no hard size limit, but large files are hard to use
 
-The export streams, so there is no hard ceiling beyond disk. What there is: a
+The export streams, so the only hard ceiling is free disk space. There is a
 warning when the selected source extract is larger than 200 MB and GeoJSON is
 checked. That threshold is on the input, not the output, because the output
-size is not known before the filter runs. GeoPackage opens faster, indexes,
-and is the default for a reason.
+size is not known before the filter runs. GeoPackage opens faster and supports
+spatial indexes, which is why it is the default.
 
 ## No negation inside an expression
 
@@ -80,8 +80,8 @@ host: the only rejected addresses are loopback and private ranges, which would
 turn the download endpoint into a way to reach services on your machine.
 
 The one requirement is a `.md5` sidecar next to the file, at the download URL
-with `.md5` appended. Verification fails closed, so a host that does not
-publish one makes every download from it fail. Checked by requesting the
+with `.md5` appended. If the checksum cannot be verified, the download is
+rejected, so every download from a host that publishes no sidecar fails. Checked by requesting the
 sidecar, not by assumption:
 
 | Host | `<url>.md5` |
@@ -113,9 +113,10 @@ members, which costs time and memory. Both runs below are the same 4.5 GB
 | Peak memory | 73 MiB | 2.01 GiB |
 | Output | 14 MB, 43,252 features | 253 MB, 686,106 features |
 
-Roughly four times the time and thirty times the memory for the second kind.
-The absolute times say more about the hardware than about the tool; the ratio
-between them is the part that transfers. Budget for the member-resolving case,
+The filter over ways and relations took roughly four times as long and thirty
+times the memory. The absolute times say more about the hardware than about the
+tool; the ratio between the two runs is what carries over to your own machine.
+Plan for the member-resolving case,
 and see [install.md](install.md) if a job is killed for memory.
 
 ## No authentication

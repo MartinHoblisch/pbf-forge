@@ -16,7 +16,7 @@ Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a
 
 ## The problem
 
-You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass times out on that area. The osmium and GDAL route works, but it is four commands with flags you look up every time, and the one that matters, the tag expression, has a syntax you have to get exactly right before anything happens.
+You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass times out on that area. The osmium and GDAL route works, but it takes four commands with flags you look up every time. The important one is the tag expression, and its syntax has to be exactly right or you get no result at all.
 
 PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with `ogr2ogr`, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself, so the result is the same result.
 
@@ -52,7 +52,7 @@ Use the launchers rather than `docker compose up`: they create the config file a
 ## What it does
 
 - **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
-- **Verifies** every download against the `.md5` published beside it. A mismatch fails closed, and so does a missing checksum file. A PBF you copy into the data directory yourself is usable but has nothing to verify against.
+- **Verifies** every download against the `.md5` published beside it. If the checksum does not match, the download is rejected. A missing checksum file is rejected the same way. A PBF you copy into the data directory yourself is usable but has nothing to verify against.
 - **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
 - **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
 - **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
@@ -60,7 +60,7 @@ Use the launchers rather than `docker compose up`: they create the config file a
 
 ## Your first filter
 
-One thing catches everybody once. **Type tag expressions without a `n/`, `w/` or `r/` prefix.** The tool builds that prefix from the Geometry types checkboxes and puts it in front of every expression, once per checked type. Pasting `w/highway=footway` with Ways checked produces `w/w/highway=footway`, which is valid, runs to completion, and matches nothing.
+One mistake is common. **Type tag expressions without a `n/`, `w/` or `r/` prefix.** The tool builds that prefix from the Geometry types checkboxes and puts it in front of every expression, once per checked type. Pasting `w/highway=footway` with Ways checked produces `w/w/highway=footway`, which is valid, runs to completion, and matches nothing at all.
 
 So, all footpaths in Liechtenstein:
 
@@ -78,12 +78,12 @@ The result is one layer named after the output file, in EPSG:4326, next to a `.t
 ## Limits
 
 - **Tag only.** No bounding box, no polygon clip, no spatial predicate. Cut the area first with `osmium extract`, then filter here.
-- **Your output will contain points you did not ask for.** `osmium tags-filter` keeps the nodes that a matched way refers to, and the export writes out every node carrying tags of its own. A `railway=rail` filter over Germany with Nodes unchecked produced 465,402 points against 220,696 lines: switches, signals and level crossings. Filter by geometry type after loading.
-- **The exclude pass leaves the nodes behind.** Removing ways with `--invert-match` does not remove the nodes they used. In a PBF output those nodes stay, orphaned. In GeoPackage and GeoJSON the untagged ones are dropped during export, but tagged ones remain: measured on a Berlin extract, excluding 44% of the ways removed no points at all.
+- **Your output will contain points you did not ask for.** `osmium tags-filter` keeps the nodes that a matched way refers to, and the export writes out every node carrying tags of its own. A `railway=rail` filter over Germany with Nodes unchecked produced 465,402 points and 220,696 lines. The extra points are switches, signals and level crossings. Filter by geometry type after loading.
+- **The exclude pass leaves the nodes behind.** Removing ways with `--invert-match` does not remove the nodes they used. In a PBF output those nodes stay in the file, orphaned, with nothing referring to them. In GeoPackage and GeoJSON the untagged ones are dropped during export, but tagged ones remain: measured on a Berlin extract, excluding 44% of the ways removed no points at all.
 - **One layer per output file**, named after the file, holding whatever geometry types the filter produced.
 - **No negation** inside an expression. Use the exclude field, which runs a second pass.
-- **GeoJSON gets large.** Above a 200 MB source extract the interface says so and points at GeoPackage.
-- **Snapshots, not live data.** However current the extract is, is how current your result is. The report states the timestamp.
+- **GeoJSON gets large.** If the source extract is larger than 200 MB, the interface warns you and suggests GeoPackage.
+- **Snapshots, not live data.** Your result is exactly as current as the extract you filtered. The report states the timestamp.
 
 ## Documentation
 

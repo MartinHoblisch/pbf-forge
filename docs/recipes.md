@@ -20,8 +20,8 @@ deeper for sub-regions.
 | Geometry types | Ways |
 | Format | GeoPackage |
 
-One layer named after the output file, in EPSG:4326. Expect tagged nodes that
-those ways refer to as points in the same layer.
+One layer named after the output file, in EPSG:4326. The same layer also contains the
+tagged nodes those ways use, as points.
 
 ## Charging stations for a whole country
 

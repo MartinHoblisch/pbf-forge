@@ -14,12 +14,12 @@ A bare key matches any object carrying it. `key=value` matches that value.
 `key=a,b,c` matches any of them. Several lines are OR: an object matching any
 line is kept.
 
-The `n/`, `w/` and `r/` prefixes are not yours to write. The tool takes them
+Do not type the `n/`, `w/` or `r/` prefixes yourself. The tool takes them
 from the Geometry types checkboxes and puts one in front of every expression,
 once per checked type, so `railway=rail` with Ways and Relations checked
 becomes `w/railway=rail r/railway=rail`. Typing the prefix yourself produces
 `w/w/railway=rail`, which osmium accepts as a filter on a key literally named
-`w/railway`. Nothing matches, and nothing tells you why.
+`w/railway`. The result is empty, and no error message explains why.
 
 There is no negation inside an expression. An expression starting with `-`
 would be read by osmium as a command-line flag, so it is rejected before the
@@ -61,7 +61,7 @@ number rather than partway through the export.
 | | |
 |---|---|
 | GeoPackage | The default. One layer named after the output file, EPSG:4326, ODbL attribution and the full filter provenance embedded in `gpkg_metadata`. |
-| GeoJSON | Same content as text. Written through a streaming intermediate, so the size limit is your disk, but the file gets unwieldy fast. Above a 200 MB source extract the interface says so. |
+| GeoJSON | Same content as text. Written through a streaming intermediate, so the only size limit is your free disk space, but large files quickly become hard to handle. Above a 200 MB source extract the interface says so. |
 | PBF | The filtered extract itself, for feeding into osmium or anything else that reads PBF. Carries no provenance metadata: the format has nowhere to put it. |
 
 Several formats can be selected at once. They share one filter pass, so
