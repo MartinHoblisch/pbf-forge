@@ -7,89 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
-
-### Changed
-
-- **The filter form starts with nothing preselected.** Ways, Relations and
-  GeoPackage were checked when the form opened. The Relations default was the
-  costly one: checking it changes what the filter matches but not what the
-  export writes, because `osmium export` produces points, linestrings and
-  polygons and drops relations that carry no geometry. A user who never touched
-  the box paid for matching relations and saw nothing for it. Every box now
-  starts empty, so a run states which geometry types and which formats were
-  actually asked for.
-
-### Fixed
-
-- **A small memory limit did not cap the job queue.** `_compute_max_parallel`
-  documents its result as `max(1, min(cpu//4, ram_gb//8))` but skipped the
-  memory term entirely below 8 GB, and the shipped container is capped at 4 GB.
-  On a machine with many cores the queue sized itself from cores alone and
-  would start several filters, each able to peak at 2 GB, inside that 4 GB. A
-  container under 8 GB now runs one job at a time.
-- **The preset form accepted a preset that could not match anything.** It sent
-  an empty geometry list to the API and silently substituted GeoPackage for a
-  missing output format. It now refuses both, with the same messages the filter
-  form already used.
-
-- **Queue sizing and the memory warning read the host's RAM, not the
-  container's limit.** Both took the total from `/proc/meminfo`, which inside a
-  container reports the host. A 4 GB container on a 32 GB machine therefore
-  believed it had 32 GB: the pre-flight warning almost never fired, and the
-  queue could start several jobs whose combined peak exceeded the cap. Measured
-  on a container capped at 4 GB, the old figure was 7.7 GB. Both now use the
-  cgroup limit where one applies and fall back to `MemTotal` otherwise.
-- **The exclude field did nothing for ways a surviving relation referenced.**
-  The exclude pass runs `osmium tags-filter --invert-match`, which keeps every
-  object that does not match and then completes the references of the
-  survivors. A relation still in the file names its member ways, so reference
-  completion put back the ways the pass had just removed. This applied whenever
-  Relations was checked and the include expression matched relations too, which
-  is the configuration the rail-network recipe recommends. Both exclude passes
-  now run with `-R`. Nodes are unaffected: an untagged node never matches a tag
-  expression, so inversion keeps it without reference completion.
-- **Intact downloads from mirrored hosts were reported as checksum failures.**
-  Large extracts are redirected to a mirror that serves the same
-  `<region>-latest.osm.pbf` name, so the resolved URL never carries a dated
-  filename while the sidecar beside it names the build it describes. Comparing
-  those names rejected every such download, even when the file was byte-perfect
-  — Geofabrik's Germany extract failed on every attempt. Verification now lets
-  the digest decide: the file is hashed once, checked against the sidecar beside
-  the alias, and against the one beside the resolved build when the first
-  describes another build. A mismatch against a sidecar that names the served
-  file is still a corrupt download and is still quarantined.
-
-### Documentation
-
-- Corrected claims that did not match the code: job history survives a restart
-  but running jobs are marked failed rather than resumed; `mem_limit` has to
-  be raised together with `memswap_limit`; there is no built-in Europe source;
-  Standard mode's columns are `name` plus the keys of the include expressions,
-  not a project-curated list; and ODbL attribution is embedded on a best-effort
-  basis, into a `gpkg_metadata` row that most clients do not surface.
-- Documented that relations without geometry never reach GeoPackage or GeoJSON,
-  that `osm_id` is unique only per object type while the output uses one layer,
-  and that `other_tags` holds JSON rather than the HSTORE of GDAL's OSM driver.
-- Replaced idiomatic and inverted phrasing throughout the README and `docs/`
-  with plain wording, for readers whose English is not native.
-- Reworked the README: a demo recording in place of the static screenshot, the
-  logo above the title, Quickstart directly after the problem statement, and
-  the audience, benchmark and alternatives sections removed or moved into
-  `docs/`. The interface tour follows the order the tabs are used in.
-- Inline code is now reserved for strings that have to be reproduced exactly.
-  Tool names, format names and quoted text are set as ordinary prose.
-
----
-
-## [1.1.0] - 2026-08-20
+## [1.1.0] - 2026-08-22
 
 Highlights: exclusion filtering as a second, inverted pass; a job queue that
 runs several filters at once and adapts to the machine; jobs and their logs
 survive a crash and report why they died; a plain-text report beside every
 output that makes a run reproducible; a Quit button that ends the session from
-the browser; and a documentation pass that removed every claim the code did
-not support.
+the browser; a documentation pass that removed every claim the code did not
+support; and four fixes found by checking each of those claims against the
+code, including an exclude pass that silently did nothing and a memory limit
+read from the host rather than from the container.
 
 ### Added
 
@@ -143,6 +70,14 @@ not support.
 
 ### Changed
 
+- **The filter form starts with nothing preselected.** Ways, Relations and
+  GeoPackage were checked when the form opened. The Relations default was the
+  costly one: checking it changes what the filter matches but not what the
+  export writes, because `osmium export` produces points, linestrings and
+  polygons and drops relations that carry no geometry. A user who never touched
+  the box paid for matching relations and saw nothing for it. Every box now
+  starts empty, so a run states which geometry types and which formats were
+  actually asked for.
 - **The size countdown is gone.** It was derived from file size alone, which
   does not predict a filter: the same extract takes minutes or hours depending
   on whether ways and relations have to be resolved. Measured throughput is
@@ -173,6 +108,43 @@ not support.
 
 ### Fixed
 
+- **A small memory limit did not cap the job queue.** `_compute_max_parallel`
+  documents its result as `max(1, min(cpu//4, ram_gb//8))` but skipped the
+  memory term entirely below 8 GB, and the shipped container is capped at 4 GB.
+  On a machine with many cores the queue sized itself from cores alone and
+  would start several filters, each able to peak at 2 GB, inside that 4 GB. A
+  container under 8 GB now runs one job at a time.
+- **The preset form accepted a preset that could not match anything.** It sent
+  an empty geometry list to the API and silently substituted GeoPackage for a
+  missing output format. It now refuses both, with the same messages the filter
+  form already used.
+
+- **Queue sizing and the memory warning read the host's RAM, not the
+  container's limit.** Both took the total from `/proc/meminfo`, which inside a
+  container reports the host. A 4 GB container on a 32 GB machine therefore
+  believed it had 32 GB: the pre-flight warning almost never fired, and the
+  queue could start several jobs whose combined peak exceeded the cap. Measured
+  on a container capped at 4 GB, the old figure was 7.7 GB. Both now use the
+  cgroup limit where one applies and fall back to `MemTotal` otherwise.
+- **The exclude field did nothing for ways a surviving relation referenced.**
+  The exclude pass runs `osmium tags-filter --invert-match`, which keeps every
+  object that does not match and then completes the references of the
+  survivors. A relation still in the file names its member ways, so reference
+  completion put back the ways the pass had just removed. This applied whenever
+  Relations was checked and the include expression matched relations too, which
+  is the configuration the rail-network recipe recommends. Both exclude passes
+  now run with `-R`. Nodes are unaffected: an untagged node never matches a tag
+  expression, so inversion keeps it without reference completion.
+- **Intact downloads from mirrored hosts were reported as checksum failures.**
+  Large extracts are redirected to a mirror that serves the same
+  `<region>-latest.osm.pbf` name, so the resolved URL never carries a dated
+  filename while the sidecar beside it names the build it describes. Comparing
+  those names rejected every such download, even when the file was byte-perfect
+  — Geofabrik's Germany extract failed on every attempt. Verification now lets
+  the digest decide: the file is hashed once, checked against the sidecar beside
+  the alias, and against the one beside the resolved build when the first
+  describes another build. A mismatch against a sidecar that names the served
+  file is still a corrupt download and is still quarantined.
 - **A filter asking for more tag keys than GeoPackage can hold now fails before
   it starts.** SQLite caps a table at 2000 columns. Manual mode counts the
   columns it would need and reports the number, instead of failing partway
@@ -212,6 +184,28 @@ not support.
 - **The tag field labels are translated.** The filter form and the preset editor both labelled their include-tags field "OSM-Tags", written into the markup and therefore German in the English interface, while the exclude field beside them read from the translation table. Three further labels bypassed the table without showing it, their German and English wording being identical.
 - **The data directory field no longer calls its value a Windows path.** It was labelled "Directory (Windows path)" in both languages, while the backend takes POSIX paths just as well, so Linux users were reading a label that did not apply to them.
 - **The GeoJSON size warning names no invented threshold.** It promised output "can exceed 500 MB", a figure that appears nowhere in the code. It now names the property that holds regardless of size: GeoJSON from a large source gets unwieldy, and GeoPackage stays smaller and opens faster.
+
+### Documentation
+
+- Corrected claims that did not match the code: job history survives a restart
+  but running jobs are marked failed rather than resumed; `mem_limit` has to
+  be raised together with `memswap_limit`; there is no built-in Europe source;
+  Standard mode's columns are `name` plus the keys of the include expressions,
+  not a project-curated list; and ODbL attribution is embedded on a best-effort
+  basis, into a `gpkg_metadata` row that most clients do not surface.
+- Documented that relations without geometry never reach GeoPackage or GeoJSON,
+  that `osm_id` is unique only per object type while the output uses one layer,
+  and that `other_tags` holds JSON rather than the HSTORE of GDAL's OSM driver.
+- Replaced idiomatic and inverted phrasing throughout the README and `docs/`
+  with plain wording, for readers whose English is not native.
+- Reworked the README: a demo recording in place of the static screenshot, the
+  logo above the title, Quickstart directly after the problem statement, and
+  the audience, benchmark and alternatives sections removed or moved into
+  `docs/`. The interface tour follows the order the tabs are used in.
+- Inline code is now reserved for strings that have to be reproduced exactly.
+  Tool names, format names and quoted text are set as ordinary prose.
+
+---
 
 ## [1.0.0] - 2026-05-02
 
