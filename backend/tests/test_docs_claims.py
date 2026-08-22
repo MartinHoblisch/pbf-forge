@@ -305,13 +305,36 @@ def test_no_region_browser_claim():
     )
 
 
-def test_built_in_extract_count_matches_config():
-    config = _read(REPO / "backend" / "config.py")
-    urls = set(re.findall(r'"(https://[^"]+-latest\.osm\.pbf)"', config))
-    readme = _read(REPO / "README.md")
-    if "continental extracts" in readme:
-        assert "eight" in readme, "README states a count of built-in extracts"
-        assert len(urls) == 8, f"config.py now holds {len(urls)} built-in extracts, not 8"
+def test_no_claim_that_extracts_are_offered_out_of_the_box():
+    """CONTINENTAL_URLS is a fallback for filenames, not a catalogue.
+
+    It has no endpoint and no control. The download list is built from the data
+    directory, so on a fresh install it is empty. Documentation that promises
+    ready-made entries sends a new reader looking for something that is not
+    there.
+    """
+    banned = ("continental extract", "built-in extract")
+    offenders = [
+        f"{p.name}: {phrase}"
+        for p in _existing(CLAIM_DOCS)
+        for phrase in banned
+        if phrase in _read(p).lower()
+    ]
+    assert not offenders, "the built-in URLs never reach the interface: " + ", ".join(offenders)
+
+
+def test_the_download_url_field_names_no_host():
+    """Any host works, so the label must not read as a restriction.
+
+    _validate_url rejects only loopback and private addresses. Naming one host
+    in the field label tells the reader the others are not allowed.
+    """
+    frontend = _read(FRONTEND)
+    hints = re.findall(r"url_hint: '([^']*)'", frontend)
+    assert hints, "url_hint is no longer a plain string in the translation tables"
+    for hint in hints:
+        label = hint.split("(")[0]  # the example after "(e.g. ...)" may name one
+        assert "geofabrik" not in label.lower(), f"the URL field label names a host: {label!r}"
 
 
 # --------------------------------------------------------------------------

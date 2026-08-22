@@ -1,8 +1,9 @@
-"""Downloading and freshness tracking for Geofabrik PBF extracts.
+"""Downloading and freshness tracking for PBF extracts.
 
-Transfers run in worker threads, resume from a .part file, and are checksummed
-against Geofabrik's .md5 before they count as complete. Per-file state is pushed
-to connected clients as it changes.
+The host is whichever one the URL names; nothing here is tied to a particular
+one. Transfers run in worker threads, resume from a .part file, and are
+checksummed against the .md5 the host publishes beside the file before they
+count as complete. Per-file state is pushed to connected clients as it changes.
 """
 
 from __future__ import annotations
@@ -181,7 +182,7 @@ def source_url(filename: str) -> Optional[str]:
 
 
 def url_to_filename(url: str) -> str:
-    """Convert a Geofabrik URL to local filename without '-latest'.
+    """Convert a download URL to a local filename without '-latest'.
 
     https://download.geofabrik.de/europe-latest.osm.pbf → europe.osm.pbf
     https://download.geofabrik.de/europe/germany/berlin-latest.osm.pbf → berlin.osm.pbf
@@ -401,7 +402,7 @@ class DownloadManager:
             return [s.to_dict() for s in self._files.values()]
 
     def check_file(self, filename: str) -> None:
-        """HEAD-request one file against Geofabrik. Runs in a thread."""
+        """HEAD-request one file against its own host. Runs in a thread."""
         # Read the disk first, so a single check reports what is actually there
         # rather than whatever this process last remembered.
         if not self._sync_local_state(filename):

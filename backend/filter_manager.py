@@ -1006,8 +1006,8 @@ class FilterManager:
         consumer needs and is unrelated to when the file was fetched.
 
         Falls back to the file's mtime, which is not the download time either —
-        DownloadManager stamps the server's Last-Modified onto the file, so for
-        a Geofabrik extract this is its publication time.
+        DownloadManager stamps the server's Last-Modified onto the file, so on
+        a host that sets it truthfully this is the extract's publication time.
         """
         path = DATA_DIR / source
         try:

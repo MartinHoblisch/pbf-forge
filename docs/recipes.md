@@ -4,10 +4,12 @@ Each of these is the whole form. Read [filtering.md](filtering.md) first if the
 expression syntax is new to you: expressions carry no `n/`, `w/` or `r/`
 prefix, because the tool adds it from the geometry checkboxes.
 
-Sources smaller than a continent are added by pasting their Geofabrik URL into
-the Downloads tab. The URL pattern is
-`https://download.geofabrik.de/<continent>/<country>-latest.osm.pbf`, and one
-level deeper for sub-regions.
+Sources are added by pasting a PBF URL into the Downloads tab. Any host works
+that publishes a `.md5` beside the file, which is what
+[limits.md](limits.md#the-host-has-to-publish-a-checksum) is about. The
+examples below use Geofabrik, whose paths run
+`https://download.geofabrik.de/<continent>/<country>-latest.osm.pbf`, one level
+deeper for sub-regions.
 
 ## Footpaths for a small country
 

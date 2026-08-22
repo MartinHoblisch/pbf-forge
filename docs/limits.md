@@ -73,6 +73,27 @@ and is the default for a reason.
 An expression beginning with `-` would reach osmium as a command-line flag, so
 it is rejected. Use the exclude field, which runs a second pass.
 
+## The host has to publish a checksum
+
+Any PBF URL works. There is no allowlist, and nothing in the tool prefers one
+host: the only rejected addresses are loopback and private ranges, which would
+turn the download endpoint into a way to reach services on your machine.
+
+The one requirement is a `.md5` sidecar next to the file, at the download URL
+with `.md5` appended. Verification fails closed, so a host that does not
+publish one makes every download from it fail. Checked by requesting the
+sidecar, not by assumption:
+
+| Host | `<url>.md5` |
+|---|---|
+| `download.geofabrik.de` | yes |
+| `planet.openstreetmap.org` | yes |
+| `download.bbbike.org` | yes |
+| `download.openstreetmap.fr` | no, downloads from it fail |
+
+A PBF you copy into the data directory yourself needs no checksum. It has
+nothing to verify against and is used as it is.
+
 ## Extracts are snapshots
 
 The data is as current as the extract, which is hours to days old depending on

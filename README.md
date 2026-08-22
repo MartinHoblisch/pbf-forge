@@ -69,7 +69,7 @@ One thing catches everybody once. **Type tag expressions without a `n/`, `w/` or
 
 So, all footpaths in Liechtenstein:
 
-1. Downloads tab. The eight continental extracts are listed; anything smaller is added by pasting its URL, for example `https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf`. Download it.
+1. Downloads tab. Paste the URL of the extract you want, for example `https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf`. Download it.
 2. Filter tab. Source: the file from step 1.
 3. Include tags, one per line:
    ```
@@ -82,7 +82,7 @@ The result is one layer named after the output file, in EPSG:4326, next to a `.t
 
 ## What it does
 
-- **Downloads** the eight built-in continental extracts, or any PBF URL you paste, from Geofabrik or elsewhere. Resumable, with a two-tier retry.
+- **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
 - **Verifies** every download against the `.md5` published beside it. A mismatch fails closed, and so does a missing checksum file. A PBF you copy into the data directory yourself is usable but has nothing to verify against.
 - **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
 - **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
@@ -147,10 +147,10 @@ PBF Forge is MIT licensed. See [LICENSE](LICENSE).
 
 The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases. Every GeoPackage and GeoJSON written here carries `© OpenStreetMap contributors (ODbL 1.0).` in its metadata; keep it there in anything you pass on.
 
-The terms of the host you download from apply on top, and they differ. The built-in extracts come from Geofabrik, whose downloads are free for non-commercial use; commercial users should read <https://www.geofabrik.de/geofabrik/agb.html>. Point PBF Forge somewhere else and that host's terms apply instead.
+The terms of the host you download from apply on top, and they differ. The examples in this documentation point at Geofabrik, whose downloads are free for non-commercial use; commercial users should read <https://www.geofabrik.de/geofabrik/agb.html>. Point PBF Forge somewhere else and that host's terms apply instead.
 
 ## Acknowledgements
 
 [osmium-tool](https://osmcode.org/osmium-tool/) does the filtering and [GDAL/OGR](https://gdal.org/) does the format conversion. This project is a form in front of them.
 
-The map data comes from [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), and the extracts from [Geofabrik](https://www.geofabrik.de/), who publish them and their checksums for free.
+The map data comes from [OpenStreetMap contributors](https://www.openstreetmap.org/copyright). The extracts come from whichever host you point at; the examples here use [Geofabrik](https://www.geofabrik.de/), who publish extracts and their checksums for free.
