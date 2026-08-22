@@ -1626,6 +1626,12 @@ function fmtSpeed(bps) {
   if (bps >= 1e6) return (bps / 1e6).toFixed(1) + ' MB/s';
   return (bps / 1e3).toFixed(0) + ' KB/s';
 }
+// Milliseconds a local copy is behind the server copy. Zero when either side is
+// unknown, so a file without timestamps never outranks one that has them.
+function ageDelta(serverMtime, localMtime) {
+  if (!serverMtime || !localMtime) return 0;
+  return new Date(serverMtime) - new Date(localMtime);
+}
 // English and German both distinguish only one from many, so a comparison
 // covers every unit used here.
 function ageUnit(n, one, many) {
@@ -1633,7 +1639,7 @@ function ageUnit(n, one, many) {
 }
 function fmtAge(serverMtime, localMtime) {
   if (!serverMtime || !localMtime) return '';
-  const days = Math.floor((new Date(serverMtime) - new Date(localMtime)) / 86400000);
+  const days = Math.floor(ageDelta(serverMtime, localMtime) / 86400000);
   if (days < 1)   return t('age_lt1day');
   if (days < 7)   return ageUnit(days, 'age_day', 'age_days');
   if (days < 30)  return ageUnit(Math.floor(days / 7), 'age_week', 'age_weeks');
@@ -1715,7 +1721,17 @@ function getSortedFiles() {
       case 'local':  av = a.local_size  || 0; bv = b.local_size  || 0; break;
       case 'server': av = a.server_size || 0; bv = b.server_size || 0; break;
       case 'status': av = STATUS_ORDER.indexOf(a.status); bv = STATUS_ORDER.indexOf(b.status);
-                     if (av < 0) av = 99; if (bv < 0) bv = 99; break;
+                     if (av < 0) av = 99; if (bv < 0) bv = 99;
+                     // A shared status keeps its group. Inside it, an outdated
+                     // file ranks by how far behind it is, compared on the
+                     // timestamps rather than the rendered label: five days
+                     // has to rank below one month, and the label cannot say
+                     // that.
+                     if (av === bv && a.status === 'update_available') {
+                       av = ageDelta(a.server_mtime, a.local_mtime);
+                       bv = ageDelta(b.server_mtime, b.local_mtime);
+                     }
+                     break;
       default: return 0;
     }
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
