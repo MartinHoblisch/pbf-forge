@@ -2,7 +2,7 @@
   <img src="docs/assets/logo.png" alt="" width="420">
 </p>
 
-<h1 align="center">PBF Forge</h1>
+# PBF Forge
 
 Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine. Docker is all you install.
 
@@ -14,7 +14,7 @@ Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a
 [![Platform: Windows | Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)](docs/install.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Four commands, or one form
+## Why I built this
 
 You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass times out on that area. The osmium and GDAL route works, but it takes four commands with flags you look up every time. The important one is the tag expression, and its syntax has to be exactly right or you get no result at all.
 
