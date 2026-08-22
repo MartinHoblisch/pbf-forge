@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="docs/assets/logo-mark.png" alt="" width="180">
+  <img src="docs/assets/logo.png" alt="" width="420">
 </p>
 
 <h1 align="center">PBF Forge</h1>
 
-Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine; Docker is all you install, osmium and GDAL stay inside it.
+Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine. Docker is all you install.
 
 [![CI](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml)
 [![Security](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml)
@@ -14,7 +14,7 @@ Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a
 [![Platform: Windows | Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)](docs/install.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## The problem
+## Four commands, or one form
 
 You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass times out on that area. The osmium and GDAL route works, but it takes four commands with flags you look up every time. The important one is the tag expression, and its syntax has to be exactly right or you get no result at all.
 
@@ -46,9 +46,6 @@ Either way the browser opens at `http://localhost:8000` once the container is re
 
 Prefer the launchers over `docker compose up`: they write the config file, create the data directory, apply the Windows drive mount, and wait for the server before opening the browser. `docker compose up` also works. You then go through the first-run setup in the browser, and the data directory defaults to `./data`. [SECURITY.md](SECURITY.md) suggests that route if you would rather not give the container access to your drives.
 
-> [!NOTE]
-> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
-
 ## What it does
 
 - **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
@@ -63,9 +60,9 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 
 One mistake is common. **Type tag expressions without a `n/`, `w/` or `r/` prefix.** The tool builds that prefix from the Geometry types checkboxes and puts it in front of every expression, once per checked type. Pasting `w/highway=footway` with Ways checked produces `w/w/highway=footway`, which is valid, runs to completion, and matches nothing at all.
 
-So, all footpaths in Liechtenstein:
+So, all footpaths in Germany:
 
-1. Downloads tab. Paste the URL of the extract you want, for example `https://download.geofabrik.de/europe/liechtenstein-latest.osm.pbf`. Download it.
+1. Downloads tab. Paste the URL of the extract you want, for example `https://download.geofabrik.de/europe/germany-latest.osm.pbf`. Download it. The file is about 4.5 GB, so the download takes a while; a smaller extract works exactly the same way if you would rather try it quickly.
 2. Filter tab. Source: the file from step 1.
 3. Include tags, one per line:
    ```
