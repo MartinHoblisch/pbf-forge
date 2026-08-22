@@ -80,8 +80,11 @@ it is rejected. Use the exclude field, which runs a second pass.
 ## The host has to publish a checksum
 
 Any PBF URL works. There is no allowlist, and nothing in the tool prefers one
-host: the only rejected addresses are loopback and private ranges, which would
-turn the download endpoint into a way to reach services on your machine.
+host. Four internal hostnames and any literal loopback, private, link-local or
+reserved IP address are rejected, so the download endpoint is not an obvious
+way to reach services on your machine. The check is a guard rail, not a
+boundary: it does not resolve hostnames and does not re-check redirects. See
+[../SECURITY.md](../SECURITY.md).
 
 The one requirement is a `.md5` sidecar next to the file, at the download URL
 with `.md5` appended. If the checksum cannot be verified, the download is
