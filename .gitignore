@@ -133,3 +133,7 @@ local/
 # ScreenToGif project files. The exported GIF is committed, the editable
 # project behind it is not.
 *.stg
+
+# osmium sparse_file_array index, written into the working directory by
+# osmium export when a test runs it without an explicit index path.
+sparse_file_array

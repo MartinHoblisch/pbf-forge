@@ -178,3 +178,24 @@ def test_malformed_cgroup_value_does_not_raise(monkeypatch):
 
     monkeypatch.setattr(fm_module.Path, "read_text", read_text)
     assert fm_module._detect_memory_limit_bytes() == 8 * GB
+
+
+class TestGeometryErrorCount:
+    """osmium reports dropped features on the verbose channel; nobody sees it.
+
+    A way whose nodes are cut off at the extract boundary has no complete
+    coordinate list, so osmium export skips it. The count is the only signal
+    that rows are missing from the output.
+    """
+
+    def test_the_count_line_is_recognised(self):
+        assert fm_module._parse_geometry_errors("[ 0:00] Encountered 1 errors.") == 1
+        assert fm_module._parse_geometry_errors("[ 1:23] Encountered 40732 errors.") == 40732
+
+    def test_zero_is_a_count_not_an_absence(self):
+        assert fm_module._parse_geometry_errors("[ 0:00] Encountered 0 errors.") == 0
+
+    def test_other_output_is_ignored(self):
+        assert fm_module._parse_geometry_errors("[ 0:00] Wrote 1 features.") is None
+        assert fm_module._parse_geometry_errors("Geometry error: invalid location") is None
+        assert fm_module._parse_geometry_errors("") is None

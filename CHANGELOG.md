@@ -9,6 +9,37 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **An `osm_type` column beside `osm_id`.** OSM ids are unique only per object
+  type, and the export puts every type in one layer, so a node and a way could
+  both arrive as `osm_id` 1. Using it as a primary key raised a constraint
+  violation; joining on it returned wrong rows and said nothing. `osm_type`
+  holds `n`, `w` or `r`, so `(osm_type, osm_id)` identifies a feature. `osm_id`
+  keeps its integer type and its meaning, so queries that never needed
+  uniqueness are unaffected.
+- **A count of features dropped for geometry errors.** A way whose nodes are
+  cut off at the edge of the extract has no coordinates to build a line from,
+  so `osmium export` skips it. It always has; nothing said so, and a run that
+  quietly wrote fewer rows than expected looked exactly like a run that did
+  not. osmium reports the number under `--verbose`, which the pipeline already
+  passed, so the figure existed and reached nobody. The report beside every
+  output now carries a "Dropped features" line whenever the count is not zero.
+  `-e` is deliberately not passed: on a country-sized extract it can emit tens
+  of thousands of lines.
+
+### Documentation
+
+- Named the facts a reader evaluating the tool looks for and could not find:
+  the REST API under `/api` exists and is internal, with no stability promise;
+  the image carries osmium-tool 1.16 and GDAL 3.8; `MAX_DOWNLOAD_SIZE` caps a
+  download at 100 GB. Guards keep the last two matching the Dockerfile and
+  `config.py`.
+- Gave the peak disk figure a measurement instead of a shrug. Iceland (62 MB),
+  a broad `highway` filter to GeoPackage: 209 MB peak, about 3.4 times the
+  source, because the source, the filtered PBF, the streaming export and the
+  output coexist. A narrow filter needs far less.
+
 ### Removed
 
 - **Nothing is written into output files any more.** GeoPackage and GeoJSON

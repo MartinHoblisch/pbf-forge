@@ -25,6 +25,19 @@ milestones. They are legitimate data, and they are not what most people expect
 from a filter they set to Ways. Filter by geometry type after loading, or in
 the SQL your consumer uses.
 
+## Features can go missing for geometric reasons
+
+A way whose nodes are cut off at the edge of the extract has no complete
+coordinate list, so `osmium export` cannot build a geometry for it and skips
+it. A broken multipolygon goes the same way. This is a property of the extract
+you chose, not of the filter, and nothing here can reconstruct the missing
+coordinates.
+
+What the tool can do is say how many. The report beside every output carries a
+"Dropped features" line whenever the count is not zero. A run that dropped
+none says nothing. A large number usually means the area you want extends past
+the edge of your extract.
+
 ## The exclude pass leaves nodes behind
 
 `--invert-match` removes the objects that match. It does not remove the nodes

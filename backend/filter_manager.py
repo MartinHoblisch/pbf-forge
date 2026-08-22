@@ -254,6 +254,7 @@ class FilterJob:
     job_started_at: float | None = None
     timeout_seconds: float | None = None
     queue_position: int | None = None
+    geometry_errors: int | None = None
     output_bytes: int | None = None
     bytes_read: int | None = None
     progress_line: str | None = None
@@ -333,6 +334,21 @@ class FilterJob:
         return d
 
 
+_GEOMETRY_ERRORS_RE = re.compile(r"Encountered (\d+) errors\.")
+
+
+def _parse_geometry_errors(line: str) -> int | None:
+    """Return the count from osmium's verbose summary, or None for other lines.
+
+    osmium export prints "Encountered N errors." once per run under --verbose.
+    Each error is a feature it could not build a geometry for, most often a way
+    whose nodes are cut off at the edge of the extract. The feature is skipped,
+    and nothing else says so.
+    """
+    m = _GEOMETRY_ERRORS_RE.search(line)
+    return int(m.group(1)) if m else None
+
+
 def _detect_memory_limit_bytes() -> int | None:
     """Memory this process may actually use, in bytes.
 
@@ -393,6 +409,10 @@ def _compute_max_parallel() -> int:
 
 
 class FilterManager:
+    # Selected explicitly by _build_export_sql; discovering them again would
+    # put duplicate columns in every output.
+    _EXCLUDED_EXPORT_FIELDS = {"@id", "id"}
+
     def __init__(self, ws_manager) -> None:
         self._ws = ws_manager
         self._jobs: dict[str, FilterJob] = {}
@@ -849,6 +869,12 @@ class FilterManager:
                                     "--output-format=geojsonseq",
                                     "--attributes",
                                     "id",
+                                    # -u type_id adds a top-level GeoJSON id
+                                    # holding n1 / w1 / r1. @id stays the bare
+                                    # integer, which is unique only per object
+                                    # type, and every type shares one layer.
+                                    "-u",
+                                    "type_id",
                                     "--index-type=sparse_file_array,sparse_file_array",
                                     "-o",
                                     str(shared_geojson),
@@ -1245,7 +1271,7 @@ class FilterManager:
         fields = []
         for line in stdout.decode().splitlines():
             m = _gdal_type.match(line)
-            if m and m.group(1) != "@id":
+            if m and m.group(1) not in self._EXCLUDED_EXPORT_FIELDS:
                 fields.append(m.group(1))
         return fields
 
@@ -1274,7 +1300,7 @@ class FilterManager:
             col_list = ", ".join(q(f) for f in fields)
 
         suffix = f", {col_list}" if col_list else ""
-        return f'SELECT "@id" AS osm_id{suffix} FROM {q(layer)}'
+        return f'SELECT "@id" AS osm_id, substr("id",1,1) AS osm_type{suffix} FROM {q(layer)}'
 
     async def _reduce_pbf_tags(self, pbf_path: Path, job: FilterJob) -> int:
         """Use pyosmium to strip all tags not in job.manual_keys from a PBF file in-place."""
@@ -1369,6 +1395,17 @@ class FilterManager:
         data_timestamp = self._source_data_timestamp(source)
         if data_timestamp:
             lines += _report_row("Data timestamp", [data_timestamp])
+        # Truthiness, not "is not None": a run that dropped nothing should not
+        # carry a row saying so.
+        if job.geometry_errors:
+            lines += _report_row(
+                "Dropped features",
+                [
+                    f"{job.geometry_errors:,} had no usable geometry and are "
+                    "not in this file (most often ways cut at the extract "
+                    "boundary)"
+                ],
+            )
         lines.append("")
 
         lines.append("FILTER")
@@ -1553,6 +1590,9 @@ class FilterManager:
                         job.progress_line = text
                     else:
                         job.append_log(text + "\n")
+                        errors = _parse_geometry_errors(text)
+                        if errors is not None:
+                            job.geometry_errors = errors
                 now = loop.time()
                 if now - last_broadcast >= 0.5:
                     await self._ws.broadcast({"type": "filter_update", "job": job.to_dict()})
