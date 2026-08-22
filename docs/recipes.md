@@ -47,23 +47,35 @@ indexes.
 | Geometry types | Nodes, Ways, Relations |
 | Format | GeoPackage |
 
-Two lines in the include field are OR: an object matching either is kept. The
-route segments and the relations land in the same layer, alongside any tagged
-nodes they use.
+Two lines in the include field are OR: an object matching either is kept.
+
+Checking Relations changes what the filter matches, not what the export writes.
+`osmium export` produces points, linestrings and polygons, so a `route=bicycle`
+relation has no geometry and is dropped: its `network`, `ref` and `name` tags do
+not reach the GeoPackage. What you get is the member ways as linestrings, plus
+any tagged nodes they use as points, in one layer. Relations tagged
+`type=multipolygon` or `type=boundary` do export, as polygons. To work with the
+relation objects themselves, choose the PBF output and read it with a tool that
+understands relations.
 
 ## Rail network without passenger-only track
 
 | | |
 |---|---|
-| Source | Europe, built in (about 33 GB, expect hours) |
+| Source | `https://download.geofabrik.de/europe-latest.osm.pbf` (about 33 GB) |
 | Include | `railway=rail` |
 | Exclude | `railway:traffic_mode=passenger` |
 | Geometry types | Ways |
 | Format | GeoPackage or GeoJSON |
 
-Freight trains are not permitted on `railway:traffic_mode=passenger`, and a
-single include expression would return those tracks too. The exclude field
-runs a second, inverted pass over the result of the first.
+`railway:traffic_mode=passenger` marks track used by passenger traffic. An
+include expression on its own would return that track too, so the exclude field
+runs a second, inverted pass over the result of the first. The tag is not mapped
+everywhere, so this removes the track that carries it, not every passenger-only
+line.
+
+Europe at 33 GB is past the container's default 4 GB memory cap. Raise the cap
+first; see [install.md](install.md).
 
 Both expressions land in the output's provenance metadata, so the file says
 what produced it.

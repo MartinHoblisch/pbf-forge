@@ -46,15 +46,25 @@ what that means per output format.
 
 | Mode | GeoPackage and GeoJSON | PBF |
 |---|---|---|
-| Standard | Curated keys become columns; everything else is folded into one `other_tags` JSON column | All original tags kept |
+| Standard | `name` and the key of every include expression you typed become columns; every other tag goes into one `other_tags` column | All original tags kept |
 | All keys | One column per distinct tag key | All original tags kept |
 | Manual | Only the keys you name become columns | A reduction pass strips every other tag |
 
-Standard is the default and the one to use unless you know you need otherwise.
-Expanding every key is not merely slow: SQLite caps a table at 2000 columns,
-and a continent-sized extract carries more distinct tag keys than that. Manual
-mode counts the columns it would need before starting and fails with the
-number rather than partway through the export.
+Standard is the default. Use it unless you have a reason to choose another
+mode. Expanding every key is not only slow: SQLite caps a table at 2000
+columns, and a continent-sized extract carries more distinct tag keys than
+that. The column count is checked before the conversion step, so a run that
+would exceed the cap stops with the number instead of failing partway through
+the export.
+
+`other_tags` holds a JSON object, not the HSTORE that GDAL's OSM driver writes
+into a column of the same name. Query it with SQLite's JSON functions, for
+example `json_extract(other_tags, '$.surface')`.
+
+Every feature carries an `osm_id` column holding the raw OSM object id. Ids are
+only unique per object type, and the output puts all types in one layer, so a
+node and a way can both arrive as `osm_id` 1. Do not use it as a primary key or
+as a join key on its own.
 
 ## Output formats
 

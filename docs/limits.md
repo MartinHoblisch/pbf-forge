@@ -57,8 +57,12 @@ that names them.
 The layer is named after the file, and it holds whatever geometry types the
 filter produced. Up to version 1.0.0 the default mode split the output into
 `points`, `lines`, `multilinestrings`, `multipolygons` and `other_relations`;
-that is no longer the case, and anything addressing those names has to be
-pointed at the new one.
+that no longer happens. Scripts and project files that use those layer names
+have to be changed to the single new layer name.
+
+Because every type shares one layer, `osm_id` is not unique in it: OSM ids are
+only unique per object type, so a node and a way can both appear as `osm_id` 1.
+Use it together with the geometry type, not as a primary key.
 
 ## GeoJSON has no hard size limit, but large files are hard to use
 

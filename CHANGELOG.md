@@ -11,6 +11,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The exclude field did nothing for ways a surviving relation referenced.**
+  The exclude pass runs `osmium tags-filter --invert-match`, which keeps every
+  object that does not match and then completes the references of the
+  survivors. A relation still in the file names its member ways, so reference
+  completion put back the ways the pass had just removed. This applied whenever
+  Relations was checked and the include expression matched relations too, which
+  is the configuration the rail-network recipe recommends. Both exclude passes
+  now run with `-R`. Nodes are unaffected: an untagged node never matches a tag
+  expression, so inversion keeps it without reference completion.
+
 - **Intact downloads from mirrored hosts were reported as checksum failures.**
   Large extracts are redirected to a mirror that serves the same
   `<region>-latest.osm.pbf` name, so the resolved URL never carries a dated
@@ -21,6 +31,21 @@ Versioning: [Semantic Versioning](https://semver.org/).
   the alias, and against the one beside the resolved build when the first
   describes another build. A mismatch against a sidecar that names the served
   file is still a corrupt download and is still quarantined.
+
+### Documentation
+
+- Corrected claims that did not match the code: job history survives a restart
+  but running jobs are marked failed rather than resumed; the memory warning
+  reads the host's RAM and cannot see the container's cap; `mem_limit` has to
+  be raised together with `memswap_limit`; there is no built-in Europe source;
+  Standard mode's columns are `name` plus the keys of the include expressions,
+  not a project-curated list; and ODbL attribution is embedded on a best-effort
+  basis, into a `gpkg_metadata` row that most clients do not surface.
+- Documented that relations without geometry never reach GeoPackage or GeoJSON,
+  that `osm_id` is unique only per object type while the output uses one layer,
+  and that `other_tags` holds JSON rather than the HSTORE of GDAL's OSM driver.
+- Replaced idiomatic and inverted phrasing throughout the README and `docs/`
+  with plain wording, for readers whose English is not native.
 
 ---
 

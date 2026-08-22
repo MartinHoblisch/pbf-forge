@@ -56,7 +56,8 @@ Use the launchers rather than `docker compose up`: they create the config file a
 - **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
 - **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
 - **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
-- Queues jobs, survives its own crash, warns before a job that is likely to run out of memory, and speaks English and German.
+- Queues jobs, keeps the job history across a restart, and has an English and a German interface. A job that was running when the backend stopped is marked failed, not resumed.
+- **Warns** before a filter whose sources are large relative to the machine's RAM. The check reads the host's total memory, so it does not know the container's own 4 GB cap; see [docs/install.md](docs/install.md).
 
 ## Your first filter
 
@@ -102,7 +103,7 @@ The result is one layer named after the output file, in EPSG:4326, next to a `.t
 
 PBF Forge is MIT licensed. See [LICENSE](LICENSE).
 
-The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases. Every GeoPackage and GeoJSON written here carries `© OpenStreetMap contributors (ODbL 1.0).` in its metadata; keep it there in anything you pass on.
+The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases. PBF Forge writes `© OpenStreetMap contributors (ODbL 1.0).` into every GeoPackage and GeoJSON it produces: a row in the GeoPackage's `gpkg_metadata` table, and a top-level member in the GeoJSON. Embedding is best effort. If it fails the file is still written and the failure is logged. The GeoPackage row is not registered through the metadata extension, so most clients will not show it; read it with `ogrinfo` or a SQLite client. Keep the notice with any file you share, and add it yourself if it is missing.
 
 The terms of the host you download from apply on top, and they differ. The examples in this documentation point at Geofabrik, whose downloads are free for non-commercial use; commercial users should read <https://www.geofabrik.de/geofabrik/agb.html>. Point PBF Forge somewhere else and that host's terms apply instead.
 

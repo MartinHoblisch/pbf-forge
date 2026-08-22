@@ -56,7 +56,9 @@ Log out and back in, or run `newgrp docker` in the current shell, then retry.
 `docker-compose.yml` caps the container at 4 GB. A filter that has to resolve
 way and relation members over a country-sized extract has been measured at
 around 2 GB peak, so the cap has headroom for that case but is not unlimited.
-Raise `mem_limit` there if a job is killed.
+If a job is killed for memory, raise `mem_limit` and `memswap_limit` together:
+`memswap_limit` is also 4 GB, and Docker refuses to start a container whose
+swap limit is below its memory limit.
 
 The Resource limits section in the interface has two presets. Full power uses
 every core at normal priority. Background halves the thread count and runs at a
