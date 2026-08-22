@@ -129,7 +129,7 @@ async def test_report_contains_sources_filters_and_completion(tmp_data_dir):
     assert "a_barge.gpkg" in text
     assert re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", text), "needs date and time"
     assert "Job duration" in text
-    assert "PBF Forge v1.1.0" in text
+    assert f"PBF Forge v{config.VERSION}" in text
     assert "OpenStreetMap contributors" in text
 
 
