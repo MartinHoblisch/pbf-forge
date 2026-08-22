@@ -1,8 +1,7 @@
-"""The age label beside an outdated download has to agree in number.
+"""Text in the interface reaches the user through a translation key.
 
-`fmtAge` picks between a singular and a plural key per unit. A branch added
-without its singular form does not fail anywhere: it silently renders
-"1 months outdated".
+Both checks here guard the same failure mode: markup or a branch that renders
+a fixed string. Nothing breaks, no test fails, the wrong words simply appear.
 """
 
 from __future__ import annotations
@@ -17,6 +16,29 @@ _AGE_UNIT_CALL = re.compile(r"ageUnit\([^,]+, '(\w+)', '(\w+)'\)")
 
 # One per translation table, and every table carries this key.
 _LANGUAGE_MARKER = re.compile(r"\bage_lt1day: '")
+
+# A form label either carries data-i18n itself or wraps its text in a span that
+# does. Anything left over between the tags is a string nobody can translate.
+_FIELD_LABEL = re.compile(r'<label class="field-label"([^>]*)>(.*?)</label>', re.S)
+_TRANSLATED_SPAN = re.compile(r"<span[^>]*data-i18n[^>]*>.*?</span>", re.S)
+_ANY_TAG = re.compile(r"<[^>]+>")
+
+
+def test_no_field_label_renders_a_hardcoded_string():
+    src = FRONTEND.read_text(encoding="utf-8")
+
+    labels = _FIELD_LABEL.findall(src)
+    assert labels, "no field labels found, the markup must have changed"
+
+    hardcoded = []
+    for attrs, body in labels:
+        if "data-i18n" in attrs:
+            continue  # the whole label is translated
+        leftover = _ANY_TAG.sub("", _TRANSLATED_SPAN.sub("", body)).strip()
+        if leftover:
+            hardcoded.append(leftover)
+
+    assert not hardcoded, f"field labels that bypass the translation table: {hardcoded}"
 
 
 def test_every_age_unit_has_both_forms_in_every_language():

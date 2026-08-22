@@ -698,7 +698,7 @@ footer .credits-sep { color: var(--border); }
         </div>
 
         <div class="form-group">
-          <label class="field-label">Suffix <span class="info" data-i18n="suffix_hint">(filename appendix)</span></label>
+          <label class="field-label"><span data-i18n="label_suffix">Suffix</span> <span class="info" data-i18n="suffix_hint">(filename appendix)</span></label>
           <input type="text" id="filter-suffix" data-i18n-placeholder="ph_filter_suffix" placeholder="e.g. railway">
         </div>
 
@@ -796,7 +796,7 @@ footer .credits-sep { color: var(--border); }
       </div>
 
       <div class="form-group">
-        <label class="field-label">OSM-Tags <span class="info" data-i18n="osm_tags_hint">(one per line)</span></label>
+        <label class="field-label"><span data-i18n="label_tags">OSM tags</span> <span class="info" data-i18n="osm_tags_hint">(one per line)</span></label>
         <textarea id="new-preset-tags" rows="3" placeholder="railway=rail&#10;railway=light_rail"></textarea>
       </div>
 
@@ -935,7 +935,7 @@ footer .credits-sep { color: var(--border); }
         <input type="number" id="resource-threads-input" class="form-control" min="1" placeholder="Auto">
       </div>
       <div class="form-group">
-        <label class="field-label"><span data-i18n="resource_label_nice">Priority (nice)</span> <span style="font-weight:400;color:var(--gray)">(0 = normal, 19 = minimal)</span></label>
+        <label class="field-label"><span data-i18n="resource_label_nice">Priority (nice)</span> <span style="font-weight:400;color:var(--gray)" data-i18n="resource_hint_nice">(0 = normal, 19 = minimal)</span></label>
         <input type="number" id="resource-nice-input" class="form-control" min="0" max="19" placeholder="Auto">
       </div>
     </details>
@@ -1159,6 +1159,7 @@ const TRANSLATIONS = {
     resource_advanced: 'Erweitert (Override)',
     resource_label_threads: 'Threads',
     resource_label_nice: 'Priorität (nice)',
+    resource_hint_nice: '(0 = normal, 19 = minimal)',
     resource_threads_range: n => `(1–${n}, leer = Auto)`,
     resource_hint_effective: (n, nice) => `Effektiv: ${n} Thread${n !== 1 ? 's' : ''}, Nice ${nice}`,
     btn_resource_limits: 'Ressourcen-Limits',
@@ -1336,7 +1337,6 @@ const TRANSLATIONS = {
       `A narrower filter, a smaller extract or PBF output (which is always memory-safe) avoids that.`,
     risk_cancel: 'Cancel (recommended)',
     risk_confirm: 'Start anyway',
-    label_suffix: 'Suffix',
     resource_title: 'Resource limits',
     resource_desc: 'Takes effect on the next job start. No restart needed.',
     resource_preset_full: 'Full power',
@@ -1344,6 +1344,7 @@ const TRANSLATIONS = {
     resource_advanced: 'Advanced (override)',
     resource_label_threads: 'Threads',
     resource_label_nice: 'Priority (nice)',
+    resource_hint_nice: '(0 = normal, 19 = minimal)',
     resource_threads_range: n => `(1–${n}, empty = Auto)`,
     resource_hint_effective: (n, nice) => `Effective: ${n} thread${n !== 1 ? 's' : ''}, nice ${nice}`,
     btn_resource_limits: 'Resource limits',
