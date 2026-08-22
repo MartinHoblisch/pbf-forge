@@ -692,8 +692,8 @@ footer .credits-sep { color: var(--border); }
           <label class="field-label" data-i18n="label_geo_types">Geometry types</label>
           <div class="checkbox-group inline-group">
             <label><input type="checkbox" id="geo-nodes"> Nodes</label>
-            <label><input type="checkbox" id="geo-ways" checked> Ways</label>
-            <label><input type="checkbox" id="geo-relations" checked> Relations</label>
+            <label><input type="checkbox" id="geo-ways"> Ways</label>
+            <label><input type="checkbox" id="geo-relations"> Relations</label>
           </div>
         </div>
 
@@ -706,7 +706,7 @@ footer .credits-sep { color: var(--border); }
           <label class="field-label" data-i18n="label_output_format">Output format</label>
           <div class="checkbox-group inline-group">
             <label><input type="checkbox" name="fmt" value="geojson" onchange="document.getElementById('geojson-mode-hint').style.display=this.checked?'block':'none';_updateFilterHints()"> GeoJSON</label>
-            <label><input type="checkbox" name="fmt" value="gpkg" checked> GeoPackage</label>
+            <label><input type="checkbox" name="fmt" value="gpkg"> GeoPackage</label>
             <div style="display:inline-flex;align-items:center;gap:.25rem">
               <label style="margin:0"><input type="checkbox" name="fmt" value="pbf" onchange="document.getElementById('pbf-hint').style.display=this.checked?'inline-block':'none';document.getElementById('pbf-mode-hint').style.display=this.checked?'block':'none'"> PBF</label><span id="pbf-hint" onclick="event.stopPropagation()" style="display:none;cursor:help;background:#6b7280;color:#fff;border-radius:.75rem;padding:.05rem .4rem;font-size:.7rem;font-weight:700;line-height:1.5;" data-i18n-title="tooltip_pbf">info</span>
             </div>
@@ -810,15 +810,15 @@ footer .credits-sep { color: var(--border); }
           <label class="field-label" data-i18n="label_geo_types">Geometry types</label>
           <div class="checkbox-group">
             <label><input type="checkbox" id="np-nodes"> Nodes</label>
-            <label><input type="checkbox" id="np-ways" checked> Ways</label>
-            <label><input type="checkbox" id="np-relations" checked> Relations</label>
+            <label><input type="checkbox" id="np-ways"> Ways</label>
+            <label><input type="checkbox" id="np-relations"> Relations</label>
           </div>
         </div>
         <div class="form-group">
           <label class="field-label" data-i18n="label_output_format">Output format</label>
           <div class="checkbox-group">
             <label><input type="checkbox" name="np-fmt" value="geojson"> GeoJSON</label>
-            <label><input type="checkbox" name="np-fmt" value="gpkg" checked> GeoPackage</label>
+            <label><input type="checkbox" name="np-fmt" value="gpkg"> GeoPackage</label>
             <label><input type="checkbox" name="np-fmt" value="pbf"> PBF</label>
           </div>
         </div>
@@ -2571,8 +2571,10 @@ async function savePreset() {
   if (document.getElementById('np-ways').checked)      geoTypes.push('ways');
   if (document.getElementById('np-relations').checked) geoTypes.push('relations');
 
+  if (!geoTypes.length) { errEl.textContent = t('err_no_geo'); errEl.style.display='block'; return; }
+
   const fmts = [...document.querySelectorAll('input[name="np-fmt"]:checked')].map(cb => cb.value);
-  if (!fmts.length) fmts.push('gpkg');
+  if (!fmts.length) { errEl.textContent = t('err_no_format'); errEl.style.display='block'; return; }
 
   const cols = document.querySelector('input[name="np-cols"]:checked')?.value || 'other_tags';
   const manualKeys = cols === 'manual'
