@@ -14,11 +14,11 @@ Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a
 [![Platform: Windows | Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)](docs/install.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Why I built this
+## The problem
 
 You want every rail line in Germany, or every charging station, as something QGIS can open. Overpass times out on that area. The osmium and GDAL route works, but it takes four commands with flags you look up every time. The important one is the tag expression, and its syntax has to be exactly right or you get no result at all.
 
-PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with `ogr2ogr`, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself, so the result is the same result.
+PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with ogr2ogr, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself, so the result is the same result.
 
 <img src="docs/assets/gif/pbf-forge-demo.gif" alt="A Geofabrik download URL is pasted into PBF Forge, the extract downloads, the filter form runs a highway filter over it, and the resulting GeoPackage opens in QGIS" width="100%">
 
@@ -44,7 +44,7 @@ start.bat
 
 Either way the browser opens at `http://localhost:8000` once the container is ready. The first start builds the image, which takes a few minutes. Stop with the Quit button in the header, or with `stop.sh` / `stop.bat`.
 
-Prefer the launchers over `docker compose up`: they write the config file, create the data directory, apply the Windows drive mount, and wait for the server before opening the browser. `docker compose up` also works. You then go through the first-run setup in the browser, and the data directory defaults to `./data`. [SECURITY.md](SECURITY.md) suggests that route if you would rather not give the container access to your drives.
+Prefer the launchers over `docker compose up`: they write the config file, create the data directory, apply the Windows drive mount, and wait for the server before opening the browser. It also works on its own. You then go through the first-run setup in the browser, and the data directory defaults to `./data`. [SECURITY.md](SECURITY.md) suggests that route if you would rather not give the container access to your drives.
 
 ## What it does
 
@@ -71,7 +71,7 @@ So, all footpaths in Germany:
 4. Geometry types: Ways.
 5. Output format: GeoPackage.
 
-The result is one layer named after the output file, in EPSG:4326, next to a `.txt` report describing the run. [docs/filtering.md](docs/filtering.md) covers the expression syntax, the exclude pass and the three attribute modes.
+The result is one layer named after the output file, in EPSG:4326, next to a plain-text report describing the run. [docs/filtering.md](docs/filtering.md) covers the expression syntax, the exclude pass and the three attribute modes.
 
 ## Limits
 
@@ -100,7 +100,7 @@ The result is one layer named after the output file, in EPSG:4326, next to a `.t
 
 PBF Forge is MIT licensed. See [LICENSE](LICENSE).
 
-The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases. PBF Forge writes `© OpenStreetMap contributors (ODbL 1.0).` into every GeoPackage and GeoJSON it produces: a row in the GeoPackage's `gpkg_metadata` table, and a top-level member in the GeoJSON. Embedding is best effort. If it fails the file is still written and the failure is logged. The GeoPackage row is not registered through the metadata extension, so most clients will not show it; read it with `ogrinfo` or a SQLite client. Keep the notice with any file you share, and add it yourself if it is missing.
+The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases. PBF Forge writes "© OpenStreetMap contributors (ODbL 1.0)." into every GeoPackage and GeoJSON it produces: a row in the GeoPackage's `gpkg_metadata` table, and a top-level member in the GeoJSON. Embedding is best effort. If it fails the file is still written and the failure is logged. The GeoPackage row is not registered through the metadata extension, so most clients will not show it; read it with ogrinfo or a SQLite client. Keep the notice with any file you share, and add it yourself if it is missing.
 
 The terms of the host you download from apply on top, and they differ. The examples in this documentation point at Geofabrik, whose downloads are free for non-commercial use; commercial users should read <https://www.geofabrik.de/geofabrik/agb.html>. Point PBF Forge somewhere else and that host's terms apply instead.
 
