@@ -2,7 +2,7 @@
 
 Download an OpenStreetMap PBF extract, filter it by tag, and get a GeoPackage, a GeoJSON or a smaller PBF back. Runs as one Docker container on your own machine.
 
-[Quickstart](#quickstart) · [Your first filter](#your-first-filter) · [Limits](#limits) · [Alternatives](#alternatives) · [Documentation](#documentation)
+**Docker is the only thing you install.** osmium, GDAL and the rest of the pipeline stay inside the container.
 
 [![CI](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/ci.yml)
 [![Security](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml/badge.svg)](https://github.com/MartinHoblisch/pbf-forge/actions/workflows/security.yml)
@@ -18,11 +18,7 @@ You want every rail line in Germany, or every charging station, as something QGI
 
 PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with `ogr2ogr`, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself, so the result is the same result.
 
-It grew out of needing reproducible tag-filtered extracts for small GIS jobs often enough that assembling the pipeline by hand each time stopped being reasonable.
-
 <img src="docs/assets/gif/pbf-forge-demo.gif" alt="A Geofabrik download URL is pasted into PBF Forge, the extract downloads, the filter form runs a highway filter over it, and the resulting GeoPackage opens in QGIS" width="100%">
-
-<sub>Paste a download URL, pick the tags, open the GeoPackage in QGIS.</sub>
 
 ## Quickstart
 
@@ -122,12 +118,6 @@ Same 4.5 GB `germany.osm.pbf`, same machine (4 cores, container capped at 4 GB).
 | [QuickOSM](https://plugins.qgis.org/plugins/QuickOSM/) for QGIS | You are already in QGIS and the area is small. It queries Overpass, so it inherits Overpass's ceiling. |
 | [osm2pgsql](https://osm2pgsql.org/) / [imposm](https://imposm.org/) | The destination is PostGIS and you want a maintained, updatable database rather than a file. |
 | [Geofabrik custom extracts](https://www.geofabrik.de/data/extracts.html) | You want somebody else to cut it, by polygon, and you can pay for it. |
-
-## New to OSM data?
-
-An extract is a snapshot of the OSM database for one region, in the compact `.osm.pbf` format. Everything in it is a node, a way or a relation, and each carries tags such as `highway=footway`. Filtering means keeping the objects whose tags match.
-
-The [OSM wiki on map features](https://wiki.openstreetmap.org/wiki/Map_features) lists which tags exist, and [taginfo](https://taginfo.openstreetmap.org/) shows how often each is actually used. Both are worth a look before you write a filter.
 
 ## Documentation
 
