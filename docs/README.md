@@ -6,7 +6,6 @@
 | [filtering.md](filtering.md) | How the expressions and the two passes actually work |
 | [recipes.md](recipes.md) | Worked examples with the exact settings |
 | [limits.md](limits.md) | What the tool does not do, and what surprises people |
-| [alternatives.md](alternatives.md) | When something else is the better tool |
 | [tour.md](tour.md) | Screenshots of the interface |
 | [ROADMAP.md](ROADMAP.md) | Planned, under consideration, and explicit non-goals |
 

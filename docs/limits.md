@@ -103,9 +103,20 @@ OSM timestamp, which is the number that matters, not the download time.
 ## Cost is driven by the filter, not the file
 
 A nodes-only filter scans. A filter touching ways or relations has to resolve
-members, which costs time and memory. On the same 4.5 GB extract and the same
-machine: 4m 45s and 73 MiB against 17m 27s and 2.01 GiB. Budget for the second
-kind, and see [install.md](install.md) if a job is killed for memory.
+members, which costs time and memory. Both runs below are the same 4.5 GB
+`germany.osm.pbf` on the same machine, four cores with the container capped at
+4 GB:
+
+| | `amenity=charging_station`, Nodes | `railway=rail`, Ways and Relations |
+|---|---|---|
+| Runtime | 4m 45s | 17m 27s |
+| Peak memory | 73 MiB | 2.01 GiB |
+| Output | 14 MB, 43,252 features | 253 MB, 686,106 features |
+
+Roughly four times the time and thirty times the memory for the second kind.
+The absolute times say more about the hardware than about the tool; the ratio
+between them is the part that transfers. Budget for the member-resolving case,
+and see [install.md](install.md) if a job is killed for memory.
 
 ## No authentication
 

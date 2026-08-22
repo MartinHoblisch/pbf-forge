@@ -5,4 +5,4 @@ contact_links:
     about: Report privately through a security advisory, not as a public issue.
   - name: Documentation
     url: https://github.com/MartinHoblisch/pbf-forge/tree/main/docs
-    about: Installation, filtering, limits and alternatives before you file.
+    about: Installation, filtering and limits before you file.

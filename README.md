@@ -46,22 +46,14 @@ Either way the browser opens at `http://localhost:8000` once the container is re
 
 Use the launchers rather than `docker compose up`: they create the config file and the data directory that a bare compose run skips.
 
-## Use this if
+## What it does
 
-- You want country-sized or continent-sized extracts, where Overpass is the wrong tool.
-- You want the same filter to be repeatable next month, with a record of what produced each file.
-- You would rather click checkboxes than remember `--index-type=sparse_file_array`.
-- You are handing the job to somebody who does not use a terminal.
-
-## Do not use this if
-
-- You need a live query against current OSM data. Extracts are snapshots, hours to days old.
-- You need spatial predicates, a bounding box, or anything geometric. Filtering is by tag only.
-- You want a hosted service. This runs on your machine, and only on your machine.
-- You already know osmium and only ever run one filter. The container buys you nothing.
-
-> [!NOTE]
-> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
+- **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
+- **Verifies** every download against the `.md5` published beside it. A mismatch fails closed, and so does a missing checksum file. A PBF you copy into the data directory yourself is usable but has nothing to verify against.
+- **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
+- **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
+- **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
+- Queues jobs, survives its own crash, warns before a job that is likely to run out of memory, and speaks English and German.
 
 ## Your first filter
 
@@ -80,46 +72,32 @@ So, all footpaths in Liechtenstein:
 
 The result is one layer named after the output file, in EPSG:4326, next to a `.txt` report describing the run. [docs/filtering.md](docs/filtering.md) covers the expression syntax, the exclude pass and the three attribute modes.
 
-## What it does
+## Use this if
 
-- **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.
-- **Verifies** every download against the `.md5` published beside it. A mismatch fails closed, and so does a missing checksum file. A PBF you copy into the data directory yourself is usable but has nothing to verify against.
-- **Filters** by tag with `osmium tags-filter`, over the geometry types you check. A second tag set removes matches in an inverted pass.
-- **Exports** GeoPackage, GeoJSON or the filtered PBF, with ODbL attribution and the full filter provenance embedded in the first two.
-- **Reports** every run: source extract, its OSM timestamp, include and exclude tags, geometry types, attribute mode, per-phase timings.
-- Queues jobs, survives its own crash, warns before a job that is likely to run out of memory, and speaks English and German.
+- You want country-sized or continent-sized extracts, where Overpass is the wrong tool.
+- You want the same filter to be repeatable next month, with a record of what produced each file.
+- You would rather click checkboxes than remember `--index-type=sparse_file_array`.
+- You are handing the job to somebody who does not use a terminal.
 
-## Numbers
+## Do not use this if
 
-One machine, one extract, two filters. The absolute times say more about the hardware than about the tool; the ratio between them is the part that transfers.
+- You need a live query against current OSM data. Extracts are snapshots, hours to days old.
+- You need spatial predicates, a bounding box, or anything geometric. Filtering is by tag only.
+- You want a hosted service. This runs on your machine, and only on your machine.
+- You already know osmium and only ever run one filter. The container buys you nothing.
 
-| | `amenity=charging_station`, Nodes | `railway=rail`, Ways and Relations |
-|---|---|---|
-| Runtime | 4m 45s | 17m 27s |
-| Peak memory | 73 MiB | 2.01 GiB |
-| Output | 14 MB, 43,252 features | 253 MB, 686,106 features |
-
-Same 4.5 GB `germany.osm.pbf`, same machine (4 cores, container capped at 4 GB). A filter that has to resolve way and relation members costs roughly four times the time and thirty times the memory of one that only scans nodes. Extract size matters less than what you ask for.
+> [!NOTE]
+> PBF Forge has no login, no API key and no user separation. It binds to `127.0.0.1` and is meant for one trusted person on their own machine. On Windows the folder picker can read every drive Docker Desktop can. Do not put it on a LAN or the internet. See [SECURITY.md](SECURITY.md).
 
 ## Limits
 
 - **Tag only.** No bounding box, no polygon clip, no spatial predicate. Cut the area first with `osmium extract`, then filter here.
-- **Your output will contain points you did not ask for.** `osmium tags-filter` keeps the nodes that a matched way refers to, and the export writes out every node carrying tags of its own. The `railway=rail` run above, with Nodes unchecked, produced 465,402 points against 220,696 lines: switches, signals and level crossings. Filter by geometry type after loading.
+- **Your output will contain points you did not ask for.** `osmium tags-filter` keeps the nodes that a matched way refers to, and the export writes out every node carrying tags of its own. A `railway=rail` filter over Germany with Nodes unchecked produced 465,402 points against 220,696 lines: switches, signals and level crossings. Filter by geometry type after loading.
 - **The exclude pass leaves the nodes behind.** Removing ways with `--invert-match` does not remove the nodes they used. In a PBF output those nodes stay, orphaned. In GeoPackage and GeoJSON the untagged ones are dropped during export, but tagged ones remain: measured on a Berlin extract, excluding 44% of the ways removed no points at all.
 - **One layer per output file**, named after the file, holding whatever geometry types the filter produced.
 - **No negation** inside an expression. Use the exclude field, which runs a second pass.
 - **GeoJSON gets large.** Above a 200 MB source extract the interface says so and points at GeoPackage.
 - **Snapshots, not live data.** However current the extract is, is how current your result is. The report states the timestamp.
-
-## Alternatives
-
-| | Reach for it when |
-|---|---|
-| [Overpass API](https://overpass-turbo.eu/) | The area is a city or smaller, you want current data, and you want the answer now. Not for country-scale extraction. |
-| [osmium-tool](https://osmcode.org/osmium-tool/) | You are comfortable in a terminal and want the engine directly. PBF Forge calls it for you; it is not a replacement. |
-| [QuickOSM](https://plugins.qgis.org/plugins/QuickOSM/) for QGIS | You are already in QGIS and the area is small. It queries Overpass, so it inherits Overpass's ceiling. |
-| [osm2pgsql](https://osm2pgsql.org/) / [imposm](https://imposm.org/) | The destination is PostGIS and you want a maintained, updatable database rather than a file. |
-| [Geofabrik custom extracts](https://www.geofabrik.de/data/extracts.html) | You want somebody else to cut it, by polygon, and you can pay for it. |
 
 ## Documentation
 
@@ -129,7 +107,6 @@ Same 4.5 GB `germany.osm.pbf`, same machine (4 cores, container capped at 4 GB).
 | [docs/filtering.md](docs/filtering.md) | Expression syntax, the exclude pass, attribute modes, the report file |
 | [docs/recipes.md](docs/recipes.md) | Worked examples with the settings that produce them |
 | [docs/limits.md](docs/limits.md) | The limits above, with the reasoning |
-| [docs/alternatives.md](docs/alternatives.md) | Longer comparison |
 | [docs/tour.md](docs/tour.md) | More screenshots |
 | [CHANGELOG.md](CHANGELOG.md) | What changed, per release |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is planned, and what is explicitly not |
