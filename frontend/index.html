@@ -1954,7 +1954,7 @@ function renderFiles() {
       <td style="font-family:monospace;font-size:.82rem">${escHtml(f.filename)}</td>
       <td>${fmtSize(f.local_size)}<br><span style="font-size:.75rem;color:var(--gray)">${fmtDate(f.local_mtime)}</span></td>
       <td>${fmtSize(f.server_size)}<br><span style="font-size:.75rem;color:var(--gray)">${fmtDate(f.server_mtime)}</span></td>
-      <td>${statusBadge(f.status)}${f.status === 'update_available' && fmtAge(f.server_mtime, f.local_mtime) ? `<br><span style="font-size:.72rem;color:var(--orange);opacity:.85">${fmtAge(f.server_mtime, f.local_mtime)}\u00a0${t('age_old')}</span>` : ''}</td>
+      <td>${statusBadge(f.status)}${f.status === 'update_available' && fmtAge(f.server_mtime, f.local_mtime) ? `<br><span style="font-size:.72rem;color:var(--orange);opacity:.85">${fmtAge(f.server_mtime, f.local_mtime)}\u00a0${t('age_old')}</span>` : ''}${f.status === 'error' && f.error ? `<br><span style="font-size:.72rem;color:var(--red);opacity:.85">${escHtml(f.error)}</span>` : ''}</td>
       <td>${progressCell}</td>
       <td style="white-space:nowrap">${actions || '—'}</td>
     </tr>`;

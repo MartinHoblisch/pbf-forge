@@ -28,6 +28,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
   `-e` is deliberately not passed: on a country-sized extract it can emit tens
   of thousands of lines.
 
+### Changed
+
+- **A failed check now names the unreachable host.** A connection failure or
+  timeout while checking a file used to surface only as a generic "Error"
+  badge, with the actual reason buried in a hover tooltip as a raw exception
+  string. It read the same whether the mirror was down or pbf-forge itself
+  had a bug. The status column now shows "`<host>` unreachable" beside the
+  badge, so an outage at the source reads as one at a glance.
+
 ### Documentation
 
 - Named the facts a reader evaluating the tool looks for and could not find:

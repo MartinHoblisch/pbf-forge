@@ -109,7 +109,7 @@ def test_check_failure_while_idle_still_reports_error(tmp_data_dir):
 
     with dm._lock:
         assert dm._files["test.osm.pbf"].status == "error"
-        assert "refused" in dm._files["test.osm.pbf"].error
+        assert dm._files["test.osm.pbf"].error == "example.com unreachable"
 
 
 def test_check_skips_status_when_download_starts_during_the_head(tmp_data_dir):

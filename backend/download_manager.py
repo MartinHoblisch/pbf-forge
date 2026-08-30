@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -199,6 +200,19 @@ def url_to_filename(url: str) -> str:
     import re
 
     return re.sub(r"-latest(?=\.osm\.pbf$)", "", _basename(url))
+
+
+def _describe_error(exc: Exception, url: str) -> str:
+    """Turn a request failure into a message that names what actually failed.
+
+    A ConnectionError/Timeout means the host never answered — that is a
+    problem with the host, not with pbf-forge, and the message says so
+    instead of dumping the raw urllib3 retry trace on the user.
+    """
+    if isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)):
+        host = urlparse(url).hostname or url
+        return f"{host} unreachable"
+    return str(exc)
 
 
 @dataclass
@@ -443,7 +457,7 @@ class DownloadManager:
                 active = state.status in _ACTIVE_STATUSES
                 if not active:
                     state.status = "error"
-                    state.error = str(exc)
+                    state.error = _describe_error(exc, url)
             if active:
                 # Surfacing this would replace a live progress bar with a red
                 # badge over a transfer that is still perfectly healthy.
