@@ -1,4 +1,4 @@
-"""Checksum verification must run BEFORE os.utime; a mismatch quarantines the file."""
+"""Checksum verification must run BEFORE os.utime; a mismatch discards the partial."""
 
 from __future__ import annotations
 
@@ -75,23 +75,9 @@ def test_verify_runs_before_utime(dm, tmp_path, monkeypatch):
     assert order == ["download", "verify", "utime"]
 
 
-def test_mismatch_overwrites_existing_quarantine(dm, tmp_path):
-    """Policy: a newer corrupt download overwrites an older .corrupt file."""
-    dest = tmp_path / "berlin.osm.pbf"
-    dest.write_bytes(b"new corrupt content")
-    old = tmp_path / "berlin.osm.pbf.corrupt"
-    old.write_bytes(b"old corrupt content")
-    session = _Session("0" * 32 + "  berlin.osm.pbf\n")
-
-    with pytest.raises(RuntimeError, match="MD5 mismatch"):
-        dm._verify_checksum("http://example.com/berlin.osm.pbf", dest, session)
-
-    assert not dest.exists()
-    assert old.read_bytes() == b"new corrupt content"
-
-
-def test_mismatch_quarantines_file(dm, tmp_path):
-    dest = tmp_path / "berlin.osm.pbf"
+def test_mismatch_discards_the_partial(dm, tmp_path):
+    """A digest mismatch proves the bytes are unusable: drop them, keep no copy."""
+    dest = tmp_path / "berlin.osm.pbf.part"
     dest.write_bytes(b"corrupt content")
     session = _Session("0" * 32 + "  berlin.osm.pbf\n")  # guaranteed mismatch
 
@@ -99,4 +85,49 @@ def test_mismatch_quarantines_file(dm, tmp_path):
         dm._verify_checksum("http://example.com/berlin.osm.pbf", dest, session)
 
     assert not dest.exists()
-    assert (tmp_path / "berlin.osm.pbf.corrupt").exists()
+    assert list(tmp_path.glob("*.corrupt")) == []
+
+
+def test_status_is_verifying_while_the_checksum_runs(dm, tmp_path, monkeypatch):
+    """The row must stop claiming to download once the transfer is done."""
+    filename = "berlin.osm.pbf"
+    mtime = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(dm, "_head", lambda url, session=None: (4, mtime))
+    monkeypatch.setattr(dm, "_do_download", lambda *a, **k: a[1].write_bytes(b"data"))
+
+    seen: list[str] = []
+    monkeypatch.setattr(
+        dm,
+        "_verify_checksum",
+        lambda url, d, session: seen.append(dm._files[filename].status),
+    )
+
+    dm.register_url("http://example.com/berlin-latest.osm.pbf", filename)
+    state = dm._files[filename]
+    state.url = "http://example.com/berlin-latest.osm.pbf"
+    state.status = "downloading"
+
+    dm._download_worker(filename, threading.Event())
+
+    assert seen == ["verifying"]
+    assert state.status == "up_to_date"
+
+
+def test_error_row_survives_a_scan_after_the_partial_was_discarded(dm, tmp_path):
+    """A mismatch leaves nothing on disk — the row must still say why."""
+    filename = "berlin.osm.pbf"
+    dm.register_url("http://example.com/berlin-latest.osm.pbf", filename)
+    state = dm._files[filename]
+    state.status = "error"
+    state.error = "MD5 mismatch for berlin.osm.pbf.part"
+    state.local_size = 21162890
+    state.local_mtime = "2026-09-06T04:25:01+00:00"
+
+    dm._refresh_local_files()
+
+    assert filename in dm._files
+    assert dm._files[filename].error == "MD5 mismatch for berlin.osm.pbf.part"
+    # The row survives, the file's size and date must not.
+    assert dm._files[filename].local_size is None
+    assert dm._files[filename].local_mtime is None

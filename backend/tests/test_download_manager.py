@@ -468,7 +468,7 @@ def test_verify_checksum_still_detects_corruption_behind_a_redirect(tmp_data_dir
     with pytest.raises(RuntimeError, match="MD5 mismatch"):
         dm._verify_checksum(_LATEST_URL, dest, session)
 
-    assert (tmp_data_dir / "germany.osm.pbf.corrupt").exists()
+    assert not dest.exists()
 
 
 def test_verify_checksum_reports_version_skew_instead_of_corruption(tmp_data_dir):
@@ -486,7 +486,6 @@ def test_verify_checksum_reports_version_skew_instead_of_corruption(tmp_data_dir
 
     # Unverifiable is not corrupt: the file stays where it is.
     assert dest.exists()
-    assert not (tmp_data_dir / "germany.osm.pbf.corrupt").exists()
 
 
 def test_verify_checksum_accepts_a_mirror_that_keeps_the_alias_name(tmp_data_dir):

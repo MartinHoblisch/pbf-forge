@@ -11,6 +11,12 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A `Verifying checksum` status.** After the last byte arrives, the download
+  is hashed and checked against the `.md5` the host publishes beside it. On a
+  country-sized extract that is tens of seconds of reading several gigabytes
+  plus the sidecar request, and the row went on saying "Downloading…" at 100 %
+  the whole time — indistinguishable from a stalled transfer. The row now names
+  the phase that is running.
 - **An `osm_type` column beside `osm_id`.** OSM ids are unique only per object
   type, and the export puts every type in one layer, so a node and a way could
   both arrive as `osm_id` 1. Using it as a primary key raised a constraint
@@ -30,6 +36,19 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **A corrupt download is discarded instead of quarantined.** A digest mismatch
+  used to rename the partial file to `<name>.osm.pbf.part.corrupt` and leave it
+  in the data directory. Nothing listed it — the file matches neither the
+  `.osm.pbf` nor the `.part` pattern the directory scan looks for — and nothing
+  removed it, so several gigabytes sat there unseen until the disk-space check
+  refused the next attempt for reasons it could not explain. The bytes are a
+  partial transfer the checksum has already proven unusable, so they are now
+  deleted and the error names both digests.
+- **Recoverable checksum failures say the transfer was kept.** An unreachable
+  sidecar, an unparsable one, or a read error while hashing all leave the
+  `.part` file on disk, and starting the download again resumes from where it
+  stopped. Only the message never said so, which made a second attempt look
+  like a second full download.
 - **The container base moved to Ubuntu 26.04 LTS.** It carried Ubuntu 24.04,
   whose archive caps GDAL at 3.8.4 (February 2024) — an old format-parser
   surface that apt cannot advance past what the archive holds. 26.04 raises
@@ -42,6 +61,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
   string. It read the same whether the mirror was down or pbf-forge itself
   had a bug. The status column now shows "`<host>` unreachable" beside the
   badge, so an outage at the source reads as one at a glance.
+
+### Fixed
+
+- **A failed download keeps its row.** Any row with nothing left on disk was
+  pruned by the next directory scan, and `GET /api/files` runs one — so an
+  error the user was meant to read could disappear within a second of
+  appearing. A checksum mismatch hit this every time, because it removes the
+  file it rejected. The row now survives with its message and its download
+  button, and reports no local size, since there is no local file.
 
 ### Documentation
 
