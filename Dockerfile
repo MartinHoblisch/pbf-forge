@@ -1,15 +1,22 @@
-# Ubuntu 24.04 LTS (Noble Numbat), pinned by digest so builds are reproducible.
-# Dependabot refreshes the digest weekly; the tag stays put, because moving to
-# the next LTS also moves osmium-tool, GDAL and python3 (tracked in issue #44).
-FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
+# Ubuntu 26.04 LTS (Resolute Raccoon), pinned by digest so builds are
+# reproducible. Dependabot refreshes the digest weekly; the tag stays put,
+# because moving to the next LTS also moves osmium-tool, GDAL and python3.
+FROM ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
 
 # Avoid interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Package versions locked by Ubuntu 24.04 LTS APT snapshot (Noble):
-#   osmium-tool ~1.16  gdal-bin ~3.8  python3 ~3.12
+# Package versions locked by Ubuntu 26.04 LTS APT snapshot (Resolute):
+#   osmium-tool ~1.19  gdal-bin ~3.12  python3 ~3.14
 # To verify installed versions: apt-cache policy <package>
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+# The 26.04 base rootfs carries /usr/bin/pebble, Canonical's container service
+# manager. It arrives outside dpkg, so apt cannot remove it and no Ubuntu
+# security update can reach it. Nothing in this image runs it — the CMD is
+# uvicorn — while its vendored Go standard library reports as vulnerable
+# whenever upstream Go is ahead of the rebuild, so the file is deleted.
+RUN apt-get update && apt-get upgrade -y \
+    && rm -f /usr/bin/pebble \
+    && apt-get install -y --no-install-recommends \
     osmium-tool \
     gdal-bin \
     python3 \
