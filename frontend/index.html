@@ -1077,6 +1077,8 @@ const TRANSLATIONS = {
     age_days: 'Tage', age_weeks: 'Wochen', age_months: 'Monate', age_years: 'Jahre', age_lt1day: '< 1 Tag', age_old: 'veraltet',
     status_not_downloaded: 'Nicht vorhanden',
     status_downloading: 'Lädt …',
+    status_verifying: 'Prüfsumme wird geprüft',
+    verifying_meta: 'MD5-Prüfsumme wird berechnet …',
     status_checking: 'Wird geprüft',
     status_waiting_retry: 'Verbindung unterbrochen',
     retry_countdown: 'Neuer Versuch in {time} (Versuch {n})',
@@ -1263,6 +1265,8 @@ const TRANSLATIONS = {
     age_days: 'days', age_weeks: 'weeks', age_months: 'months', age_years: 'years', age_lt1day: '< 1 day', age_old: 'outdated',
     status_not_downloaded: 'Not downloaded',
     status_downloading: 'Downloading…',
+    status_verifying: 'Verifying checksum',
+    verifying_meta: 'Computing MD5 checksum…',
     status_checking: 'Checking',
     status_waiting_retry: 'Connection lost',
     retry_countdown: 'Retry in {time} (attempt {n})',
@@ -1406,7 +1410,7 @@ function toggleLang() {
 // purpose: window.close() is ignored for windows the user did not open from a
 // script, which is every window start.bat and start.sh produce.
 async function quitApp() {
-  const busy = files.some(f => f.status === 'downloading')
+  const busy = files.some(f => f.status === 'downloading' || f.status === 'verifying')
     || filterJobs.some(j => j.status === 'running' || j.status === 'pending');
   if (!confirm(t(busy ? 'quit_confirm_busy' : 'quit_confirm'))) return;
 
@@ -1691,6 +1695,7 @@ function getStatusLabels() {
     update_available: ['badge-orange', ic('arrow-up')   + t('status_update_available')],
     not_downloaded:   ['badge-gray',   ic('arrow-down') + t('status_not_downloaded')],
     downloading:      ['badge-blue',   ic('arrow-down') + t('status_downloading')],
+    verifying:        ['badge-blue',   ic('refresh')    + t('status_verifying')],
     paused:           ['badge-gray',   ic('pause')      + t('status_paused')],
     checking:         ['badge-blue',   ic('refresh')    + t('status_checking')],
     waiting_retry:    ['badge-orange', ic('refresh')    + t('status_waiting_retry')],
@@ -1704,7 +1709,7 @@ function statusBadge(status) {
 }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
-const STATUS_ORDER = ['up_to_date','update_available','not_downloaded','downloading','paused','waiting_retry','checking','error','unknown'];
+const STATUS_ORDER = ['up_to_date','update_available','not_downloaded','downloading','verifying','paused','waiting_retry','checking','error','unknown'];
 
 function sortFiles(col) {
   if (currentSort.col === col) {
@@ -1757,7 +1762,7 @@ function updateSortHeaders() {
 // Purely client-side — driven by the full snapshots the WebSocket already sends.
 // 'checking' is deliberately not an active download state: the automatic checkAll()
 // on page load would otherwise ring a bell without anything having been downloaded.
-const DL_ACTIVE = ['downloading', 'waiting_retry'];
+const DL_ACTIVE = ['downloading', 'verifying', 'waiting_retry'];
 const FJ_ACTIVE = ['running', 'queued', 'pending'];
 
 let soundEnabled = localStorage.getItem('soundNotify') === '1';
@@ -1920,6 +1925,9 @@ function renderFiles() {
            <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
            <div class="progress-meta">${pct}%${fmtSpeed(f.speed_bps) ? ' · ' + fmtSpeed(f.speed_bps) : ''}${eta ? ' · ' + eta : ''}</div>
          </div>`;
+    } else if (f.status === 'verifying') {
+      // No percentage to show: the transfer is done and the hash runs in one go.
+      progressCell = `<span style="font-size:.82rem;color:var(--gray)">${t('verifying_meta')}</span>`;
     } else if (f.status === 'paused' && f.partial_bytes) {
       // downloaded_bytes is 0 once the worker is gone, so measure the .part itself.
       const ppct = f.server_size ? Math.round(f.partial_bytes / f.server_size * 100) : 0;

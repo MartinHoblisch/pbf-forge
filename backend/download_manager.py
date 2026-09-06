@@ -51,8 +51,14 @@ PART_SUFFIX = ".part"
 
 # Statuses that mean a worker thread is alive and owns this file's row. While a
 # transfer is running only a .part file exists on disk, so anything that reads
-# the directory must neither reset such a row's status nor prune it.
-_ACTIVE_STATUSES = ("downloading", "waiting_retry")
+# the directory must neither reset such a row's status nor prune it. Checksum
+# verification belongs here too: the bytes are complete but still live in the
+# .part file, so a scan would otherwise report the row as paused mid-check.
+_ACTIVE_STATUSES = ("downloading", "verifying", "waiting_retry")
+
+# Appended to every checksum failure that leaves the .part file on disk, so the
+# user knows a second click resumes instead of starting the transfer over.
+_RESUME_HINT = "The partial download was kept — start it again to resume."
 
 # Statuses that a directory scan must leave alone on top of the active ones:
 # an in-flight check owns the row just as much, and an error is a result the
@@ -224,7 +230,7 @@ class FileState:
     server_size: Optional[int] = None
     server_mtime: Optional[str] = None
     # unknown | not_downloaded | checking | up_to_date | update_available
-    # downloading | paused | waiting_retry | error
+    # downloading | verifying | paused | waiting_retry | error
     status: str = "unknown"
     downloaded_bytes: int = 0
     speed_bps: float = 0.0
@@ -366,8 +372,18 @@ class DownloadManager:
         if complete is None and partial is None:
             with self._lock:
                 state = self._files.get(filename)
-                # Nothing tracked, or a worker is about to create the .part file.
-                if state is None or state.status in _ACTIVE_STATUSES:
+                # Nothing tracked, or a worker is about to create the .part
+                # file. An error row outlives its file on purpose: a checksum
+                # mismatch discards the partial, and dropping the row with it
+                # would take the only report of what went wrong. What must not
+                # outlive the file is its size and date — a row that still
+                # advertises 21 MB local reads as if the file were usable. A
+                # worker's row is left alone: it owns those fields itself.
+                if state is None or state.status in _PRESERVED_STATUSES:
+                    if state is not None and state.status not in _ACTIVE_STATUSES:
+                        state.local_size = None
+                        state.local_mtime = None
+                        state.partial_bytes = None
                     return True
                 del self._files[filename]
             self._broadcast({"type": "file_removed", "filename": filename})
@@ -407,17 +423,13 @@ class DownloadManager:
         for filename in sorted(found):
             self._sync_local_state(filename)
 
-        # Remove states for files no longer on disk (skip active transfers)
+        # Rows with nothing left on disk go through the same path: it drops the
+        # ones nobody is waiting on and clears the stale size and date of the
+        # ones worth keeping.
         with self._lock:
-            gone = [
-                k
-                for k in self._files
-                if k not in found and self._files[k].status not in _ACTIVE_STATUSES
-            ]
-            for k in gone:
-                del self._files[k]
-        for filename in gone:
-            self._broadcast({"type": "file_removed", "filename": filename})
+            missing = [k for k in self._files if k not in found]
+        for filename in missing:
+            self._sync_local_state(filename)
 
     def list_files(self) -> list[dict]:
         self._refresh_local_files()
@@ -803,6 +815,15 @@ class DownloadManager:
                         f"Download of {filename!r} produced no output "
                         f"(server returned 416 with no partial file present)"
                     )
+                # Hashing several GB and fetching the sidecar takes long enough
+                # that a row still labelled "downloading" at 100 % reads as a
+                # stalled transfer. Name the phase that is actually running.
+                with self._lock:
+                    state.status = "verifying"
+                    state.speed_bps = 0.0
+                    state.eta_seconds = 0.0
+                self._broadcast({"type": "file_update", "file": state.to_dict()})
+
                 # Order matters. Verify the .part file first, then rename it
                 # into place, and only stamp the server mtime last: a corrupt
                 # download that already carried the server timestamp would look
@@ -842,12 +863,16 @@ class DownloadManager:
             resp = session.get(md5_url, timeout=30)
             resp.raise_for_status()
         except Exception as exc:
-            raise RuntimeError(f"Could not fetch checksum from {md5_url}: {exc}") from exc
+            raise RuntimeError(
+                f"Could not fetch checksum from {md5_url}: {exc}. {_RESUME_HINT}"
+            ) from exc
 
         fields = resp.text.strip().split()
         expected_hex = fields[0] if fields else ""
         if len(expected_hex) != 32:
-            raise RuntimeError(f"Unexpected .md5 content from {md5_url}: {resp.text.strip()!r}")
+            raise RuntimeError(
+                f"Unexpected .md5 content from {md5_url}: {resp.text.strip()!r}. {_RESUME_HINT}"
+            )
         return expected_hex, fields[1] if len(fields) > 1 else None
 
     def _verify_checksum(self, url: str, dest: Path, session: requests.Session) -> None:
@@ -857,7 +882,10 @@ class DownloadManager:
         so the download is marked error and osmium is never invoked on the file.
         Caller must ensure *dest* exists.
         """
-        actual_hex = _md5_of(dest)
+        try:
+            actual_hex = _md5_of(dest)
+        except OSError as exc:
+            raise RuntimeError(f"Could not read {dest.name}: {exc}. {_RESUME_HINT}") from exc
 
         md5_url = url + ".md5"
         expected_hex, listed_name = self._fetch_checksum(md5_url, session)
@@ -893,12 +921,14 @@ class DownloadManager:
                 f"{dest.name} was kept; try again later."
             )
 
-        quarantine = dest.with_name(dest.name + ".corrupt")
+        # The digest proves these bytes are unusable, and they are a .part file,
+        # never something the user put there. Keeping a multi-GB copy nobody can
+        # act on only takes the disk space the next attempt needs.
         try:
-            dest.replace(quarantine)
-            hint = f"File quarantined as {quarantine.name}."
+            dest.unlink()
+            hint = "The partial download was discarded; the next one starts over."
         except OSError:
-            hint = "File left in place — delete it manually."
+            hint = f"{dest.name} could not be removed — delete it manually."
         raise RuntimeError(
             f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}. {hint}"
         )
