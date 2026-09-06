@@ -115,3 +115,17 @@ jobs:
 
       - name: Build image (smoke test)
         run: docker build . --tag pbf-forge:smoke
+
+      # The runner's apt packages are not what ships. Running the
+      # integration-marked tests inside the image is the only way a change to
+      # the base image can be caught by CI, because osmium-tool and gdal-bin
+      # come from the base archive and are not pinnable on their own.
+      - name: Record the shipped toolchain
+        run: docker run --rm pbf-forge:smoke sh -c "osmium --version | head -1; ogr2ogr --version; python3 --version"
+
+      - name: Run integration tests inside the image
+        run: |
+          docker run --rm pbf-forge:smoke sh -c "
+            pip install --no-cache-dir pytest pytest-asyncio httpx &&
+            cd /app/backend &&
+            pytest tests/ -m integration"
