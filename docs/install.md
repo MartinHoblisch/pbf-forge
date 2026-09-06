@@ -13,7 +13,7 @@ on Iceland (62 MB) with a broad `highway` filter to GeoPackage, the peak was
 less, because every intermediate shrinks with it. Budget four times the extract
 and a broad filter still fits.
 
-The image carries osmium-tool 1.16 and GDAL 3.8 from the Ubuntu 24.04 archive.
+The image carries osmium-tool 1.19 and GDAL 3.12 from the Ubuntu 26.04 archive.
 Which expression forms and export options exist follows from those versions.
 Ask the container directly with
 `docker compose exec pbf-forge osmium --version`.

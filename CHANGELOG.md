@@ -30,6 +30,12 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The container base moved to Ubuntu 26.04 LTS.** It carried Ubuntu 24.04,
+  whose archive caps GDAL at 3.8.4 (February 2024) — an old format-parser
+  surface that apt cannot advance past what the archive holds. 26.04 raises
+  osmium-tool to 1.19, GDAL to 3.12 and python3 to 3.14. The
+  integration-marked tests now run inside the built image, so the toolchain
+  under test is the one that ships.
 - **A failed check now names the unreachable host.** A connection failure or
   timeout while checking a file used to surface only as a generic "Error"
   badge, with the actual reason buried in a hover tooltip as a raw exception
@@ -41,7 +47,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 - Named the facts a reader evaluating the tool looks for and could not find:
   the REST API under `/api` exists and is internal, with no stability promise;
-  the image carries osmium-tool 1.16 and GDAL 3.8; `MAX_DOWNLOAD_SIZE` caps a
+  the image carries osmium-tool 1.19 and GDAL 3.12; `MAX_DOWNLOAD_SIZE` caps a
   download at 100 GB. Guards keep the last two matching the Dockerfile and
   `config.py`.
 - Gave the peak disk figure a measurement instead of a shrug. Iceland (62 MB),
