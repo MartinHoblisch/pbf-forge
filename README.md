@@ -60,7 +60,7 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 
 ## Your first filter
 
-So, all footpaths in Germany:
+All footpaths in Germany:
 
 1. Downloads tab. Paste the URL of the extract you want, for example `https://download.geofabrik.de/europe/germany-latest.osm.pbf`. Download it. The file is about 4.5 GB, so the download takes a while; a smaller extract works exactly the same way if you would rather try it quickly.
 2. Filter tab. Source: the file from step 1.
