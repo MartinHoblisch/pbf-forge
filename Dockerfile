@@ -9,7 +9,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Package versions locked by Ubuntu 26.04 LTS APT snapshot (Resolute):
 #   osmium-tool ~1.19  gdal-bin ~3.12  python3 ~3.14
 # To verify installed versions: apt-cache policy <package>
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+# The 26.04 base rootfs carries /usr/bin/pebble, Canonical's container service
+# manager. It arrives outside dpkg, so apt cannot remove it and no Ubuntu
+# security update can reach it. Nothing in this image runs it — the CMD is
+# uvicorn — while its vendored Go standard library reports as vulnerable
+# whenever upstream Go is ahead of the rebuild, so the file is deleted.
+RUN apt-get update && apt-get upgrade -y \
+    && rm -f /usr/bin/pebble \
+    && apt-get install -y --no-install-recommends \
     osmium-tool \
     gdal-bin \
     python3 \
