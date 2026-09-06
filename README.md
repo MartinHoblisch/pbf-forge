@@ -60,13 +60,11 @@ Prefer the launchers over `docker compose up`: they write the config file, creat
 
 ## Your first filter
 
-One mistake is common. **Type tag expressions without a `n/`, `w/` or `r/` prefix.** The tool builds that prefix from the Geometry types checkboxes and puts it in front of every expression, once per checked type. Pasting `w/highway=footway` with Ways checked produces `w/w/highway=footway`, which is valid, runs to completion, and matches nothing at all.
-
 So, all footpaths in Germany:
 
 1. Downloads tab. Paste the URL of the extract you want, for example `https://download.geofabrik.de/europe/germany-latest.osm.pbf`. Download it. The file is about 4.5 GB, so the download takes a while; a smaller extract works exactly the same way if you would rather try it quickly.
 2. Filter tab. Source: the file from step 1.
-3. Include tags, one per line:
+3. Include tags, one per line, without a `n/`, `w/` or `r/` prefix — the tool adds that itself from the Geometry types checkboxes:
    ```
    highway=footway,pedestrian,path,steps
    ```
