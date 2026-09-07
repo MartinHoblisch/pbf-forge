@@ -11,6 +11,13 @@ cd pbf-forge
 The launchers do the first-run setup (config file, data directory) that a bare
 `docker compose up` skips.
 
+They also prefer the published image over a local build, so a checkout with
+changed source runs the last release until you ask for a build:
+
+```bash
+./start.sh --build          # start.bat --build on Windows
+```
+
 For backend development without Docker:
 
 ```bash
@@ -19,6 +26,27 @@ python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\ac
 pip install -r requirements.txt
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+## Releasing
+
+A tag publishes the container image, so three places have to name the same
+version before the tag is pushed:
+
+1. `VERSION` in `backend/config.py`
+2. The image tag in `docker-compose.yml`
+3. The Git tag itself, as `v<version>`
+
+`test_compose_pulls_the_version_the_app_reports` catches the first two, and
+`.github/workflows/release.yml` refuses to publish when any of the three
+disagree. Move the CHANGELOG entries from *Unreleased* into the new version,
+commit, then tag:
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+The first push of a package to GHCR creates it as private. Set it to public
+once in the package settings, or the launchers fall back to building locally.
 
 ## Running tests
 

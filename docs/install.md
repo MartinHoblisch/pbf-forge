@@ -13,6 +13,19 @@ on Iceland (62 MB) with a broad `highway` filter to GeoPackage, the peak was
 less, because every intermediate shrinks with it. Budget four times the extract
 and a broad filter still fits.
 
+## Where the image comes from
+
+Every release publishes a container image to
+`ghcr.io/martinhoblisch/pbf-forge`, tagged with its version. The launchers
+fetch the tag that `docker-compose.yml` names, which is the version the
+checkout beside it reports, so the code and the image always match.
+
+Images are published for `linux/amd64`. On any other platform, and on a
+working copy that is ahead of the last release, there is nothing to fetch and
+the launcher builds the image from the source in the folder instead. That
+takes a few minutes and produces the same image. `./start.sh --build` (or
+`start.bat --build`) forces that path when you want to run local changes.
+
 The image carries osmium-tool 1.19 and GDAL 3.12 from the Ubuntu 26.04 archive.
 Which expression forms and export options exist follows from those versions.
 Ask the container directly with
@@ -93,7 +106,7 @@ Windows in the PBF Forge folder:
 ```
 
 The script fast-forwards the checkout and hands over to the launcher, which
-stops the container, rebuilds the image and starts the new version. Downloads
+stops the container, fetches the image for the new version and starts it. Downloads
 and filter jobs that are still running are cancelled with the container, so
 finish or stop them first. Local changes to tracked files stop the script
 instead of being overwritten.

@@ -1,0 +1,79 @@
+name: Release
+
+# Tags only. The image a release publishes has to come from the commit the tag
+# names, so there is no branch or manual trigger that could publish something
+# else under the same version.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/martinhoblisch/pbf-forge
+
+jobs:
+  image:
+    name: Publish container image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+
+      # The tag, the version the app reports and the tag docker-compose.yml
+      # pulls all name the same release, or the launchers would fetch an image
+      # that does not match the checkout beside it.
+      - name: Check the tag against the source
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' backend/config.py)
+          compose=$(sed -n "s|^ *image: ${IMAGE}:\(.*\)|\1|p" docker-compose.yml)
+          echo "tag=$tag version=$version compose=$compose"
+          test "$tag" = "$version" || { echo "::error::tag $tag does not match VERSION $version in backend/config.py"; exit 1; }
+          test "$tag" = "$compose" || { echo "::error::tag $tag does not match the image tag $compose in docker-compose.yml"; exit 1; }
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # latest is added automatically for a non-prerelease tag.
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      # linux/amd64 only. Cross-building osmium-tool and GDAL under emulation
+      # costs far more than it returns for a tool documented for Windows and
+      # Linux desktops; every other platform falls back to the local build in
+      # docker-compose.yml, which produces the same image from the same source.
+      - id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
+
+      # Signed provenance for the pushed digest, verifiable with
+      # `gh attestation verify oci://ghcr.io/martinhoblisch/pbf-forge:<tag>
+      #  --repo MartinHoblisch/pbf-forge`.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}

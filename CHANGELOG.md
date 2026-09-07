@@ -11,6 +11,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Prebuilt container images.** A first start built the image on the user's
+  machine: apt fetching osmium-tool and GDAL, pip installing the Python
+  dependencies, several minutes before anything opened. Releases now publish an
+  image to `ghcr.io/martinhoblisch/pbf-forge`, tagged with the version, and the
+  launchers fetch it instead. The tag `docker-compose.yml` names is the version
+  the app reports, so the image and the checkout beside it always match; a
+  release workflow that finds them disagreeing refuses to publish. Nothing is
+  lost where there is nothing to fetch — a platform other than `linux/amd64`, a
+  working copy ahead of the last release, or `--build` — the launcher builds
+  from source as before. Images carry an SBOM and signed build provenance.
 - **An update notice, and an `update.sh` / `update.bat` to act on it.** A copy
   installed with `git clone` stayed on the version it was cloned at: nothing in
   the tool knew a newer release existed, and finding out meant opening a console
