@@ -7,7 +7,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.2.1] - 2026-09-07
 
 ### Fixed
 
@@ -417,6 +417,7 @@ read from the host rather than from the container.
 - Localhost-only bind (`127.0.0.1`); no telemetry, no CDN fetches.
 - Docker Compose single-command startup.
 
+[1.2.1]: https://github.com/MartinHoblisch/pbf-forge/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/MartinHoblisch/pbf-forge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MartinHoblisch/pbf-forge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/MartinHoblisch/pbf-forge/releases/tag/v1.0.0
