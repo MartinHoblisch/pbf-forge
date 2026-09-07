@@ -28,14 +28,22 @@ jobs:
       # The tag, the version the app reports and the tag docker-compose.yml
       # pulls all name the same release, or the launchers would fetch an image
       # that does not match the checkout beside it.
+      # A pre-release tag (v1.2.0-rc.1) is compared on its core version, so a
+      # release can be rehearsed end to end without touching the source. Such a
+      # tag publishes only its own full version: docker/metadata-action does not
+      # move latest, {{major}} or {{major}}.{{minor}} onto a pre-release, and no
+      # docker-compose.yml ever names one, so nothing pulls it by accident.
       - name: Check the tag against the source
+        id: version
         run: |
           tag="${GITHUB_REF_NAME#v}"
+          core="${tag%%-*}"
           version=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' backend/config.py)
           compose=$(sed -n "s|^ *image: ${IMAGE}:\(.*\)|\1|p" docker-compose.yml)
-          echo "tag=$tag version=$version compose=$compose"
-          test "$tag" = "$version" || { echo "::error::tag $tag does not match VERSION $version in backend/config.py"; exit 1; }
-          test "$tag" = "$compose" || { echo "::error::tag $tag does not match the image tag $compose in docker-compose.yml"; exit 1; }
+          echo "tag=$tag core=$core version=$version compose=$compose"
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          test "$core" = "$version" || { echo "::error::tag $tag does not match VERSION $version in backend/config.py"; exit 1; }
+          test "$core" = "$compose" || { echo "::error::tag $tag does not match the image tag $compose in docker-compose.yml"; exit 1; }
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4
 
@@ -54,6 +62,49 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+
+      # Built to the local daemon and exercised before anything is pushed. A
+      # release that fails the smoke test below publishes nothing at all, so a
+      # tag the launchers pull can never point at an image that does not run.
+      - name: Build for the smoke test
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          load: true
+          tags: pbf-forge:smoke
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test the image
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/smoke/data /tmp/smoke/config
+          docker run -d --name smoke -p 127.0.0.1:8000:8000             -v /tmp/smoke/data:/data -v /tmp/smoke/config:/app/config pbf-forge:smoke
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8000/ >/dev/null && break
+            sleep 1
+          done
+
+          echo "-- the interface is served"
+          curl -sf http://127.0.0.1:8000/ | grep -q "PBF Forge"
+
+          echo "-- settings answer"
+          curl -sf http://127.0.0.1:8000/api/settings | grep -q '"configured"'
+
+          echo "-- the image reports the version being released"
+          reported=$(curl -sf http://127.0.0.1:8000/api/update-check \n            | grep -o '"current":"[^"]*"' | cut -d'"' -f4)
+          test "$reported" = "${{ steps.version.outputs.core }}" || {
+            echo "::error::the image reports $reported, the tag says ${{ steps.version.outputs.core }}"
+            exit 1
+          }
+
+          echo "-- the tools the pipeline shells out to run"
+          docker run --rm pbf-forge:smoke ogr2ogr --version
+          docker run --rm -v "$PWD:/src:ro" pbf-forge:smoke             osmium tags-filter /src/mini.osm.pbf w/highway -o /tmp/smoke.osm.pbf
+
+          docker logs smoke
+          docker rm -f smoke
 
       # linux/amd64 only. Cross-building osmium-tool and GDAL under emulation
       # costs far more than it returns for a tool documented for Windows and

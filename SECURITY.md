@@ -30,8 +30,10 @@ Release images are built from the tagged commit by
 [.github/workflows/release.yml](.github/workflows/release.yml) and pushed to
 `ghcr.io/martinhoblisch/pbf-forge`. The workflow refuses to publish when the
 tag, `VERSION` in `backend/config.py` and the image tag in `docker-compose.yml`
-disagree, so a published image always matches the source that carries the same
-version. Each image is built with a BuildKit SBOM and signed build provenance:
+disagree, and it starts the built image and checks that it serves the interface
+and reports the version being released before pushing anything, so a published
+image always matches the source that carries the same version and is known to
+run. Each image is built with a BuildKit SBOM and signed build provenance:
 
 ```bash
 gh attestation verify oci://ghcr.io/martinhoblisch/pbf-forge:1.1.0 --repo MartinHoblisch/pbf-forge

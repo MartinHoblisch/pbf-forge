@@ -45,6 +45,23 @@ commit, then tag:
 git tag v1.2.0 && git push origin v1.2.0
 ```
 
+The workflow builds the image, starts it and checks that it serves the
+interface and reports the version being released before anything is pushed, so
+a failed release publishes nothing.
+
+To rehearse the whole pipeline without publishing anything a launcher would
+pull, tag a pre-release of the same version:
+
+```bash
+git tag v1.2.0-rc.1 && git push origin v1.2.0-rc.1
+```
+
+The version check compares the core version, so this passes on the same source.
+`docker/metadata-action` never moves `latest`, `{{major}}` or
+`{{major}}.{{minor}}` onto a pre-release, and no `docker-compose.yml` names
+one, so the only thing published is `1.2.0-rc.1`, which nothing fetches by
+accident. Delete the package version and the tag afterwards.
+
 The first push of a package to GHCR creates it as private. Set it to public
 once in the package settings, or the launchers fall back to building locally.
 
