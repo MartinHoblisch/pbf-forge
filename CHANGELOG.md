@@ -11,6 +11,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A `Discard` action for a partial download.** A `.part` file could only ever
+  be resumed or left alone: nothing in the app removed one. A transfer the user
+  had lost interest in kept its gigabytes indefinitely, and a partial whose
+  bytes the disk could no longer read back was a dead end — every retry read the
+  same unreadable file and failed the same way, with a file manager the only way
+  out. Rows with a partial now offer **Discard** (never while a transfer is
+  running), which deletes the `.part` so the next download starts from zero.
 - **A `Verifying checksum` status.** After the last byte arrives, the download
   is hashed and checked against the `.md5` the host publishes beside it. On a
   country-sized extract that is tens of seconds of reading several gigabytes
@@ -70,6 +77,25 @@ Versioning: [Semantic Versioning](https://semver.org/).
   appearing. A checksum mismatch hit this every time, because it removes the
   file it rejected. The row now survives with its message and its download
   button, and reports no local size, since there is no local file.
+- **A host that is down when a download starts is waited for, not given up on.**
+  A connection that failed or timed out mid-transfer started a slow retry that
+  waited the outage out; the same failure on the request that opens the
+  transfer ended it with a red row and nothing to retry it. Whether an outage
+  was recoverable depended on nothing but how far the download had already got.
+  The opening request now waits the same way, reports `Waiting for retry` with
+  its countdown, and can be cancelled. A permanent failure still fails at once:
+  a 404, a bad certificate, or a hostname that does not resolve.
+- **A partial that cannot be read is no longer told to resume.** Every checksum
+  failure that left the `.part` file on disk ended with "start it again to
+  resume", including the one raised when the file could not be read at all.
+  Resuming appends to exactly the file that failed to read, so the advice could
+  never work; the message now says to discard the partial and download again.
+- **A deleted file no longer lingers behind a failed check.** The rule that
+  keeps a failed download's row also kept every other error row, including one
+  a check produced. So a file the user removed while the host was unreachable
+  stayed in the list through every "Check all", with an error about the host
+  rather than the deletion. Only a row whose bytes the tool discarded itself
+  now outlives its file; every other row goes when the file goes.
 
 ### Documentation
 

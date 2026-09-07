@@ -1117,6 +1117,9 @@ const TRANSLATIONS = {
     btn_cancel: 'Abbrechen',
     btn_close: 'Schließen',
     btn_check: 'Prüfen',
+    btn_discard: 'Verwerfen',
+    btn_discard_title: 'Angefangenen Download löschen — der nächste beginnt von vorn',
+    confirm_discard: size => `Angefangenen Download verwerfen? ${size} bereits geladene Daten gehen verloren, der nächste Download beginnt von vorn.`,
     alert_no_updates: 'Keine veralteten oder fehlenden Dateien mit bekannter URL.',
     no_files: 'Keine PBF-Dateien im Datenverzeichnis gefunden.',
     no_source_files: 'Keine PBF-Dateien vorhanden.',
@@ -1305,6 +1308,9 @@ const TRANSLATIONS = {
     btn_cancel: 'Cancel',
     btn_close: 'Close',
     btn_check: 'Check',
+    btn_discard: 'Discard',
+    btn_discard_title: 'Delete the partial download — the next one starts from zero',
+    confirm_discard: size => `Discard the partial download? ${size} of downloaded data is lost and the next download starts from zero.`,
     alert_no_updates: 'No outdated or missing files with known URL.',
     no_files: 'No PBF files found in the data directory.',
     no_source_files: 'No PBF files available.',
@@ -1946,6 +1952,9 @@ function renderFiles() {
 
     const canDownload = f.url && ['update_available','not_downloaded','unknown','error','paused'].includes(f.status);
     const canCancel   = ['downloading', 'waiting_retry'].includes(f.status);
+    // Only a row nobody is working on: the .part of a running transfer is the
+    // file that transfer is writing to.
+    const canDiscard  = f.partial_bytes && !DL_ACTIVE.includes(f.status);
 
     // Filenames travel in data attributes, never interpolated into an inline
     // handler: escHtml does not escape the apostrophe that would break out of one.
@@ -1954,6 +1963,7 @@ function renderFiles() {
       ${canDownload ? `<button class="btn btn-secondary btn-sm" ${fileAttr} data-file-action="download">${t('btn_download')}</button>` : ''}
       ${canCancel   ? `<button class="btn btn-danger btn-sm" ${fileAttr} data-file-action="cancel">${t('btn_cancel')}</button>` : ''}
       ${f.url ? `<button class="btn btn-secondary btn-sm" ${fileAttr} data-file-action="check">${t('btn_check')}</button>` : ''}
+      ${canDiscard  ? `<button class="btn btn-secondary btn-sm" ${fileAttr} data-partial-bytes="${f.partial_bytes}" data-file-action="discard" title="${escHtml(t('btn_discard_title'))}">${t('btn_discard')}</button>` : ''}
     `.trim();
 
     const errTip = f.error ? ` title="${escHtml(f.error)}"` : '';
@@ -2035,6 +2045,11 @@ async function downloadOne(filename) {
 
 async function cancelDownload(filename) {
   await _postDownloadAction('/api/cancel', { filename });
+}
+
+async function discardPartial(filename, partialBytes) {
+  if (!confirm(t('confirm_discard', fmtSize(partialBytes)))) return;
+  await _postDownloadAction('/api/discard', { filename });
 }
 
 async function downloadOutdated() {
@@ -2668,6 +2683,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn.dataset.fileAction === 'download') downloadOne(filename);
     if (btn.dataset.fileAction === 'cancel')   cancelDownload(filename);
     if (btn.dataset.fileAction === 'check')    checkOne(filename);
+    if (btn.dataset.fileAction === 'discard')  discardPartial(filename, Number(btn.dataset.partialBytes));
   });
 
   document.addEventListener('click', e => {

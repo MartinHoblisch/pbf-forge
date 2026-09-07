@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -60,10 +61,36 @@ _ACTIVE_STATUSES = ("downloading", "verifying", "waiting_retry")
 # user knows a second click resumes instead of starting the transfer over.
 _RESUME_HINT = "The partial download was kept — start it again to resume."
 
+# Appended where the bytes on disk cannot be read back. Resuming appends to
+# exactly the file that failed to read, so it can never clear the fault — the
+# only way forward is to throw those bytes away and fetch them again.
+_DISCARD_HINT = "The partial download cannot be read — discard it and download again."
+
 # Statuses that a directory scan must leave alone on top of the active ones:
 # an in-flight check owns the row just as much, and an error is a result the
 # user still needs to see.
 _PRESERVED_STATUSES = _ACTIVE_STATUSES + ("checking", "error")
+
+
+class _DiscardedPartial(RuntimeError):
+    """A download failed and the tool removed the bytes it had written.
+
+    The row is the only remaining report of what happened, so it has to outlive
+    the file — unlike an error a check produced, which says nothing about a
+    file the user has since deleted.
+    """
+
+
+def _survives_deletion(state: "FileState") -> bool:
+    """Whether a row stays once nothing is left of it on disk.
+
+    A worker owns its row while it runs, and so does an in-flight check. An
+    error row only stays when the tool discarded the bytes itself: a failed
+    check would otherwise pin a row for a file the user deleted on purpose.
+    """
+    if state.status in _ACTIVE_STATUSES or state.status == "checking":
+        return True
+    return state.status == "error" and state.discarded
 
 
 def _stat_or_none(path: Path) -> Optional[os.stat_result]:
@@ -141,6 +168,45 @@ def _scanned_status(state: "FileState", partial: Optional[os.stat_result]) -> st
         return "paused" if partial else "unknown"
     server_mtime = datetime.fromisoformat(state.server_mtime) if state.server_mtime else None
     return _freshness(state, state.server_size, server_mtime)
+
+
+class _WaitCancelled(Exception):
+    """The user cancelled while the worker was waiting for the host."""
+
+
+def _is_name_resolution_failure(exc: BaseException) -> bool:
+    """Whether a request failed because the hostname does not resolve.
+
+    requests reports this as a ConnectionError like any other, but a host that
+    DNS does not know is a typo in the URL, not an outage — waiting for it to
+    come back would wait forever. The cause is looked up through the exception
+    chain, where urllib3 leaves either a socket.gaierror or its own
+    NameResolutionError (matched by name, so no urllib3 internal is imported).
+    """
+    seen: Optional[BaseException] = exc
+    while seen is not None:
+        if isinstance(seen, socket.gaierror) or type(seen).__name__ == "NameResolutionError":
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
+def _is_transient(exc: Exception) -> bool:
+    """Whether a request failed in a way that waiting could still fix.
+
+    Same verdict the transfer loop reaches: a connection that never came up or
+    timed out, and the HTTP statuses hosts return while they are overloaded.
+    An SSL failure is a requests.ConnectionError but never a passing outage,
+    and neither is a hostname nobody can resolve.
+    """
+    if isinstance(exc, requests.exceptions.SSLError):
+        return False
+    if isinstance(exc, requests.HTTPError):
+        code = exc.response.status_code if exc.response is not None else 0
+        return code in TRANSIENT_HTTP_STATUSES
+    if not isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+        return False
+    return not _is_name_resolution_failure(exc)
 
 
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
@@ -245,6 +311,10 @@ class FileState:
     # a check can tell a partial that is still resumable from one the server has
     # already built past.
     partial_mtime: Optional[str] = None
+    # Set when a failed download left nothing behind because the tool removed
+    # it. Not reported to clients — it only decides whether the row survives
+    # the file. See _survives_deletion.
+    discarded: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -373,13 +443,13 @@ class DownloadManager:
             with self._lock:
                 state = self._files.get(filename)
                 # Nothing tracked, or a worker is about to create the .part
-                # file. An error row outlives its file on purpose: a checksum
-                # mismatch discards the partial, and dropping the row with it
-                # would take the only report of what went wrong. What must not
-                # outlive the file is its size and date — a row that still
-                # advertises 21 MB local reads as if the file were usable. A
-                # worker's row is left alone: it owns those fields itself.
-                if state is None or state.status in _PRESERVED_STATUSES:
+                # file. A discarded-partial error row outlives its file on
+                # purpose: dropping it would take the only report of what went
+                # wrong. What must not outlive the file is its size and date —
+                # a row that still advertises 21 MB local reads as if the file
+                # were usable. A worker's row is left alone: it owns those
+                # fields itself.
+                if state is None or _survives_deletion(state):
                     if state is not None and state.status not in _ACTIVE_STATUSES:
                         state.local_size = None
                         state.local_mtime = None
@@ -514,6 +584,7 @@ class DownloadManager:
             state.url = url
             state.status = "downloading"
             state.error = None
+            state.discarded = False
             state.downloaded_bytes = 0
             cancel = threading.Event()
             self._cancel_flags[filename] = cancel
@@ -521,6 +592,39 @@ class DownloadManager:
 
         self._broadcast({"type": "file_update", "file": state_dict})
         self._executor.submit(self._download_worker, filename, cancel)
+        return True
+
+    def discard_partial(self, filename: str) -> bool:
+        """Delete a row's .part file so the next download starts from zero.
+
+        The way out of a partial that can never complete: bytes the disk no
+        longer reads back, or a transfer the user has lost interest in. Both
+        used to leave the file behind with no way to remove it from the app.
+
+        Refuses while a worker owns the row — it holds the file open and would
+        keep writing to a path nobody can see any more. Returns False when
+        there is no such row, and lets an unlink error through so the caller
+        can report why the file is still there.
+        """
+        with self._lock:
+            state = self._files.get(filename)
+            if state is None or state.status in _ACTIVE_STATUSES:
+                return False
+
+        (DATA_DIR / (filename + PART_SUFFIX)).unlink(missing_ok=True)
+
+        with self._lock:
+            state.error = None
+            state.discarded = False
+            # The status is re-derived below from what is left on disk, but an
+            # error row would otherwise be preserved on the strength of a
+            # message that no longer describes anything.
+            if state.status == "error":
+                state.status = "unknown"
+        if self._sync_local_state(filename):
+            with self._lock:
+                data = self._files[filename].to_dict()
+            self._broadcast({"type": "file_update", "file": data})
         return True
 
     def cancel_download(self, filename: str) -> None:
@@ -582,6 +686,7 @@ class DownloadManager:
                 return False
             state.status = "downloading"
             state.error = None
+            state.discarded = False
             state.downloaded_bytes = 0
             cancel = threading.Event()
             self._cancel_flags[filename] = cancel
@@ -684,6 +789,68 @@ class DownloadManager:
             state.server_mtime = mtime.isoformat() if mtime else None
         return size, mtime
 
+    def _head_waiting_for_the_host(
+        self,
+        url: str,
+        session: requests.Session,
+        state: FileState,
+        cancel: threading.Event,
+    ) -> tuple[int, Optional[datetime]]:
+        """HEAD the URL, waiting out an unreachable host the way a transfer does.
+
+        A host that drops away one byte into a transfer is waited for until the
+        user says otherwise. The request that opens the transfer used to end it
+        outright on the same failure, so whether an outage was recoverable
+        depended on nothing but how far the download had already got — and a
+        click during a host's bad minute produced a red row that nothing would
+        ever retry.
+
+        Raises _WaitCancelled when the user cancels the wait, and lets a
+        permanent failure (a 404, a bad certificate) through untouched.
+        """
+        attempt = 0
+        while True:
+            try:
+                return self._head(url, session=session)
+            except Exception as exc:
+                if not _is_transient(exc):
+                    raise
+                if cancel.is_set():
+                    raise _WaitCancelled from exc
+                attempt += 1
+                _log.warning("Host not answering for %s: %s — waiting to retry", url, exc)
+                retry_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=SLOW_RETRY_INTERVAL_SECONDS
+                )
+                with self._lock:
+                    state.status = "waiting_retry"
+                    state.retry_at = retry_at.isoformat()
+                    state.retry_attempt = attempt
+                self._broadcast({"type": "file_update", "file": state.to_dict()})
+                cancel.wait(timeout=SLOW_RETRY_INTERVAL_SECONDS)
+                if cancel.is_set():
+                    raise _WaitCancelled from exc
+                with self._lock:
+                    state.status = "downloading"
+                    state.retry_at = None
+                self._broadcast({"type": "file_update", "file": state.to_dict()})
+
+    def _settle_cancelled_row(self, state: FileState, part: Path) -> None:
+        """Report a row whose transfer was stopped before it finished.
+
+        The .part file is intentionally left on disk as the resume base for the
+        next attempt, so the row is reported as paused rather than vanishing on
+        the next directory scan.
+        """
+        leftover = _stat_or_none(part)
+        with self._lock:
+            state.status = "paused" if leftover else "unknown"
+            state.retry_at = None
+            state.retry_attempt = None
+            state.partial_bytes = leftover.st_size if leftover else None
+            state.speed_bps = 0.0
+            state.eta_seconds = 0.0
+
     def _download_worker(self, filename: str, cancel: threading.Event) -> None:
         with self._lock:
             state = self._files[filename]
@@ -695,7 +862,7 @@ class DownloadManager:
 
         try:
             with self._new_session() as session:
-                size, mtime = self._head(url, session=session)
+                size, mtime = self._head_waiting_for_the_host(url, session, state, cancel)
                 with self._lock:
                     state.server_size = size
                     state.server_mtime = mtime.isoformat() if mtime else None
@@ -800,15 +967,7 @@ class DownloadManager:
                         break  # exit fast retry loop (slow loop handled everything)
 
             if cancel.is_set():
-                # .part intentionally kept on disk — resume base for the next
-                # attempt. Report it as paused so the row stays and offers a
-                # resume instead of vanishing on the next directory scan.
-                leftover = _stat_or_none(part)
-                with self._lock:
-                    state.status = "paused" if leftover else "unknown"
-                    state.partial_bytes = leftover.st_size if leftover else None
-                    state.speed_bps = 0.0
-                    state.eta_seconds = 0.0
+                self._settle_cancelled_row(state, part)
             else:
                 if not part.exists():
                     raise RuntimeError(
@@ -842,10 +1001,13 @@ class DownloadManager:
                     state.eta_seconds = 0.0
                     state.downloaded_bytes = 0
 
+        except _WaitCancelled:
+            self._settle_cancelled_row(state, part)
         except Exception as exc:
             with self._lock:
                 state.status = "error"
                 state.error = str(exc)
+                state.discarded = isinstance(exc, _DiscardedPartial)
         finally:
             with self._lock:
                 self._cancel_flags.pop(filename, None)
@@ -885,7 +1047,7 @@ class DownloadManager:
         try:
             actual_hex = _md5_of(dest)
         except OSError as exc:
-            raise RuntimeError(f"Could not read {dest.name}: {exc}. {_RESUME_HINT}") from exc
+            raise RuntimeError(f"Could not read {dest.name}: {exc}. {_DISCARD_HINT}") from exc
 
         md5_url = url + ".md5"
         expected_hex, listed_name = self._fetch_checksum(md5_url, session)
@@ -927,9 +1089,11 @@ class DownloadManager:
         try:
             dest.unlink()
             hint = "The partial download was discarded; the next one starts over."
+            error: type[RuntimeError] = _DiscardedPartial
         except OSError:
             hint = f"{dest.name} could not be removed — delete it manually."
-        raise RuntimeError(
+            error = RuntimeError
+        raise error(
             f"MD5 mismatch for {dest.name}: expected {expected_hex}, got {actual_hex}. {hint}"
         )
 
