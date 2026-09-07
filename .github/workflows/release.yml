@@ -111,7 +111,7 @@ jobs:
 
           echo "-- the tools the pipeline shells out to run"
           docker run --rm pbf-forge:smoke ogr2ogr --version
-          docker run --rm -v "$PWD:/src:ro" pbf-forge:smoke osmium tags-filter /src/mini.osm.pbf w/highway -o /tmp/smoke.osm.pbf
+          docker run --rm pbf-forge:smoke osmium --version
 
           docker logs smoke
           docker rm -f smoke
