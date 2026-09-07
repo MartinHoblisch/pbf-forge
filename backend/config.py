@@ -13,7 +13,7 @@ from pathlib import Path
 # The release this build is. Reaches users through the download user agent, the
 # provenance metadata embedded in every output file, and the report written
 # beside it. Raising it here raises it everywhere.
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/app/config"))

@@ -7,7 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.2.0] - 2026-09-07
+
+Highlights: an update notice and update scripts, so an install no longer sits
+on the version it was cloned at; prebuilt images, so a first start is a
+download rather than a build; a Discard action for partial downloads; a
+checksum phase that reports itself and recovers from its own failures; and an
+`osm_type` column that makes exported feature ids unique.
 
 ### Added
 
@@ -394,5 +400,6 @@ read from the host rather than from the container.
 - Localhost-only bind (`127.0.0.1`); no telemetry, no CDN fetches.
 - Docker Compose single-command startup.
 
+[1.2.0]: https://github.com/MartinHoblisch/pbf-forge/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MartinHoblisch/pbf-forge/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/MartinHoblisch/pbf-forge/releases/tag/v1.0.0
