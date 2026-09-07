@@ -1,4 +1,4 @@
-"""HTTP endpoints for user settings: the host data directory and resource limits."""
+"""HTTP endpoints for user settings: data directory, resource limits, update check."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import re
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+import update_check
 from config import STARTUP_TIME, USER_CONFIG_FILE
 
 _log = logging.getLogger(__name__)
@@ -110,5 +111,26 @@ def post_resource_limits(payload: ResourceLimitsPayload) -> dict:
     cfg["resource_mode"] = payload.mode
     cfg["osmium_threads_override"] = payload.osmium_threads_override
     cfg["nice_override"] = payload.nice_override
+    _write_config(cfg)
+    return {"ok": True}
+
+
+# ── Update check ──────────────────────────────────────────────────────────────
+
+
+class UpdateCheckPayload(BaseModel):
+    enabled: bool
+
+
+@router.get("/api/update-check")
+def get_update_check() -> dict:
+    cfg = _read_config()
+    return update_check.status(cfg.get("update_check", True) is not False)
+
+
+@router.post("/api/update-check")
+def post_update_check(payload: UpdateCheckPayload) -> dict:
+    cfg = _read_config()
+    cfg["update_check"] = payload.enabled
     _write_config(cfg)
     return {"ok": True}

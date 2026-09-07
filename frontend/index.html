@@ -131,6 +131,45 @@ nav.tabs {
 .tab-btn:hover  { color: var(--blue); }
 .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
 
+/* ── Update banner ──
+   Sits under the tab bar instead of inside it: a new release is worth seeing
+   once, not worth a permanent slot. The bar scrolls away with the page, and
+   dismissing it hides that one version for good. */
+#update-banner {
+  display: none;  /* renderUpdateBanner switches this to flex */
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  background: var(--blue-lt);
+  border-bottom: 1px solid #bfdbfe;
+  color: #1e3a5f;
+  padding: .6rem 1.5rem;
+  font-size: .9rem;
+}
+#update-banner .icon { color: var(--blue); flex-shrink: 0; }
+#update-banner-text { font-weight: 500; }
+#update-banner a { color: var(--blue); font-weight: 500; }
+#update-banner-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--gray);
+  cursor: pointer;
+  display: inline-flex;
+  padding: .25rem;
+  border-radius: var(--radius);
+}
+#update-banner-close:hover { color: #111827; background: rgba(0,0,0,.06); }
+.update-optout {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .85rem;
+  color: var(--gray);
+  margin-bottom: 1.25rem;
+  cursor: pointer;
+}
+
 /* ── Layout ── */
 main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; flex: 1; width: 100%; }
 .tab-panel { display: none; }
@@ -599,6 +638,17 @@ footer .credits-sep { color: var(--border); }
   <button class="tab-btn" onclick="showTab('presets')" data-i18n="tab_presets">Presets</button>
 </nav>
 
+<!-- ── Update banner ──
+     Hidden unless the release check found a newer version that the user has
+     not dismissed. Filled by renderUpdateBanner(). -->
+<div id="update-banner">
+  <svg class="icon"><use href="#i-arrow-up"/></svg>
+  <span id="update-banner-text"></span>
+  <a id="update-banner-notes" href="https://github.com/MartinHoblisch/pbf-forge/releases/latest" target="_blank" rel="noopener" data-i18n="update_notes">What's new</a>
+  <button class="btn btn-primary btn-sm" onclick="openUpdateModal()" data-i18n="update_how">How to update</button>
+  <button id="update-banner-close" onclick="dismissUpdate()" data-i18n-title="update_dismiss" title="Hide this until the next release"><svg class="icon"><use href="#i-x"/></svg></button>
+</div>
+
 <main>
 
 <!-- ═══════════════════════════════════════════════════════════ DOWNLOADS ═══ -->
@@ -899,6 +949,23 @@ footer .credits-sep { color: var(--border); }
   </div>
 </div>
 
+<!-- ── Update modal ──
+     Names both scripts rather than detecting the platform, the way the restart
+     and goodbye overlays do. The scripts stop the container themselves, so the
+     only thing worth warning about is work that is still running. -->
+<div id="modal-update" class="overlay" style="display:none">
+  <div class="overlay-box">
+    <h2 data-i18n="update_title">Update PBF Forge</h2>
+    <p id="update-p">Run <strong>update.bat</strong> (Windows) or <strong>./update.sh</strong> (Linux) in the PBF Forge folder. It fetches the new release, rebuilds the image and starts PBF Forge again.</p>
+    <p id="update-privacy-p" style="font-size:.8rem;color:var(--gray);margin-bottom:.75rem">Once a day PBF Forge asks the GitHub release API which version is current. Nothing else is sent.</p>
+    <label class="update-optout"><input type="checkbox" id="update-optout-box" onchange="setUpdateCheck(!this.checked)"> <span data-i18n="update_optout">Stop checking for updates</span></label>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <a class="btn btn-secondary" id="update-modal-notes" href="https://github.com/MartinHoblisch/pbf-forge/releases/latest" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center" data-i18n="update_notes">What's new</a>
+      <button class="btn btn-primary" onclick="closeUpdateModal()" data-i18n="update_close">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Change-dir modal ── -->
 <div id="modal-change-dir" class="overlay" style="display:none">
   <div class="overlay-box">
@@ -1182,6 +1249,15 @@ const TRANSLATIONS = {
     quit_done_body: 'Der Container ist gestoppt. Dieser Tab kann geschlossen werden. Zum Neustarten <strong>start.bat</strong> (Windows) bzw. <strong>./start.sh</strong> (Linux) ausführen.',
     quit_failed: 'Beenden fehlgeschlagen. Der Server läuft weiter; mit stop.bat bzw. ./stop.sh stoppen.',
     github_title: 'Projekt auf GitHub öffnen',
+    update_available: (latest, current) => `Version ${latest} ist verfügbar. Installiert ist ${current}.`,
+    update_notes: 'Was ist neu',
+    update_how: 'Aktualisieren',
+    update_dismiss: 'Hinweis bis zur nächsten Version ausblenden',
+    update_title: 'PBF Forge aktualisieren',
+    update_p: 'Im PBF-Forge-Ordner <strong>update.bat</strong> (Windows) bzw. <strong>./update.sh</strong> (Linux) ausführen. Das Skript holt die neue Version, baut das Image neu und startet PBF Forge wieder. Laufende Downloads und Filter-Jobs werden dabei abgebrochen.',
+    update_privacy: 'Für die Prüfung fragt PBF Forge einmal täglich die GitHub-Release-API nach der neuesten Version. Übertragen wird dabei nur, was jede HTTP-Anfrage überträgt: IP-Adresse und User-Agent.',
+    update_optout: 'Nicht mehr nach Updates suchen',
+    update_close: 'Schließen',
     credits_built_with: 'Gebaut mit',
   },
   en: {
@@ -1371,6 +1447,15 @@ const TRANSLATIONS = {
     quit_done_body: 'The container has been shut down. You can close this tab. To start again, run <strong>start.bat</strong> (Windows) or <strong>./start.sh</strong> (Linux).',
     quit_failed: 'Could not quit. The server is still running; stop it with stop.bat or ./stop.sh.',
     github_title: 'Open the project on GitHub',
+    update_available: (latest, current) => `Version ${latest} is available. You are running ${current}.`,
+    update_notes: "What's new",
+    update_how: 'Update',
+    update_dismiss: 'Hide this until the next release',
+    update_title: 'Update PBF Forge',
+    update_p: 'Run <strong>update.bat</strong> (Windows) or <strong>./update.sh</strong> (Linux) in the PBF Forge folder. The script fetches the new release, rebuilds the image and starts PBF Forge again. Downloads and filter jobs that are still running are cancelled.',
+    update_privacy: 'For this check PBF Forge asks the GitHub release API once a day which version is the newest. It sends what any HTTP request sends and nothing more: an IP address and a user agent.',
+    update_optout: 'Stop checking for updates',
+    update_close: 'Close',
     credits_built_with: 'Built with',
   }
 };
@@ -1398,6 +1483,9 @@ function applyLang() {
   document.getElementById('url-hint-p').innerHTML = t('url_hint');
   document.getElementById('lock-p').innerHTML = t('lock_p');
   document.getElementById('cd-p').innerHTML = t('cd_p');
+  document.getElementById('update-p').innerHTML = t('update_p');
+  document.getElementById('update-privacy-p').innerHTML = t('update_privacy');
+  renderUpdateBanner();
   document.getElementById('ws-text').textContent = t(wsStatus);
   updateSoundBtn();
 }
@@ -1480,6 +1568,7 @@ function applySettingsState() {
     const badge = document.getElementById('dir-badge');
     badge.style.display = 'flex';
     document.getElementById('dir-badge-text').textContent = host_data_dir;
+    loadUpdateCheck();
   }
 }
 
@@ -1538,6 +1627,67 @@ async function saveChangedDir() {
   document.getElementById('lock-path').textContent = path;
   _showOverlay('lock');
   _startLockPolling();
+}
+
+// ─── Update check ─────────────────────────────────────────────────────────────
+// The backend decides whether GitHub is actually asked; it answers from a
+// day-old cache the rest of the time. This side only renders the answer.
+let updateInfo = null;
+let _updateChecked = false;
+
+async function loadUpdateCheck() {
+  if (_updateChecked) return;
+  _updateChecked = true;
+  try {
+    const res = await fetch('/api/update-check');
+    updateInfo = await res.json();
+  } catch {
+    return;  // offline, or the backend is restarting — no banner, no error
+  }
+  document.getElementById('update-optout-box').checked = !updateInfo.enabled;
+  document.getElementById('update-banner-notes').href = updateInfo.release_url;
+  document.getElementById('update-modal-notes').href = updateInfo.release_url;
+  renderUpdateBanner();
+}
+
+function renderUpdateBanner() {
+  const bar = document.getElementById('update-banner');
+  const show = updateInfo?.update_available
+    && localStorage.getItem('update_dismissed') !== updateInfo.latest;
+  bar.style.display = show ? 'flex' : 'none';
+  if (!show) return;
+  // Release tags carry a leading v that means nothing to the reader.
+  const latest = updateInfo.latest.replace(/^v/, '');
+  document.getElementById('update-banner-text').textContent =
+    t('update_available', latest, updateInfo.current);
+}
+
+// Dismissal is per version, not permanent: the next release shows up again.
+function dismissUpdate() {
+  if (updateInfo?.latest) localStorage.setItem('update_dismissed', updateInfo.latest);
+  renderUpdateBanner();
+}
+
+function openUpdateModal() {
+  document.getElementById('modal-update').style.display = 'flex';
+}
+
+function closeUpdateModal() {
+  document.getElementById('modal-update').style.display = 'none';
+}
+
+async function setUpdateCheck(enabled) {
+  try {
+    await fetch('/api/update-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    });
+  } catch { /* the checkbox reverts on the next reload */ }
+  if (!enabled && updateInfo) {
+    updateInfo.update_available = false;
+    renderUpdateBanner();
+  }
 }
 
 // ─── Resource limits ──────────────────────────────────────────────────────────

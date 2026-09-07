@@ -1,6 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM --build ignores the published image and builds from the source in this
+REM folder. Only useful when that source differs from the last release.
+set "BUILD_FROM_SOURCE="
+if /i "%~1"=="--build" set "BUILD_FROM_SOURCE=1"
+
 echo Starting PBF Forge...
 
 REM Check if Docker Desktop is running
@@ -53,8 +58,36 @@ REM Create data directory before Docker creates it as root
 if not exist "!DATA_DIR!" mkdir "!DATA_DIR!" 2>nul
 
 REM Restart Docker with current DATA_DIR
-docker compose -f docker-compose.yml -f docker-compose.windows.yml down --remove-orphans 2>nul
-docker compose -f docker-compose.yml -f docker-compose.windows.yml up --build -d
+set "COMPOSE=-f docker-compose.yml -f docker-compose.windows.yml"
+docker compose %COMPOSE% down --remove-orphans 2>nul
+
+REM Fetching the published image takes seconds where building osmium, GDAL and
+REM the Python dependencies takes minutes, so a build only happens when there is
+REM nothing to fetch: a working copy ahead of the last release, a platform with
+REM no image published for it, or --build to test local changes.
+if defined BUILD_FROM_SOURCE goto do_build
+
+docker compose %COMPOSE% pull --quiet 2>nul
+if not errorlevel 1 goto image_ready
+
+set "PBF_IMAGE="
+for /f "usebackq delims=" %%I in (`docker compose %COMPOSE% config --images`) do if not defined PBF_IMAGE set "PBF_IMAGE=%%I"
+docker image inspect "!PBF_IMAGE!" >nul 2>&1
+if not errorlevel 1 goto image_ready
+
+echo.
+echo No published image for this version. Building it from source instead.
+
+:do_build
+docker compose %COMPOSE% build
+if errorlevel 1 (
+    echo ERROR: Docker image build failed. See the output above.
+    pause
+    exit /b 1
+)
+
+:image_ready
+docker compose %COMPOSE% up -d
 
 if errorlevel 1 (
     echo ERROR: Docker Compose failed.

@@ -1,6 +1,14 @@
 services:
   pbf-forge:
     container_name: pbf-forge
+    # The launchers fetch this image instead of building it, which turns a
+    # first start from minutes into a download. The tag tracks VERSION in
+    # backend/config.py, so a checkout and the image beside it always name the
+    # same release. Only released versions are published: on a working copy
+    # ahead of the last release, and on platforms with no published image, the
+    # launchers fall back to the build below and produce the same image from
+    # this source.
+    image: ghcr.io/martinhoblisch/pbf-forge:1.1.0
     build: .
     # Bind to loopback only — never expose to LAN/public internet.
     # SECURITY.md non-goal: tool is auth-less; do not change to 0.0.0.0.

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
+# --build ignores the published image and builds from the source in this
+# folder. Only useful when that source differs from the last release.
+BUILD_FROM_SOURCE=""
+if [ "${1:-}" = "--build" ]; then
+    BUILD_FROM_SOURCE="yes"
+fi
+
 echo "Starting PBF Forge..."
 
 # Create user-config.json if missing (migrate from .env if present)
@@ -33,11 +40,29 @@ export DATA_DIR
 trap 'docker compose down; exit' INT TERM
 docker compose down --remove-orphans 2>/dev/null || true
 
+# Fetching the published image takes seconds where building osmium, GDAL and
+# the Python dependencies takes minutes, so a build only happens when there is
+# nothing to fetch: a working copy ahead of the last release, a platform with
+# no image published for it, or --build to test local changes.
+IMAGE=$(docker compose config --images 2>/dev/null | head -1 || true)
+NEED_BUILD=""
+if [ -n "$BUILD_FROM_SOURCE" ]; then
+    NEED_BUILD="yes"
+elif docker compose pull --quiet 2>/dev/null; then
+    :
+elif docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    :  # nothing to fetch, but the image is already here
+else
+    echo ""
+    echo "No published image for this version. Building it from source instead."
+    NEED_BUILD="yes"
+fi
+
 # Build in the foreground, before starting the readiness poll. A cold build
 # installs osmium/GDAL and pip dependencies and takes minutes; if the build ran
 # in the background the poll below would spend its whole budget waiting for apt
 # and give up before the container ever started.
-if ! docker compose build; then
+if [ -n "$NEED_BUILD" ] && ! docker compose build; then
     echo ""
     echo "ERROR: Docker image build failed. See the output above."
     exit 1

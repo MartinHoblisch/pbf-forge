@@ -13,6 +13,19 @@ on Iceland (62 MB) with a broad `highway` filter to GeoPackage, the peak was
 less, because every intermediate shrinks with it. Budget four times the extract
 and a broad filter still fits.
 
+## Where the image comes from
+
+Every release publishes a container image to
+`ghcr.io/martinhoblisch/pbf-forge`, tagged with its version. The launchers
+fetch the tag that `docker-compose.yml` names, which is the version the
+checkout beside it reports, so the code and the image always match.
+
+Images are published for `linux/amd64`. On any other platform, and on a
+working copy that is ahead of the last release, there is nothing to fetch and
+the launcher builds the image from the source in the folder instead. That
+takes a few minutes and produces the same image. `./start.sh --build` (or
+`start.bat --build`) forces that path when you want to run local changes.
+
 The image carries osmium-tool 1.19 and GDAL 3.12 from the Ubuntu 26.04 archive.
 Which expression forms and export options exist follows from those versions.
 Ask the container directly with
@@ -80,10 +93,27 @@ an explicit value overrides the preset.
 
 ## Updating
 
+PBF Forge asks the GitHub release API once a day whether a newer version
+exists and shows a bar under the tab row when there is one. The bar links to
+the release notes and can be dismissed; the next release brings it back. To
+switch the check off entirely, open it and tick *Stop checking for updates*.
+
+To install the new version, run `update.sh` on Linux or `update.bat` on
+Windows in the PBF Forge folder:
+
 ```bash
-git pull
+./update.sh
 ```
 
-Then start again. The launchers rebuild the image when the source has changed.
+The script fast-forwards the checkout and hands over to the launcher, which
+stops the container, fetches the image for the new version and starts it. Downloads
+and filter jobs that are still running are cancelled with the container, so
+finish or stop them first. Local changes to tracked files stop the script
+instead of being overwritten.
+
+Without Git, or without a checkout, download the newest release from the
+[releases page](https://github.com/MartinHoblisch/pbf-forge/releases/latest)
+and unpack it over the old folder, keeping `config/` and your data directory.
+
 A browser that still shows the old interface needs one hard reload
 (Ctrl+Shift+R); after that the cache headers keep it current on their own.

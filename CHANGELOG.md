@@ -11,6 +11,27 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Prebuilt container images.** A first start built the image on the user's
+  machine: apt fetching osmium-tool and GDAL, pip installing the Python
+  dependencies, several minutes before anything opened. Releases now publish an
+  image to `ghcr.io/martinhoblisch/pbf-forge`, tagged with the version, and the
+  launchers fetch it instead. The tag `docker-compose.yml` names is the version
+  the app reports, so the image and the checkout beside it always match; a
+  release workflow that finds them disagreeing refuses to publish. Nothing is
+  lost where there is nothing to fetch — a platform other than `linux/amd64`, a
+  working copy ahead of the last release, or `--build` — the launcher builds
+  from source as before. Images carry an SBOM and signed build provenance.
+- **An update notice, and an `update.sh` / `update.bat` to act on it.** A copy
+  installed with `git clone` stayed on the version it was cloned at: nothing in
+  the tool knew a newer release existed, and finding out meant opening a console
+  and typing `git pull`. PBF Forge now asks the GitHub release API once a day
+  which version is current and shows a bar under the tab row when that is ahead
+  of the running one. The bar links to the release notes and can be dismissed
+  per version. The new scripts fast-forward the checkout and hand over to the
+  launcher, which rebuilds the image and restarts the container, so updating is
+  one script instead of two commands. The check is the only request the tool
+  makes that nobody asked for: it is cached for a day, silent when it fails, and
+  switchable off in the update dialog, which stops it entirely.
 - **A `Discard` action for a partial download.** A `.part` file could only ever
   be resumed or left alone: nothing in the app removed one. A transfer the user
   had lost interest in kept its gigabytes indefinitely, and a partial whose
