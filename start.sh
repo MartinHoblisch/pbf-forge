@@ -40,6 +40,26 @@ export DATA_DIR
 trap 'docker compose down; exit' INT TERM
 docker compose down --remove-orphans 2>/dev/null || true
 
+# The down above removed this folder's container, so a container still holding
+# the name belongs to another checkout: a second clone, or the folder this one
+# replaced. Docker's own conflict error names neither the folder it came from
+# nor the way out of it.
+if docker container inspect pbf-forge >/dev/null 2>&1; then
+    OTHER=$(docker container inspect         -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}'         pbf-forge 2>/dev/null || true)
+    echo ""
+    echo "ERROR: another PBF Forge installation holds the container name \"pbf-forge\","
+    echo "       and only one installation can hold it at a time."
+    if [ -n "$OTHER" ]; then
+        echo "       That one was started from: $OTHER"
+    fi
+    echo ""
+    echo "       Remove that container and run this script again:"
+    echo ""
+    echo "           docker rm -f pbf-forge"
+    echo ""
+    exit 1
+fi
+
 # Fetching the published image takes seconds where building osmium, GDAL and
 # the Python dependencies takes minutes, so a build only happens when there is
 # nothing to fetch: a working copy ahead of the last release, a platform with
