@@ -569,6 +569,7 @@ footer {
 footer a { color: var(--gray); text-decoration: none; }
 footer a:hover { color: var(--blue); text-decoration: underline; }
 footer .credits-sep { color: var(--border); }
+.version-slot { display: contents; }
 .version-badge {
   background: transparent;
   border: none;
@@ -913,10 +914,14 @@ footer .credits-sep { color: var(--border); }
 
 <footer>
   <a id="github-link" href="https://github.com/MartinHoblisch/pbf-forge" target="_blank" rel="noopener" data-i18n-title="github_title" title="Open the project on GitHub"><svg class="icon icon-solid"><use href="#i-github"/></svg></a>
-  <span class="credits-sep">|</span>
-  <button id="version-badge" class="version-badge" style="display:none" onclick="openUpdateModal()" data-i18n-title="version_title" title="Check for updates">
-    <span id="version-text"></span><span class="dot" id="version-dot" style="display:none"></span>
-  </button>
+  <!-- display:contents, so the separator and the badge stay separate flex
+       items with the bar's own gap while they hide and appear as one. -->
+  <span id="version-slot" class="version-slot" style="display:none">
+    <span class="credits-sep">|</span>
+    <button id="version-badge" class="version-badge" onclick="openUpdateModal()" data-i18n-title="version_title" title="Check for updates">
+      <span id="version-text"></span><span class="dot" id="version-dot" style="display:none"></span>
+    </button>
+  </span>
   <span class="credits-sep">|</span>
   <span>by Martin Hoblisch</span>
   <span class="credits-sep">|</span>
@@ -1672,7 +1677,7 @@ async function loadUpdateCheck() {
 function renderUpdateBanner() {
   if (updateInfo?.current) {
     document.getElementById('version-text').textContent = 'v' + updateInfo.current;
-    document.getElementById('version-badge').style.display = 'inline-flex';
+    document.getElementById('version-slot').style.display = '';
     document.getElementById('version-dot').style.display =
       updateInfo.update_available ? 'inline-block' : 'none';
   }

@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **No empty slot in the footer before the version arrives.** The version and
+  its separator were hidden independently, so the bar showed two separators
+  with a gap between them until `/api/update-check` answered — on every load,
+  and for good when that request failed. Both now hide and appear as one.
+
 ## [1.2.2] - 2026-09-07
 
 ### Added
