@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -572,3 +573,30 @@ def test_shellcheck_covers_every_shell_script():
     assert scripts, "no shell scripts found, the layout must have changed"
     missing = [s for s in scripts if s not in linted]
     assert not missing, f"shellcheck does not cover: {missing}"
+
+
+def test_shell_scripts_are_executable():
+    """A script the docs tell a user to run has to be runnable.
+
+    update.sh shipped in 1.2.0 as mode 100644, so `./update.sh` on Linux
+    answered with permission denied while the docs named it as the way to
+    update. The mode is invisible in a diff and is not recorded at all on
+    Windows, where core.fileMode is off, so nothing but the index shows it.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "-s", "--", "*.sh", "scripts/*.sh"],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        pytest.skip("not a git checkout, so the recorded file modes cannot be read")
+
+    assert listing.strip(), "no shell scripts are tracked, the layout must have changed"
+
+    not_executable = [
+        line.split("\t", 1)[1] for line in listing.splitlines() if line.startswith("100644")
+    ]
+    assert not not_executable, f"tracked but not executable: {not_executable}"
