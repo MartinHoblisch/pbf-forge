@@ -569,6 +569,19 @@ footer {
 footer a { color: var(--gray); text-decoration: none; }
 footer a:hover { color: var(--blue); text-decoration: underline; }
 footer .credits-sep { color: var(--border); }
+.version-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--gray);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+}
+.version-badge:hover { color: var(--blue); text-decoration: underline; }
+.dot.update { background: var(--blue); }
 /* Leads the bar, in place of the app name the header already carries. */
 #github-link {
   display: inline-flex;
@@ -900,6 +913,10 @@ footer .credits-sep { color: var(--border); }
 
 <footer>
   <a id="github-link" href="https://github.com/MartinHoblisch/pbf-forge" target="_blank" rel="noopener" data-i18n-title="github_title" title="Open the project on GitHub"><svg class="icon icon-solid"><use href="#i-github"/></svg></a>
+  <span class="credits-sep">|</span>
+  <button id="version-badge" class="version-badge" style="display:none" onclick="openUpdateModal()" data-i18n-title="version_title" title="Check for updates">
+    <span id="version-text"></span><span class="dot" id="version-dot" style="display:none"></span>
+  </button>
   <span class="credits-sep">|</span>
   <span>by Martin Hoblisch</span>
   <span class="credits-sep">|</span>
@@ -1258,6 +1275,7 @@ const TRANSLATIONS = {
     update_privacy: 'Für die Prüfung fragt PBF Forge einmal täglich die GitHub-Release-API nach der neuesten Version. Übertragen wird dabei nur, was jede HTTP-Anfrage überträgt: IP-Adresse und User-Agent.',
     update_optout: 'Nicht mehr nach Updates suchen',
     update_close: 'Schließen',
+    version_title: 'Nach Updates suchen',
     credits_built_with: 'Gebaut mit',
   },
   en: {
@@ -1456,6 +1474,7 @@ const TRANSLATIONS = {
     update_privacy: 'For this check PBF Forge asks the GitHub release API once a day which version is the newest. It sends what any HTTP request sends and nothing more: an IP address and a user agent.',
     update_optout: 'Stop checking for updates',
     update_close: 'Close',
+    version_title: 'Check for updates',
     credits_built_with: 'Built with',
   }
 };
@@ -1651,6 +1670,13 @@ async function loadUpdateCheck() {
 }
 
 function renderUpdateBanner() {
+  if (updateInfo?.current) {
+    document.getElementById('version-text').textContent = 'v' + updateInfo.current;
+    document.getElementById('version-badge').style.display = 'inline-flex';
+    document.getElementById('version-dot').style.display =
+      updateInfo.update_available ? 'inline-block' : 'none';
+  }
+
   const bar = document.getElementById('update-banner');
   const show = updateInfo?.update_available
     && localStorage.getItem('update_dismissed') !== updateInfo.latest;

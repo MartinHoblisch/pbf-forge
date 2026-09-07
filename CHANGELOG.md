@@ -7,6 +7,19 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **The running version, in the footer.** Nothing in the interface said which
+  version was running, and the update dialog — which names it, links the
+  release notes and carries the opt-out for the release check — could only be
+  reached from the banner, so it existed only while an update happened to be
+  pending. The footer now carries the version beside the project link, and
+  clicking it opens that dialog at any time. A dot appears next to it while a
+  newer release is available, and stays after the banner has been dismissed for
+  that version.
+
 ## [1.2.1] - 2026-09-07
 
 ### Fixed
