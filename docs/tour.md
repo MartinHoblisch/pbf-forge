@@ -11,7 +11,9 @@ Every PBF in your data directory gets a row, and so does every running
 transfer. Each row shows local size, published size and status. Add a file by
 pasting its URL; see [limits.md](limits.md#the-host-has-to-publish-a-checksum)
 for what a host has to provide. Interrupted transfers resume, and at startup
-the tool checks every host in the list.
+the tool checks every host in the list. A partial transfer you do not want to
+finish — or one whose bytes the disk can no longer read — is removed with
+**Discard**, and the next download of that file starts from zero.
 
 ## Filter
 

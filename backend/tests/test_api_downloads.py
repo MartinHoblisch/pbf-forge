@@ -43,6 +43,24 @@ def test_post_cancel_returns_200(client):
     assert resp.status_code == 200
 
 
+def test_post_discard_removes_the_partial(client, tmp_data_dir):
+    import state
+
+    part = tmp_data_dir / "europe.osm.pbf.part"
+    part.write_bytes(b"x" * 500)
+    state.download_manager._refresh_local_files()
+
+    resp = client.post("/api/discard", json={"filename": "europe.osm.pbf"})
+
+    assert resp.status_code == 200
+    assert not part.exists()
+
+
+def test_post_discard_unknown_file_reports_conflict(client):
+    resp = client.post("/api/discard", json={"filename": "does-not-exist.osm.pbf"})
+    assert resp.status_code == 409
+
+
 def test_post_url_info_valid_url_returns_size_and_filename(client):
     import state
 

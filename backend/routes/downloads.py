@@ -53,6 +53,10 @@ class CancelRequest(BaseModel):
     filename: str
 
 
+class DiscardRequest(BaseModel):
+    filename: str
+
+
 class CheckRequest(BaseModel):
     filenames: Optional[list[str]] = None
 
@@ -93,6 +97,21 @@ def start_downloads(req: DownloadRequest):
 def cancel_download(req: CancelRequest):
     state.download_manager.cancel_download(req.filename)
     return {"status": "cancelling"}
+
+
+@router.post("/discard")
+def discard_partial(req: DiscardRequest):
+    """Remove a file's leftover .part so the next download starts over."""
+    try:
+        discarded = state.download_manager.discard_partial(req.filename)
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"Could not remove the partial file: {exc}")
+    if not discarded:
+        raise HTTPException(
+            status_code=409,
+            detail="Nothing to discard: the file is unknown or a transfer is running.",
+        )
+    return {"status": "discarded"}
 
 
 @router.post("/url-info")

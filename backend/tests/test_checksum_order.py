@@ -121,6 +121,7 @@ def test_error_row_survives_a_scan_after_the_partial_was_discarded(dm, tmp_path)
     state = dm._files[filename]
     state.status = "error"
     state.error = "MD5 mismatch for berlin.osm.pbf.part"
+    state.discarded = True
     state.local_size = 21162890
     state.local_mtime = "2026-09-06T04:25:01+00:00"
 
@@ -131,3 +132,17 @@ def test_error_row_survives_a_scan_after_the_partial_was_discarded(dm, tmp_path)
     # The row survives, the file's size and date must not.
     assert dm._files[filename].local_size is None
     assert dm._files[filename].local_mtime is None
+
+
+def test_failed_check_does_not_pin_a_deleted_file(dm, tmp_path):
+    """An unreachable host says nothing about a file the user removed."""
+    filename = "berlin.osm.pbf"
+    dm.register_url("http://example.com/berlin-latest.osm.pbf", filename)
+    state = dm._files[filename]
+    state.status = "error"
+    state.error = "502 Server Error: Bad Gateway"
+    state.local_size = 21162890
+
+    dm._refresh_local_files()
+
+    assert filename not in dm._files
