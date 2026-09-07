@@ -534,3 +534,41 @@ def test_launchers_fall_back_to_a_local_build():
             f"{launcher} has no local build to fall back to"
         )
         assert "--build" in text, f"{launcher} no longer accepts --build"
+
+
+# --------------------------------------------------------------------------
+# Workflows
+# --------------------------------------------------------------------------
+
+
+def test_ci_and_the_release_run_the_same_image_smoke_test():
+    """One definition of "the image runs", exercised on every change.
+
+    These checks used to live inline in release.yml, where they first ran at
+    the tag: two defects in them failed a release the image itself was fine
+    for. A check that only ever runs at a release is a check nothing has run.
+    """
+    assert (REPO / "scripts" / "smoke-image.sh").is_file(), "the shared image smoke test is gone"
+    for name in ("ci.yml", "release.yml"):
+        text = _read(REPO / ".github" / "workflows" / name)
+        assert "scripts/smoke-image.sh" in text, (
+            f"{name} no longer runs the shared image smoke test"
+        )
+
+
+def test_shellcheck_covers_every_shell_script():
+    """A script CI does not lint is a script CI does not check at all."""
+    ci = _read(REPO / ".github" / "workflows" / "ci.yml")
+    linted = next(
+        (line for line in ci.splitlines() if "shellcheck " in line and "run:" in line),
+        None,
+    )
+    assert linted, "ci.yml no longer runs shellcheck"
+
+    scripts = sorted(
+        p.relative_to(REPO).as_posix()
+        for p in [*REPO.glob("*.sh"), *(REPO / "scripts").glob("*.sh")]
+    )
+    assert scripts, "no shell scripts found, the layout must have changed"
+    missing = [s for s in scripts if s not in linted]
+    assert not missing, f"shellcheck does not cover: {missing}"

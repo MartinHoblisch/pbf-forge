@@ -103,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
       - run: sudo apt-get install -y --no-install-recommends shellcheck
-      - run: shellcheck start.sh stop.sh
+      - run: shellcheck start.sh stop.sh update.sh scripts/smoke-image.sh
 
   docker-build:
     runs-on: ubuntu-latest
@@ -115,6 +115,14 @@ jobs:
 
       - name: Build image (smoke test)
         run: docker build . --tag pbf-forge:smoke
+
+      # The same script the release workflow runs before it pushes anything.
+      # Running it here is what keeps a defect in it from surfacing for the
+      # first time at a tag.
+      - name: Prove the image runs
+        run: |
+          version=$(sed -n 's/^VERSION = //p' backend/config.py | tr -d '"')
+          scripts/smoke-image.sh pbf-forge:smoke "$version"
 
       # The runner's apt packages are not what ships. Running the
       # integration-marked tests inside the image is the only way a change to
