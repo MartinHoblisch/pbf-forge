@@ -20,7 +20,9 @@ You want every rail line in Germany, or every charging station, as something QGI
 
 PBF Forge is that pipeline with a form in front of it. It downloads the extract, verifies its checksum, runs `osmium tags-filter`, converts the result with ogr2ogr, and writes a report next to every output listing the source, its OSM timestamp, the expressions used and the time each phase took. The tools underneath are the ones you would have called yourself. The pipeline makes a handful of choices on top: one layer per file, the OSM id as the only attribute, and tags you did not name folded into a JSON column. [docs/filtering.md](docs/filtering.md) lists them.
 
-<img src="docs/assets/gif/pbf-forge-demo.gif" alt="A Geofabrik download URL is pasted into PBF Forge, the extract downloads, the filter form runs a highway filter over it, and the resulting GeoPackage opens in QGIS" width="100%">
+<img src="docs/assets/gif/pbf-forge-demo.gif" alt="The Germany extract is downloaded in PBF Forge, filtered to highway=motorway, exported as a GeoPackage and opened in QGIS" width="100%">
+
+<p align="center"><em>The Germany extract downloaded, filtered to <code>highway=motorway</code>, exported as a GeoPackage and opened in QGIS.</em></p>
 
 ## Quickstart
 
@@ -102,7 +104,7 @@ PBF Forge is MIT licensed. See [LICENSE](LICENSE).
 
 The data is not. OpenStreetMap data is licensed under the [Open Database License 1.0](https://www.openstreetmap.org/copyright), which requires attribution and share-alike on derived databases.
 
-That obligation is yours, and it applies when you publish or hand on a result, not while you work with it locally. PBF Forge writes nothing into your output files, so add the notice yourself where your work is seen: "© OpenStreetMap contributors (ODbL 1.0)." The report beside every output names the source extract and its OSM timestamp if you need to trace where a file came from.
+Attribution applies when you publish or hand on a result, not while you work locally. Credit the data where your work is seen: "© OpenStreetMap contributors (ODbL 1.0)." The report beside every output names the source extract and its OSM timestamp.
 
 The terms of the host you download from apply on top, and they differ. The examples in this documentation point at Geofabrik, whose downloads are free for non-commercial use; commercial users should read <https://www.geofabrik.de/geofabrik/agb.html>. Point PBF Forge somewhere else and that host's terms apply instead.
 
