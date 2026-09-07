@@ -55,8 +55,10 @@ nor the major and minor tags move onto a pre-release, and no
 `docker-compose.yml` names one. That makes it a rehearsal nothing fetches by
 accident, which matters once installs are in other people's hands.
 
-The first push of a package to GHCR creates it as private. Set it to public
-once in the package settings, or the launchers fall back to building locally.
+The package takes its visibility from the repository on the first push. Check
+it once in the package settings after the first release: a private package
+makes every launcher fall back to building locally, and nothing in the output
+says why.
 
 ## Running tests
 
