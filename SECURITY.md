@@ -50,8 +50,8 @@ The following scans run automatically on every push and weekly:
 |---|---|---|
 | [CodeQL](https://codeql.github.com/) | Static analysis (SAST) for Python source | [security.yml](.github/workflows/security.yml) |
 | [Trivy](https://github.com/aquasecurity/trivy) | Docker image CVEs. The build fails on CRITICAL or HIGH findings for which a fix is available; `ignore-unfixed` is on, so a CVE with no fix does not block | [security.yml](.github/workflows/security.yml) |
-| [OpenSSF Scorecard](https://securityscorecards.dev/) | Supply-chain / repo hygiene aggregate score | [security.yml](.github/workflows/security.yml) |
+| [OpenSSF Scorecard](https://securityscorecards.dev/) | Supply-chain / repo hygiene aggregate score, published to [scorecard.dev](https://scorecard.dev/viewer/?uri=github.com/MartinHoblisch/pbf-forge) | [security.yml](.github/workflows/security.yml) |
 | [Dependabot](https://docs.github.com/en/code-security/dependabot) | Dependency updates for pip, GitHub Actions, Docker base image digests and pre-commit hooks | [dependabot.yml](.github/dependabot.yml) |
 | Secret scanning | Push protection is active: a push containing a recognized secret is blocked | Repository setting |
 
-Results are visible in the [Security tab](https://github.com/MartinHoblisch/pbf-forge/security) of this repository.
+CodeQL, Trivy and Dependabot results are visible in the [Security tab](https://github.com/MartinHoblisch/pbf-forge/security) of this repository. The Scorecard result is published as a score rather than as individual alerts; the badge at the top of the README links to the full report.

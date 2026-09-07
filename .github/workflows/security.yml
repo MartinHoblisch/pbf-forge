@@ -39,7 +39,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
-      security-events: write
       id-token: write
       contents: read
       actions: read
@@ -48,17 +47,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # Results are published to scorecard.dev (badge in README) rather than
+      # uploaded to code scanning. The checks Scorecard reports on for this
+      # repository -- reviewer approval on every commit, hash-pinned pip
+      # installs, fuzzing -- are not actionable here, so routing them into the
+      # code scanning alert feed only produces recurring noise that crowds out
+      # real CodeQL and Trivy findings.
       - name: Run Scorecard
         uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc  # v2.4.4
         with:
           results_file: scorecard.sarif
           results_format: sarif
           publish_results: true
-
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938  # v4
-        with:
-          sarif_file: scorecard.sarif
 
   trivy:
     name: Trivy Image Scan
