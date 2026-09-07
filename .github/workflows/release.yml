@@ -80,20 +80,30 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/smoke/data /tmp/smoke/config
-          docker run -d --name smoke -p 127.0.0.1:8000:8000             -v /tmp/smoke/data:/data -v /tmp/smoke/config:/app/config pbf-forge:smoke
+          docker run -d --name smoke -p 127.0.0.1:8000:8000 -v /tmp/smoke/data:/data -v /tmp/smoke/config:/app/config pbf-forge:smoke
+
+          # `curl && break` would abort the whole step under set -e on the
+          # first attempt, before the server has finished starting.
           for _ in $(seq 1 60); do
-            curl -sf http://127.0.0.1:8000/ >/dev/null && break
+            if curl -sf http://127.0.0.1:8000/ >/dev/null; then break; fi
             sleep 1
           done
 
+          # Every response is written to a file before it is searched.
+          # Piping curl into grep -q closes the pipe at the first match,
+          # curl dies of EPIPE with status 23, and pipefail then fails the
+          # step on a check that actually passed.
           echo "-- the interface is served"
-          curl -sf http://127.0.0.1:8000/ | grep -q "PBF Forge"
+          curl -sf http://127.0.0.1:8000/ -o /tmp/index.html
+          grep -q "PBF Forge" /tmp/index.html
 
           echo "-- settings answer"
-          curl -sf http://127.0.0.1:8000/api/settings | grep -q '"configured"'
+          curl -sf http://127.0.0.1:8000/api/settings -o /tmp/settings.json
+          grep -q '"configured"' /tmp/settings.json
 
           echo "-- the image reports the version being released"
-          reported=$(curl -sf http://127.0.0.1:8000/api/update-check \n            | grep -o '"current":"[^"]*"' | cut -d'"' -f4)
+          curl -sf http://127.0.0.1:8000/api/update-check -o /tmp/update.json
+          reported=$(grep -o '"current":"[^"]*"' /tmp/update.json | cut -d'"' -f4)
           test "$reported" = "${{ steps.version.outputs.core }}" || {
             echo "::error::the image reports $reported, the tag says ${{ steps.version.outputs.core }}"
             exit 1
@@ -101,7 +111,7 @@ jobs:
 
           echo "-- the tools the pipeline shells out to run"
           docker run --rm pbf-forge:smoke ogr2ogr --version
-          docker run --rm -v "$PWD:/src:ro" pbf-forge:smoke             osmium tags-filter /src/mini.osm.pbf w/highway -o /tmp/smoke.osm.pbf
+          docker run --rm -v "$PWD:/src:ro" pbf-forge:smoke osmium tags-filter /src/mini.osm.pbf w/highway -o /tmp/smoke.osm.pbf
 
           docker logs smoke
           docker rm -f smoke
