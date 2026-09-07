@@ -110,6 +110,7 @@ config/user-config.json
 config/.osm_tool_presets.json
 config/.osm_tool_urls.json
 config/.filter_history.json
+config/update-check.json
 
 # job queue persistence (manifest.json + per-job logs) — runtime state
 config/jobs/
