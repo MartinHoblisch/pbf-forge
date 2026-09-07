@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **`update.sh` runs on Linux.** It was published in 1.2.0 with mode `100644`,
+  so `./update.sh` — the command the documentation names as the way to update —
+  answered with permission denied. `bash update.sh` worked around it. The file
+  is marked executable, and a test now reads the recorded modes so a script
+  that cannot be run fails the suite instead of a release.
+
 ## [1.2.0] - 2026-09-07
 
 Highlights: an update notice and update scripts, so an install no longer sits
