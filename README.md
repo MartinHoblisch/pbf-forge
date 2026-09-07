@@ -48,6 +48,10 @@ Either way the browser opens at `http://localhost:8000` once the container is re
 
 Prefer the launchers over `docker compose up`: they write the config file, create the data directory, apply the Windows drive mount, and wait for the server before opening the browser. It also works on its own. You then go through the first-run setup in the browser, and the data directory defaults to `./data`. [SECURITY.md](SECURITY.md) suggests that route if you would rather not give the container access to your drives.
 
+## Staying current
+
+PBF Forge checks once a day whether a newer release exists and says so in the interface. Running `update.sh` (Linux) or `update.bat` (Windows) fetches it and restarts the tool. The check reaches the GitHub release API and nothing else, and can be switched off in the update dialog. See [docs/install.md](docs/install.md#updating).
+
 ## What it does
 
 - **Downloads** any PBF URL you paste, whichever host it points at. Resumable, with a two-tier retry.

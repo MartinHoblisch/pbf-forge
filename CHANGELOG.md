@@ -11,6 +11,17 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **An update notice, and an `update.sh` / `update.bat` to act on it.** A copy
+  installed with `git clone` stayed on the version it was cloned at: nothing in
+  the tool knew a newer release existed, and finding out meant opening a console
+  and typing `git pull`. PBF Forge now asks the GitHub release API once a day
+  which version is current and shows a bar under the tab row when that is ahead
+  of the running one. The bar links to the release notes and can be dismissed
+  per version. The new scripts fast-forward the checkout and hand over to the
+  launcher, which rebuilds the image and restarts the container, so updating is
+  one script instead of two commands. The check is the only request the tool
+  makes that nobody asked for: it is cached for a day, silent when it fails, and
+  switchable off in the update dialog, which stops it entirely.
 - **A `Discard` action for a partial download.** A `.part` file could only ever
   be resumed or left alone: nothing in the app removed one. A transfer the user
   had lost interest in kept its gigabytes indefinitely, and a partial whose

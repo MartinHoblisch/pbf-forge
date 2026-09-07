@@ -442,3 +442,47 @@ def test_documented_tool_versions_match_the_image():
     assert f"GDAL {gdal.group(1)}" in docs, (
         f"install.md must name the GDAL the image carries ({gdal.group(1)})"
     )
+
+
+# --------------------------------------------------------------------------
+# Updating
+# --------------------------------------------------------------------------
+
+
+def test_documented_update_scripts_exist_and_hand_over_to_the_launcher():
+    """install.md tells the reader to run update.sh or update.bat.
+
+    Both must exist, and both must end in the launcher rather than driving
+    Docker themselves: an update path that duplicates the start path is one
+    that can start behaving differently from it.
+    """
+    docs = _read(REPO / "docs" / "install.md")
+    assert "update.sh" in docs and "update.bat" in docs, (
+        "install.md no longer names the update scripts"
+    )
+    for script, launcher in (("update.sh", "start.sh"), ("update.bat", "start.bat")):
+        path = REPO / script
+        assert path.is_file(), f"install.md tells the reader to run {script}, which does not exist"
+        assert launcher in _read(path), f"{script} must hand over to {launcher}"
+
+
+def test_security_policy_names_the_endpoint_the_update_check_calls():
+    """SECURITY.md discloses one outbound request the user did not ask for.
+
+    The disclosure is only worth something while it names what the code
+    actually calls, and while the check stays switchable off.
+    """
+    policy = _read(REPO / "SECURITY.md")
+    src = _read(REPO / "backend" / "update_check.py")
+    url = re.search(r'RELEASES_API = "([^"]+)"', src)
+    assert url, "update_check.py no longer names the releases endpoint"
+    assert url.group(1) in policy, (
+        f"SECURITY.md must name the endpoint the check calls ({url.group(1)})"
+    )
+    assert "update-check.json" in policy and "update-check.json" in src, (
+        "SECURITY.md names the cache file; update_check.py must still write it"
+    )
+    settings = _read(REPO / "backend" / "routes" / "settings.py")
+    assert '"update_check"' in settings, (
+        "SECURITY.md says the check can be switched off; nothing reads the setting"
+    )

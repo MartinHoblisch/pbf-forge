@@ -16,5 +16,6 @@ known-first-party = [
     "presets",
     "routes",
     "state",
+    "update_check",
     "ws_manager",
 ]

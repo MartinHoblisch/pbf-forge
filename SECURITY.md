@@ -20,6 +20,10 @@ On Linux the container sees the data directory and `./config`, and nothing else.
 
 On Windows, `docker-compose.windows.yml` adds `/mnt:/host_drives:ro`. Docker Desktop exposes the host's drive letters under `/mnt`, so on Windows the container can read every drive the Docker Desktop user can, read-only. This is what makes the folder picker able to offer `C:`, `D:` and so on. If that is more than you want to hand to a container, start it with `docker compose up` without the Windows override file; the folder picker then has nothing to list, and the data directory still works.
 
+## What leaves the machine
+
+Downloads go to whichever host the pasted URL names, and to nothing else. Beyond that the tool makes one request the user did not ask for: once a day it reads `https://api.github.com/repos/MartinHoblisch/pbf-forge/releases/latest` to learn whether a newer release exists. It sends what any HTTP request sends — an IP address and the `pbf-forge/<version>` user agent — and no identifier of its own. The answer is cached in `config/update-check.json`, nothing is downloaded or installed as a result, and the check can be switched off in the update dialog, which stops the request entirely.
+
 ## Known gaps
 
 Stated rather than implied, because a security policy that only lists what is covered is misleading about what is not.
