@@ -7,6 +7,18 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **A second installation says what is in its way.** `docker-compose.yml` pins
+  the container name, so it is taken once per machine rather than once per
+  folder: a second clone, or the folder a re-clone replaced, collided with it
+  and Docker answered with a name conflict that pointed at a container id and
+  nothing else. The launchers now check the name before starting and name the
+  folder the other installation runs from, along with the command that frees
+  it.
+
 ## [1.2.1] - 2026-09-07
 
 ### Fixed

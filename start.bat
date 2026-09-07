@@ -61,6 +61,29 @@ REM Restart Docker with current DATA_DIR
 set "COMPOSE=-f docker-compose.yml -f docker-compose.windows.yml"
 docker compose %COMPOSE% down --remove-orphans 2>nul
 
+REM The down above removed this folder's container, so a container still
+REM holding the name belongs to another checkout: a second clone, or the
+REM folder this one replaced. Docker's own conflict error names neither the
+REM folder it came from nor the way out of it.
+docker container inspect pbf-forge >nul 2>&1
+if errorlevel 1 goto name_free
+
+set "PBF_OTHER="
+for /f "usebackq delims=" %%O in (`docker container inspect -f "{{index .Config.Labels \"com.docker.compose.project.working_dir\"}}" pbf-forge 2^>nul`) do set "PBF_OTHER=%%O"
+echo.
+echo ERROR: another PBF Forge installation holds the container name "pbf-forge",
+echo        and only one installation can hold it at a time.
+if defined PBF_OTHER echo        That one was started from: !PBF_OTHER!
+echo.
+echo        Remove that container and run this script again:
+echo.
+echo            docker rm -f pbf-forge
+echo.
+pause
+exit /b 1
+
+:name_free
+
 REM Fetching the published image takes seconds where building osmium, GDAL and
 REM the Python dependencies takes minutes, so a build only happens when there is
 REM nothing to fetch: a working copy ahead of the last release, a platform with

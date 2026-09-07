@@ -600,3 +600,25 @@ def test_shell_scripts_are_executable():
         line.split("\t", 1)[1] for line in listing.splitlines() if line.startswith("100644")
     ]
     assert not not_executable, f"tracked but not executable: {not_executable}"
+
+
+def test_the_launchers_free_the_container_name_compose_fixes():
+    """The conflict message has to name the container compose actually creates.
+
+    docker-compose.yml pins container_name, so the name is taken once per
+    machine rather than once per checkout: a second clone, or the folder a
+    re-clone replaced, collides with it. Docker's own error names neither the
+    folder it came from nor the way out, so the launchers say both -- but only
+    while they check and name the same container compose does.
+    """
+    compose = _read(REPO / "docker-compose.yml")
+    fixed = re.search(r"^\s*container_name:\s*(\S+)", compose, re.MULTILINE)
+    assert fixed, "docker-compose.yml no longer pins a container name"
+    name = fixed.group(1)
+
+    for launcher in ("start.sh", "start.bat"):
+        text = _read(REPO / launcher)
+        assert f"docker container inspect {name}" in text, (
+            f"{launcher} does not check whether {name} is held by another checkout"
+        )
+        assert f"docker rm -f {name}" in text, f"{launcher} does not say how to free {name}"
