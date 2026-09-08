@@ -29,6 +29,32 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8000
 
 ## Releasing
 
+Releases are cut deliberately, not whenever `main` moves. Two questions come
+before the mechanics: whether the change needs a release at all, and which
+number it gets.
+
+**A patch release fixes a published defect that cannot wait** — a blocked
+install or update, data loss, or a security fix. `update.sh` shipping
+non-executable in 1.2.0 qualified. Everything else waits for the next minor,
+however small the change is and however ready it feels. A feature published
+hours after the last tag spends a version number on itself and teaches nobody
+to read the changelog.
+
+**The number follows the commits since the last tag.** Any `feat` makes the
+next release a minor, even when fixes travel with it; `fix`, `docs`, `ci` and
+`chore` alone make it a patch; a breaking change makes it a major.
+`git log v1.2.0..HEAD --oneline` answers the question, and the Conventional
+Commits subjects CONTRIBUTING.md asks for are what make that possible.
+
+**A defect that reached a release comes back with a test.** The fix and a
+check that fails against the published artifact land together, so the same
+class of bug cannot ship twice: `test_shell_scripts_are_executable` in
+`backend/tests/test_docs_claims.py` reads the recorded file modes, and would
+have held 1.2.0 back.
+
+Rehearse anything uncertain with a pre-release tag, described below, rather
+than by publishing and patching.
+
 A tag publishes the container image, so three places have to name the same
 version before the tag is pushed:
 
