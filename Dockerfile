@@ -1,7 +1,7 @@
 # Ubuntu 26.04 LTS (Resolute Raccoon), pinned by digest so builds are
 # reproducible. Dependabot refreshes the digest weekly; the tag stays put,
 # because moving to the next LTS also moves osmium-tool, GDAL and python3.
-FROM ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
+FROM ubuntu:26.04@sha256:513c074113a871b51a8d16ab445c88779d6452d937a164fb5cc479f32668a41d
 
 # Avoid interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
